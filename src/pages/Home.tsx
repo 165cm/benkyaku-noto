@@ -56,22 +56,24 @@ export default function Home() {
     return `${minutes}分`
   }
 
-  const handleStartFirstTimeStudy = async (minutes: number) => {
-    setGeneratingStudySet(true)
+  const handleStartFirstTimeStudy = async () => {
+    setLoading(true)
     try {
-      const problems = await generateFirstTimeStudySet(minutes)
+      // 最初の未学習問題を取得
+      const problems = await generateFirstTimeStudySet(180) // 最初の1問だけ取得
 
       if (problems.length === 0) {
         alert('未学習の問題がありません。')
+        setLoading(false)
         return
       }
 
-      setStudySetPreview({ minutes, problems, isFirstTime: true })
+      // 最初の問題に直接ナビゲート
+      navigate(`/study/${problems[0].id}`)
     } catch (error) {
-      console.error('Error generating first-time study set:', error)
-      alert('学習セットの生成に失敗しました')
-    } finally {
-      setGeneratingStudySet(false)
+      console.error('Error starting first-time study:', error)
+      alert('学習を開始できませんでした')
+      setLoading(false)
     }
   }
 
@@ -274,7 +276,7 @@ export default function Home() {
         {/* 初回学習モードのコンテンツ */}
         {activeTab === 'firstTime' && (
           <div>
-            <div className="mb-4">
+            <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
                 <GraduationCap size={20} className="text-green-600" />
                 <h2 className="text-xl font-semibold">初回学習モード</h2>
@@ -284,59 +286,34 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-5 gap-3 mb-4">
-              {[5, 10, 15, 30, 45].map((minutes) => (
-                <Button
-                  key={minutes}
-                  variant="secondary"
-                  onClick={() => handleStartFirstTimeStudy(minutes)}
-                  disabled={generatingStudySet}
-                  className="flex flex-col items-center gap-1 h-20"
-                >
-                  <span className="text-2xl font-bold">{minutes}</span>
-                  <span className="text-xs">分</span>
-                </Button>
-              ))}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+              <div className="mb-4">
+                <p className="text-green-900 font-medium mb-2">
+                  未学習問題: {unstudiedCount}問
+                </p>
+                <p className="text-sm text-green-700">
+                  最初の問題から順番に学習を開始します
+                </p>
+              </div>
+              <Button
+                onClick={handleStartFirstTimeStudy}
+                disabled={unstudiedCount === 0 || loading}
+                size="lg"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={20} className="mr-2 animate-spin" />
+                    開始中...
+                  </>
+                ) : (
+                  <>
+                    <Play size={20} className="mr-2" />
+                    初回学習を開始
+                  </>
+                )}
+              </Button>
             </div>
-
-            {generatingStudySet && (
-              <div className="flex items-center justify-center gap-2 py-4 text-gray-600">
-                <Loader2 size={20} className="animate-spin" />
-                <span>学習セットを生成中...</span>
-              </div>
-            )}
-
-            {studySetPreview && studySetPreview.isFirstTime && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-green-900">
-                      {studySetPreview.minutes}分の学習セット
-                    </p>
-                    <p className="text-sm text-green-700">
-                      {studySetPreview.problems.length}問が選択されました（順番に出題）
-                    </p>
-                  </div>
-                  <Button onClick={startStudySession}>
-                    <Play size={16} className="mr-1" />
-                    開始
-                  </Button>
-                </div>
-                <div className="space-y-1">
-                  {studySetPreview.problems.slice(0, 3).map((problem) => (
-                    <p key={problem.id} className="text-xs text-green-600">
-                      · {problem.problemNumber}
-                      {problem.page && ` (p.${problem.page})`}
-                    </p>
-                  ))}
-                  {studySetPreview.problems.length > 3 && (
-                    <p className="text-xs text-green-500">
-                      ...他 {studySetPreview.problems.length - 3}問
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </Card>

@@ -47,7 +47,7 @@ export default function WorkbookDetail() {
   const [categoryFormData, setCategoryFormData] = useState({
     categoryName: '',
   })
-  const [selectedProblems, setSelectedProblems] = useState<Set<string>>(new Set())
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
   const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false)
   const [bulkCategoryValue, setBulkCategoryValue] = useState('')
 
@@ -358,26 +358,49 @@ export default function WorkbookDetail() {
     setCategoryFormData({ categoryName: '' })
   }
 
-  const toggleProblemSelection = (problemId: string) => {
-    const newSelected = new Set(selectedProblems)
-    if (newSelected.has(problemId)) {
-      newSelected.delete(problemId)
+  const toggleSectionSelection = (sectionKey: string) => {
+    const newSelected = new Set(selectedSections)
+    if (newSelected.has(sectionKey)) {
+      newSelected.delete(sectionKey)
     } else {
-      newSelected.add(problemId)
+      newSelected.add(sectionKey)
     }
-    setSelectedProblems(newSelected)
+    setSelectedSections(newSelected)
   }
 
-  const toggleAllProblems = () => {
-    if (selectedProblems.size === problems.length) {
-      setSelectedProblems(new Set())
+  const toggleAllSections = () => {
+    const problemHierarchy = groupProblemsByHierarchy()
+    const allSectionKeys: string[] = []
+    Object.entries(problemHierarchy).forEach(([category, titles]) => {
+      Object.keys(titles).forEach((title) => {
+        allSectionKeys.push(`${category}-${title}`)
+      })
+    })
+
+    if (selectedSections.size === allSectionKeys.length) {
+      setSelectedSections(new Set())
     } else {
-      setSelectedProblems(new Set(problems.map(p => p.id)))
+      setSelectedSections(new Set(allSectionKeys))
     }
+  }
+
+  const getSelectedProblems = (): Problem[] => {
+    const problemHierarchy = groupProblemsByHierarchy()
+    const selectedProblems: Problem[] = []
+
+    selectedSections.forEach((sectionKey) => {
+      const [category, ...titleParts] = sectionKey.split('-')
+      const title = titleParts.join('-')
+      if (problemHierarchy[category] && problemHierarchy[category][title]) {
+        selectedProblems.push(...problemHierarchy[category][title])
+      }
+    })
+
+    return selectedProblems
   }
 
   const handleBulkCategoryChange = async () => {
-    if (selectedProblems.size === 0) return
+    if (selectedSections.size === 0) return
 
     setIsBulkCategoryModalOpen(true)
   }
@@ -386,31 +409,34 @@ export default function WorkbookDetail() {
     e.preventDefault()
 
     const categoryToSet = bulkCategoryValue.trim() !== '' ? bulkCategoryValue.trim() : undefined
+    const problemsToUpdate = getSelectedProblems()
 
-    for (const problemId of selectedProblems) {
-      await db.problems.update(problemId, {
+    for (const problem of problemsToUpdate) {
+      await db.problems.update(problem.id, {
         category: categoryToSet,
       })
     }
 
     setIsBulkCategoryModalOpen(false)
     setBulkCategoryValue('')
-    setSelectedProblems(new Set())
+    setSelectedSections(new Set())
     loadData()
   }
 
   const handleBulkDelete = async () => {
-    if (selectedProblems.size === 0) return
+    if (selectedSections.size === 0) return
 
-    if (!confirm(`選択した${selectedProblems.size}問の問題を削除しますか？学習記録もすべて削除されます。`)) {
+    const problemsToDelete = getSelectedProblems()
+
+    if (!confirm(`選択した${selectedSections.size}セクション（${problemsToDelete.length}問）の問題を削除しますか？学習記録もすべて削除されます。`)) {
       return
     }
 
-    for (const problemId of selectedProblems) {
-      await deleteProblem(problemId)
+    for (const problem of problemsToDelete) {
+      await deleteProblem(problem.id)
     }
 
-    setSelectedProblems(new Set())
+    setSelectedSections(new Set())
     loadData()
   }
 
@@ -527,21 +553,21 @@ export default function WorkbookDetail() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedProblems.size === problems.length && problems.length > 0}
-                    onChange={toggleAllProblems}
+                    checked={selectedSections.size > 0 && selectedSections.size === Object.entries(groupProblemsByHierarchy()).reduce((count, [, titles]) => count + Object.keys(titles).length, 0)}
+                    onChange={toggleAllSections}
                     className="w-4 h-4 rounded border-gray-300"
                   />
                   <span className="text-sm font-medium">
                     すべて選択
                   </span>
                 </label>
-                {selectedProblems.size > 0 && (
+                {selectedSections.size > 0 && (
                   <span className="text-sm text-gray-600">
-                    {selectedProblems.size}問選択中
+                    {selectedSections.size}セクション（{getSelectedProblems().length}問）選択中
                   </span>
                 )}
               </div>
-              {selectedProblems.size > 0 && (
+              {selectedSections.size > 0 && (
                 <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
@@ -627,10 +653,16 @@ export default function WorkbookDetail() {
                           {/* 目次タイトルヘッダー */}
                           <div className="bg-white border border-border rounded-lg">
                             <div
-                              className="flex items-center justify-between p-3 cursor-pointer hover:bg-secondary/50 transition-colors"
-                              onClick={() => toggleTitle(titleKey)}
+                              className="flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleTitle(titleKey)}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSections.has(titleKey)}
+                                  onChange={() => toggleSectionSelection(titleKey)}
+                                  className="w-4 h-4 rounded border-gray-300"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
                                 {isTitleExpanded ? (
                                   <ChevronDown size={16} className="text-gray-600" />
                                 ) : (
@@ -679,26 +711,17 @@ export default function WorkbookDetail() {
                                     key={problem.id}
                                     className="flex items-center justify-between p-2 bg-white rounded hover:bg-secondary/50 transition-colors"
                                   >
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedProblems.has(problem.id)}
-                                        onChange={() => toggleProblemSelection(problem.id)}
-                                        className="w-4 h-4 rounded border-gray-300"
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium">
-                                            {problem.problemNumber.split('-').pop()}
-                                          </span>
-                                        </div>
-                                        {problem.memo && (
-                                          <p className="text-xs text-gray-600 mt-1">
-                                            {problem.memo}
-                                          </p>
-                                        )}
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">
+                                          {problem.problemNumber.split('-').pop()}
+                                        </span>
                                       </div>
+                                      {problem.memo && (
+                                        <p className="text-xs text-gray-600 mt-1">
+                                          {problem.memo}
+                                        </p>
+                                      )}
                                     </div>
 
                                     <div className="flex items-center gap-1">
@@ -962,7 +985,7 @@ export default function WorkbookDetail() {
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              {selectedProblems.size}問が選択されています
+              {selectedSections.size}セクション（{getSelectedProblems().length}問）が選択されています
             </p>
           </div>
 

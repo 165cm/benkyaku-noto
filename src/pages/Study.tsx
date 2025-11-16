@@ -21,6 +21,7 @@ export default function Study() {
   const [startTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [memo, setMemo] = useState('')
+  const [timeExpired, setTimeExpired] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -31,10 +32,19 @@ export default function Study() {
   useEffect(() => {
     const timer = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
+
+      // セッションがある場合、制限時間をチェック
+      const session = getSession()
+      if (session && !timeExpired) {
+        const elapsedMinutes = (Date.now() - session.startTime.getTime()) / 1000 / 60
+        if (elapsedMinutes >= session.targetMinutes) {
+          setTimeExpired(true)
+        }
+      }
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [startTime])
+  }, [startTime, timeExpired])
 
   // キーボードショートカット
   useEffect(() => {
@@ -151,6 +161,21 @@ export default function Study() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* 時間終了メッセージ */}
+      {timeExpired && (
+        <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-400 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Clock size={24} className="text-orange-600" />
+            <div>
+              <p className="text-lg font-bold text-orange-900">時間です！</p>
+              <p className="text-sm text-orange-700">
+                この問題がとき終わったら終了してください
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Button
         variant="secondary"
         size="sm"
