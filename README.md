@@ -48,6 +48,14 @@ http://localhost:5173/ にアクセス
 npm run build
 ```
 
+### デプロイ
+
+このプロジェクトはGitHub Pagesに自動デプロイされます。
+
+**公開URL**: https://165cm.github.io/benkyaku-noto/
+
+ブランチ `claude/study-app-mvp-01NG116jdi9tkruqn5zNVidD` にプッシュすると、GitHub Actionsが自動的にビルド・デプロイを実行します。
+
 ## 📁 プロジェクト構造
 
 ```
