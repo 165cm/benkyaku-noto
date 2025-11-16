@@ -22,6 +22,13 @@ export class BenkyakuDB extends Dexie {
       problems: 'id, workbookId, problemNumber, createdAt, deletedAt',
       studyRecords: 'id, problemId, workbookId, studiedAt',
     })
+
+    // 親子関係用のparentProblemIdフィールドを追加
+    this.version(3).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, createdAt, deletedAt, parentProblemId',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+    })
   }
 }
 
@@ -152,4 +159,27 @@ export async function updateStudyRecord(
 
 export async function deleteStudyRecord(id: string) {
   await db.studyRecords.delete(id)
+}
+
+// 問題を親問題の小問にする
+export async function makeSubProblem(problemId: string, parentProblemId: string) {
+  await db.problems.update(problemId, { parentProblemId })
+}
+
+// 小問を独立した問題にする
+export async function makeIndependentProblem(problemId: string) {
+  await db.problems.update(problemId, { parentProblemId: undefined })
+}
+
+// 親問題の小問を取得
+export async function getSubProblems(parentProblemId: string) {
+  const problems = await db.problems
+    .where('parentProblemId')
+    .equals(parentProblemId)
+    .toArray()
+
+  // 削除されていない問題のみを返す
+  return problems
+    .filter(p => !p.deletedAt)
+    .sort((a, b) => a.problemNumber.localeCompare(b.problemNumber))
 }
