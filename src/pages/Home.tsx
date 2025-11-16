@@ -6,6 +6,7 @@ import Button from '@/components/Button'
 import { calculateStudyStats, getTodayReviewList } from '@/lib/review'
 import { getWorkbooks } from '@/lib/db'
 import { generateStudySet } from '@/lib/studySet'
+import { createStudySession } from '@/lib/studySession'
 import type { StudyStats, ReviewSchedule, Workbook, Problem } from '@/types'
 
 export default function Home() {
@@ -70,8 +71,10 @@ export default function Home() {
   const startStudySession = () => {
     if (!studySetPreview || studySetPreview.problems.length === 0) return
 
+    // セッションを作成
+    createStudySession(studySetPreview.minutes, studySetPreview.problems)
+
     // 最初の問題に移動
-    // TODO: 将来的にはセッションIDを使って連続学習に対応
     navigate(`/study/${studySetPreview.problems[0].id}`)
   }
 

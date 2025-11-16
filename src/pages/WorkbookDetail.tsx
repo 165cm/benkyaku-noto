@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2 } from 'lucide-react'
-import Card from '@/components/Card'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -34,6 +33,8 @@ export default function WorkbookDetail() {
     groupName: '',
     page: '',
   })
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (id) {
@@ -176,25 +177,110 @@ export default function WorkbookDetail() {
     setGroupFormData({ groupName: '', page: '' })
   }
 
-  // 問題を階層構造にグループ化
-  const groupProblemsByHierarchy = () => {
-    const groups: { [key: string]: Problem[] } = {}
-
-    problems.forEach((problem) => {
-      // 問題番号から章や節を抽出（例: "第1章-基本問題-1" → "第1章"）
-      const parts = problem.problemNumber.split('-')
-      const groupKey = parts.length > 1 ? parts[0] : '問題'
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
+  // 問題番号から親カテゴリと目次タイトルを抽出
+  const parseGroupInfo = (problemNumber: string) => {
+    // "[言語]熟語の成り立ち-109" → { category: "[言語]", title: "熟語の成り立ち" }
+    const match = problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
+    if (match) {
+      return {
+        category: match[1],
+        title: match[2],
       }
-      groups[groupKey].push(problem)
-    })
+    }
 
-    return groups
+    // "[言語]" だけの場合や、ハイフンがない場合
+    const parts = problemNumber.split('-')
+    if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
+      return {
+        category: parts[0],
+        title: parts.slice(1, -1).join('-') || '問題',
+      }
+    }
+
+    // デフォルト
+    return {
+      category: '未分類',
+      title: parts.length > 1 ? parts[0] : '問題',
+    }
   }
 
-  const problemGroups = groupProblemsByHierarchy()
+  // 問題を3階層構造にグループ化（親カテゴリ → 目次タイトル → 問題）
+  const groupProblemsByHierarchy = () => {
+    const hierarchy: {
+      [category: string]: {
+        [title: string]: Problem[]
+      }
+    } = {}
+
+    problems.forEach((problem) => {
+      const { category, title } = parseGroupInfo(problem.problemNumber)
+
+      if (!hierarchy[category]) {
+        hierarchy[category] = {}
+      }
+
+      if (!hierarchy[category][title]) {
+        hierarchy[category][title] = []
+      }
+
+      hierarchy[category][title].push(problem)
+    })
+
+    // 各グループ内の問題を数値でソート
+    Object.keys(hierarchy).forEach((category) => {
+      Object.keys(hierarchy[category]).forEach((title) => {
+        hierarchy[category][title].sort((a, b) => {
+          // 問題番号の最後の数値部分を抽出して比較
+          const getLastNumber = (problemNumber: string) => {
+            const parts = problemNumber.split('-')
+            const lastPart = parts[parts.length - 1]
+            const num = parseInt(lastPart)
+            return isNaN(num) ? 0 : num
+          }
+
+          const numA = getLastNumber(a.problemNumber)
+          const numB = getLastNumber(b.problemNumber)
+
+          // 数値で比較
+          if (numA !== numB) {
+            return numA - numB
+          }
+
+          // 数値が同じ場合はページ番号で比較
+          if (a.page !== undefined && b.page !== undefined) {
+            return a.page - b.page
+          }
+
+          // ページ番号がない場合は文字列で比較
+          return a.problemNumber.localeCompare(b.problemNumber)
+        })
+      })
+    })
+
+    return hierarchy
+  }
+
+  const problemHierarchy = groupProblemsByHierarchy()
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category)
+    } else {
+      newExpanded.add(category)
+    }
+    setExpandedCategories(newExpanded)
+  }
+
+  const toggleTitle = (titleKey: string) => {
+    const newExpanded = new Set(expandedTitles)
+    if (newExpanded.has(titleKey)) {
+      newExpanded.delete(titleKey)
+    } else {
+      newExpanded.add(titleKey)
+    }
+    setExpandedTitles(newExpanded)
+  }
 
   if (!workbook) {
     return <div>読み込み中...</div>
@@ -233,71 +319,138 @@ export default function WorkbookDetail() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(problemGroups).map(([groupName, groupProblems]) => {
-            const firstProblemWithPage = groupProblems.find(p => p.page !== undefined)
+        <div className="space-y-4">
+          {Object.entries(problemHierarchy).map(([category, titles]) => {
+            const isCategoryExpanded = expandedCategories.has(category)
+            const totalProblems = Object.values(titles).reduce(
+              (sum, problems) => sum + problems.length,
+              0
+            )
+
             return (
-              <div key={groupName}>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-border">
+              <div key={category}>
+                {/* 親カテゴリヘッダー */}
+                <div
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => toggleCategory(category)}
+                >
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold">{groupName}</h2>
-                    {firstProblemWithPage?.page && (
-                      <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                        p.{firstProblemWithPage.page}
-                      </span>
+                    {isCategoryExpanded ? (
+                      <ChevronDown size={20} className="text-gray-600" />
+                    ) : (
+                      <ChevronRight size={20} className="text-gray-600" />
                     )}
-                    <span className="text-sm font-normal text-gray-500">
-                      {groupProblems.length}問
+                    <h2 className="text-xl font-bold">{category}</h2>
+                    <span className="text-sm text-gray-500">
+                      {Object.keys(titles).length}セクション · {totalProblems}問
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleStartGroupStudy(groupProblems)}
-                    >
-                      <Play size={16} className="mr-1" />
-                      学習開始
-                    </Button>
-                    <button
-                      onClick={() => handleEditGroup(groupName, groupProblems)}
-                      className="p-2 hover:bg-blue-100 rounded transition-colors"
-                    >
-                      <Edit2 size={16} className="text-primary" />
-                    </button>
-                  </div>
                 </div>
-                <div className="space-y-2">
-                  {groupProblems.map((problem) => (
-                    <Card
-                      key={problem.id}
-                      className="flex items-center justify-between hover:bg-secondary/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{problem.problemNumber}</h3>
-                        </div>
-                        {problem.memo && (
-                          <p className="text-sm text-gray-600 mt-1">{problem.memo}</p>
-                        )}
-                      </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(problem)}
-                          className="p-2 hover:bg-blue-100 rounded transition-colors"
-                        >
-                          <Edit2 size={16} className="text-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(problem.id)}
-                          className="p-2 hover:bg-red-100 rounded transition-colors"
-                        >
-                          <Trash2 size={16} className="text-error" />
-                        </button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                {/* 目次タイトルリスト */}
+                {isCategoryExpanded && (
+                  <div className="ml-8 mt-2 space-y-2">
+                    {Object.entries(titles).map(([title, titleProblems]) => {
+                      const titleKey = `${category}-${title}`
+                      const isTitleExpanded = expandedTitles.has(titleKey)
+                      const firstProblemWithPage = titleProblems.find(
+                        (p) => p.page !== undefined
+                      )
+
+                      return (
+                        <div key={titleKey}>
+                          {/* 目次タイトルヘッダー */}
+                          <div className="bg-white border border-border rounded-lg">
+                            <div
+                              className="flex items-center justify-between p-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+                              onClick={() => toggleTitle(titleKey)}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isTitleExpanded ? (
+                                  <ChevronDown size={16} className="text-gray-600" />
+                                ) : (
+                                  <ChevronRight size={16} className="text-gray-600" />
+                                )}
+                                <h3 className="font-semibold">{title}</h3>
+                                {firstProblemWithPage?.page && (
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                    p.{firstProblemWithPage.page}
+                                  </span>
+                                )}
+                                <span className="text-sm text-gray-500">
+                                  {titleProblems.length}問
+                                </span>
+                              </div>
+                              <div
+                                className="flex items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStartGroupStudy(titleProblems)}
+                                >
+                                  <Play size={14} className="mr-1" />
+                                  学習
+                                </Button>
+                                <button
+                                  onClick={() =>
+                                    handleEditGroup(
+                                      `${category}${title}`,
+                                      titleProblems
+                                    )
+                                  }
+                                  className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                                >
+                                  <Edit2 size={14} className="text-primary" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 問題リスト（折りたたみ可能） */}
+                            {isTitleExpanded && (
+                              <div className="border-t border-border p-3 space-y-2 bg-gray-50">
+                                {titleProblems.map((problem) => (
+                                  <div
+                                    key={problem.id}
+                                    className="flex items-center justify-between p-2 bg-white rounded hover:bg-secondary/50 transition-colors"
+                                  >
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">
+                                          {problem.problemNumber.split('-').pop()}
+                                        </span>
+                                      </div>
+                                      {problem.memo && (
+                                        <p className="text-xs text-gray-600 mt-1">
+                                          {problem.memo}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => handleEdit(problem)}
+                                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                                      >
+                                        <Edit2 size={14} className="text-primary" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(problem.id)}
+                                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                                      >
+                                        <Trash2 size={14} className="text-error" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}

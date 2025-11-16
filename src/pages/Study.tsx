@@ -4,6 +4,12 @@ import { ArrowLeft, Circle, Triangle, X, Clock } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords } from '@/lib/db'
+import {
+  getSession,
+  addResult,
+  isSessionComplete,
+  getNextProblemId,
+} from '@/lib/studySession'
 import type { Problem, Workbook, StudyRecord, StudyResult } from '@/types'
 
 export default function Study() {
@@ -82,7 +88,32 @@ export default function Study() {
       memo: memo || undefined,
     })
 
-    // 戻る
+    // セッション管理の確認
+    const session = getSession()
+    if (session) {
+      // セッション結果に追加
+      addResult(problem.id, result, studyTime)
+
+      // セッションが完了したかチェック
+      if (isSessionComplete(session)) {
+        // レポートページへ
+        navigate('/study-report')
+        return
+      }
+
+      // 次の問題へ
+      const nextProblemId = getNextProblemId(session)
+      if (nextProblemId) {
+        navigate(`/study/${nextProblemId}`)
+        return
+      }
+
+      // 問題がない場合はレポートへ
+      navigate('/study-report')
+      return
+    }
+
+    // セッションがない場合は通常通り戻る
     navigate(`/workbooks/${problem.workbookId}`)
   }
 

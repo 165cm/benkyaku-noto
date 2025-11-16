@@ -4,6 +4,7 @@ import Home from '@/pages/Home'
 import Workbooks from '@/pages/Workbooks'
 import WorkbookDetail from '@/pages/WorkbookDetail'
 import Study from '@/pages/Study'
+import StudyReport from '@/pages/StudyReport'
 import Review from '@/pages/Review'
 import Stats from '@/pages/Stats'
 import Settings from '@/pages/Settings'
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/workbooks/:id" element={<WorkbookDetail />} />
           <Route path="/workbooks/import" element={<ImportFromImage />} />
           <Route path="/study/:id" element={<Study />} />
+          <Route path="/study-report" element={<StudyReport />} />
           <Route path="/review" element={<Review />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
