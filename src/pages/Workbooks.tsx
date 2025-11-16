@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, BookOpen, Trash2 } from 'lucide-react'
+import { Plus, BookOpen, Trash2, Image } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
@@ -50,10 +50,19 @@ export default function Workbooks() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">問題集</h1>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus size={20} className="mr-2" />
-          新規作成
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => navigate('/workbooks/import')}
+          >
+            <Image size={20} className="mr-2" />
+            目次からインポート
+          </Button>
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus size={20} className="mr-2" />
+            新規作成
+          </Button>
+        </div>
       </div>
 
       {workbooks.length === 0 ? (

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Home, Calendar, BarChart3 } from 'lucide-react'
+import { BookOpen, Home, Calendar, BarChart3, Settings } from 'lucide-react'
 import clsx from 'clsx'
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/workbooks', icon: BookOpen, label: '問題集' },
     { path: '/review', icon: Calendar, label: '復習' },
     { path: '/stats', icon: BarChart3, label: '統計' },
+    { path: '/settings', icon: Settings, label: '設定' },
   ]
 
   return (

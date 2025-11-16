@@ -1,0 +1,333 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Upload, ArrowLeft, Loader2, Trash2 } from 'lucide-react'
+import Button from '@/components/Button'
+import Card from '@/components/Card'
+import { hasOpenAIApiKey } from '@/lib/storage'
+import { imageToBase64, parseTableOfContents, type ParsedTableOfContents } from '@/lib/openai'
+import { addWorkbook, addProblem } from '@/lib/db'
+
+export default function ImportFromImage() {
+  const navigate = useNavigate()
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [parsedData, setParsedData] = useState<ParsedTableOfContents | null>(null)
+  const [problemCounts, setProblemCounts] = useState<{ [sectionId: string]: number }>({})
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      setError(null)
+
+      // プレビュー表示
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setPreview(event.target?.result as string)
+      }
+      reader.readAsDataURL(selectedFile)
+    }
+  }
+
+  const handleAnalyze = async () => {
+    if (!file) return
+
+    if (!hasOpenAIApiKey()) {
+      setError('OpenAI APIキーが設定されていません。設定ページで設定してください。')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const base64 = await imageToBase64(file)
+      const data = await parseTableOfContents(base64)
+      setParsedData(data)
+
+      // セクションごとの問題数を初期化
+      const counts: { [key: string]: number } = {}
+      data.sections.forEach((_, index) => {
+        counts[index] = 0
+      })
+      setProblemCounts(counts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '解析に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!parsedData) return
+
+    try {
+      // 問題集を作成
+      const workbookId = await addWorkbook({
+        title: parsedData.workbookTitle,
+        subject: parsedData.subject,
+        totalProblems: 0,
+      })
+
+      // セクションごとに問題を登録
+      for (let i = 0; i < parsedData.sections.length; i++) {
+        const section = parsedData.sections[i]
+        const count = problemCounts[i] || 0
+
+        // 問題数が設定されていればその数だけ問題を作成
+        for (let j = 1; j <= count; j++) {
+          await addProblem({
+            workbookId,
+            problemNumber: `${section.title}-${j}`,
+            memo: `${section.title} の問題 ${j}`,
+          })
+        }
+      }
+
+      // 問題集詳細ページへ遷移
+      navigate(`/workbooks/${workbookId}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'インポートに失敗しました')
+    }
+  }
+
+  const updateProblemCount = (index: number, count: number) => {
+    setProblemCounts({
+      ...problemCounts,
+      [index]: Math.max(0, count),
+    })
+  }
+
+  const updateSectionTitle = (index: number, newTitle: string) => {
+    if (!parsedData) return
+    const newSections = [...parsedData.sections]
+    newSections[index] = { ...newSections[index], title: newTitle }
+    setParsedData({ ...parsedData, sections: newSections })
+  }
+
+  const removeSection = (index: number) => {
+    if (!parsedData) return
+    const newSections = parsedData.sections.filter((_, i) => i !== index)
+    setParsedData({ ...parsedData, sections: newSections })
+
+    const newCounts = { ...problemCounts }
+    delete newCounts[index]
+    setProblemCounts(newCounts)
+  }
+
+  const totalProblems = Object.values(problemCounts).reduce((sum, count) => sum + count, 0)
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => navigate('/workbooks')}
+        className="mb-4"
+      >
+        <ArrowLeft size={16} className="mr-2" />
+        戻る
+      </Button>
+
+      <h1 className="text-2xl font-bold mb-6">目次画像からインポート</h1>
+
+      {/* アップロードセクション */}
+      {!parsedData && (
+        <Card className="mb-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                目次画像をアップロード
+              </label>
+              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="image-upload"
+                />
+                <label
+                  htmlFor="image-upload"
+                  className="cursor-pointer flex flex-col items-center gap-3"
+                >
+                  <Upload size={48} className="text-gray-400" />
+                  <div>
+                    <p className="font-medium">クリックして画像を選択</p>
+                    <p className="text-sm text-gray-500">
+                      JPG, PNG形式に対応
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {preview && (
+              <div>
+                <p className="text-sm font-medium mb-2">プレビュー</p>
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="max-w-full h-auto rounded-lg border border-border"
+                />
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
+
+            <Button
+              onClick={handleAnalyze}
+              disabled={!file || loading}
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={20} className="mr-2 animate-spin" />
+                  解析中...
+                </>
+              ) : (
+                '解析開始'
+              )}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* 解析結果 */}
+      {parsedData && (
+        <>
+          <Card className="mb-6">
+            <h2 className="text-lg font-semibold mb-4">解析結果</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  問題集タイトル
+                </label>
+                <input
+                  type="text"
+                  value={parsedData.workbookTitle}
+                  onChange={(e) =>
+                    setParsedData({ ...parsedData, workbookTitle: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">科目</label>
+                <input
+                  type="text"
+                  value={parsedData.subject}
+                  onChange={(e) =>
+                    setParsedData({ ...parsedData, subject: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">タグ</label>
+                <div className="flex flex-wrap gap-2">
+                  {parsedData.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-secondary rounded-full text-sm"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">
+                セクション ({parsedData.sections.length})
+              </h2>
+              <p className="text-sm text-gray-600">
+                合計: {totalProblems}問
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {parsedData.sections.map((section, index) => (
+                <div
+                  key={index}
+                  className="border border-border rounded-lg p-4"
+                  style={{ marginLeft: `${section.level * 20}px` }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={section.title}
+                          onChange={(e) =>
+                            updateSectionTitle(index, e.target.value)
+                          }
+                          className="flex-1 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        />
+                        <button
+                          onClick={() => removeSection(index)}
+                          className="p-1 hover:bg-red-100 rounded"
+                        >
+                          <Trash2 size={16} className="text-error" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">問題数:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={problemCounts[index] || 0}
+                          onChange={(e) =>
+                            updateProblemCount(
+                              index,
+                              parseInt(e.target.value) || 0
+                            )
+                          }
+                          className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        />
+                        {section.page && (
+                          <span className="text-xs text-gray-500">
+                            p.{section.page}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setParsedData(null)
+                setFile(null)
+                setPreview(null)
+              }}
+            >
+              やり直す
+            </Button>
+            <Button onClick={handleImport} disabled={totalProblems === 0}>
+              インポート ({totalProblems}問)
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
