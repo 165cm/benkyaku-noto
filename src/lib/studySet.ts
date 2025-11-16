@@ -171,6 +171,25 @@ export async function hasUnstudiedProblems(): Promise<boolean> {
   return false
 }
 
+// 未学習問題数を取得
+export async function getUnstudiedProblemsCount(): Promise<number> {
+  const allProblems = await db.problems.toArray()
+  let count = 0
+
+  for (const problem of allProblems) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .toArray()
+
+    if (records.length === 0) {
+      count++
+    }
+  }
+
+  return count
+}
+
 // 配列をシャッフル
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
