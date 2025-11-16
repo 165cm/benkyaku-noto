@@ -2,6 +2,7 @@ import { getOpenAIApiKey } from './storage'
 
 export interface TableOfContentsSection {
   title: string
+  category?: string // 親カテゴリ（例: "言語", "数学"）
   level: number // 0: 章, 1: 節, 2: 項
   page?: number
 }
@@ -49,9 +50,13 @@ export async function parseTableOfContents(
 2. subject: 科目名（例: 数学、英語、物理など）
 3. sections: 章・節・項の階層構造を順番に全て抽出
    - title: セクションのタイトル
+   - category: 親カテゴリ（例: "言語"、"数学"、"知識"など。明確な分類がある場合のみ）
    - level: 0=章、1=節、2=項
    - page: ページ番号（あれば）
 4. tags: 適切なタグ（例: ["基本", "応用", "頻出"]など）
+
+categoryは、目次の大分類（例：公務員試験の「言語」「数学」「知識」など）が明示されている場合のみ設定してください。
+セクションが特定のカテゴリに属していない場合や不明な場合は省略してください。
 
 JSON形式で出力してください。他のテキストは含めないでください。`,
     },

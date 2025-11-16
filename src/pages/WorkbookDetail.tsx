@@ -21,6 +21,7 @@ export default function WorkbookDetail() {
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
   const [formData, setFormData] = useState({
     problemNumber: '',
+    category: '',
     page: '',
     memo: '',
   })
@@ -84,6 +85,7 @@ export default function WorkbookDetail() {
       // 編集モード
       await db.problems.update(editingProblem.id, {
         problemNumber: formData.problemNumber,
+        category: formData.category || undefined,
         page: formData.page ? parseInt(formData.page) : undefined,
         memo: formData.memo || undefined,
       })
@@ -92,12 +94,13 @@ export default function WorkbookDetail() {
       await addProblem({
         workbookId: id,
         problemNumber: formData.problemNumber,
+        category: formData.category || undefined,
         page: formData.page ? parseInt(formData.page) : undefined,
         memo: formData.memo || undefined,
       })
     }
 
-    setFormData({ problemNumber: '', page: '', memo: '' })
+    setFormData({ problemNumber: '', category: '', page: '', memo: '' })
     setEditingProblem(null)
     setIsModalOpen(false)
     loadData()
@@ -107,6 +110,7 @@ export default function WorkbookDetail() {
     setEditingProblem(problem)
     setFormData({
       problemNumber: problem.problemNumber,
+      category: problem.category || '',
       page: problem.page?.toString() || '',
       memo: problem.memo || '',
     })
@@ -176,7 +180,7 @@ export default function WorkbookDetail() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setEditingProblem(null)
-    setFormData({ problemNumber: '', page: '', memo: '' })
+    setFormData({ problemNumber: '', category: '', page: '', memo: '' })
   }
 
   const handleCloseGroupModal = () => {
@@ -546,6 +550,22 @@ export default function WorkbookDetail() {
             />
             <p className="text-xs text-gray-500 mt-1">
               ハイフン（-）で区切ると自動的に階層表示されます
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">カテゴリ</label>
+            <input
+              type="text"
+              value={formData.category}
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 言語"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              親カテゴリを指定（空欄の場合は問題番号から自動抽出）
             </p>
           </div>
 

@@ -66,9 +66,9 @@ export default function ImportFromImage() {
       // セクションごとの問題数とカテゴリを初期化
       const counts: { [key: string]: number } = {}
       const cats: { [key: string]: string } = {}
-      data.sections.forEach((_, index) => {
+      data.sections.forEach((section, index) => {
         counts[index] = 0
-        cats[index] = '' // 初期値は空
+        cats[index] = section.category || '' // AIが抽出したカテゴリを使用
       })
       setProblemCounts(counts)
       setCategories(cats)
