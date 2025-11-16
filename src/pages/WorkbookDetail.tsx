@@ -25,6 +25,15 @@ export default function WorkbookDetail() {
     page: '',
     memo: '',
   })
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<{
+    groupKey: string
+    problems: Problem[]
+  } | null>(null)
+  const [groupFormData, setGroupFormData] = useState({
+    groupName: '',
+    page: '',
+  })
 
   useEffect(() => {
     if (id) {
@@ -102,14 +111,69 @@ export default function WorkbookDetail() {
     }
   }
 
-  const handleStartStudy = (problemId: string) => {
-    navigate(`/study/${problemId}`)
+  const handleStartGroupStudy = (groupProblems: Problem[]) => {
+    if (groupProblems.length === 0) return
+
+    // グループ内の問題からランダムに1つ選択
+    const randomProblem = groupProblems[Math.floor(Math.random() * groupProblems.length)]
+    navigate(`/study/${randomProblem.id}`)
+  }
+
+  const handleEditGroup = (groupKey: string, groupProblems: Problem[]) => {
+    setEditingGroup({ groupKey, problems: groupProblems })
+
+    // グループ内の最初の問題のページ数を取得
+    const firstProblemWithPage = groupProblems.find(p => p.page !== undefined)
+
+    setGroupFormData({
+      groupName: groupKey,
+      page: firstProblemWithPage?.page?.toString() || '',
+    })
+    setIsGroupModalOpen(true)
+  }
+
+  const handleGroupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingGroup) return
+
+    const newPage = groupFormData.page ? parseInt(groupFormData.page) : undefined
+
+    // グループ内のすべての問題のページ数を更新
+    for (const problem of editingGroup.problems) {
+      await db.problems.update(problem.id, {
+        page: newPage,
+      })
+    }
+
+    // グループ名が変更された場合、問題番号のプレフィックスを更新
+    if (groupFormData.groupName !== editingGroup.groupKey) {
+      for (const problem of editingGroup.problems) {
+        const parts = problem.problemNumber.split('-')
+        if (parts.length > 1) {
+          parts[0] = groupFormData.groupName
+          await db.problems.update(problem.id, {
+            problemNumber: parts.join('-'),
+          })
+        }
+      }
+    }
+
+    setIsGroupModalOpen(false)
+    setEditingGroup(null)
+    setGroupFormData({ groupName: '', page: '' })
+    loadData()
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setEditingProblem(null)
     setFormData({ problemNumber: '', page: '', memo: '' })
+  }
+
+  const handleCloseGroupModal = () => {
+    setIsGroupModalOpen(false)
+    setEditingGroup(null)
+    setGroupFormData({ groupName: '', page: '' })
   }
 
   // 問題を階層構造にグループ化
@@ -170,60 +234,73 @@ export default function WorkbookDetail() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(problemGroups).map(([groupName, groupProblems]) => (
-            <div key={groupName}>
-              <h2 className="text-lg font-semibold mb-3 pb-2 border-b border-border">
-                {groupName}
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  ({groupProblems.length}問)
-                </span>
-              </h2>
-              <div className="space-y-2">
-                {groupProblems.map((problem) => (
-                  <Card
-                    key={problem.id}
-                    className="flex items-center justify-between hover:bg-secondary/50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{problem.problemNumber}</h3>
-                        {problem.page && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                            p.{problem.page}
-                          </span>
+          {Object.entries(problemGroups).map(([groupName, groupProblems]) => {
+            const firstProblemWithPage = groupProblems.find(p => p.page !== undefined)
+            return (
+              <div key={groupName}>
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-semibold">{groupName}</h2>
+                    {firstProblemWithPage?.page && (
+                      <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                        p.{firstProblemWithPage.page}
+                      </span>
+                    )}
+                    <span className="text-sm font-normal text-gray-500">
+                      {groupProblems.length}問
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleStartGroupStudy(groupProblems)}
+                    >
+                      <Play size={16} className="mr-1" />
+                      学習開始
+                    </Button>
+                    <button
+                      onClick={() => handleEditGroup(groupName, groupProblems)}
+                      className="p-2 hover:bg-blue-100 rounded transition-colors"
+                    >
+                      <Edit2 size={16} className="text-primary" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {groupProblems.map((problem) => (
+                    <Card
+                      key={problem.id}
+                      className="flex items-center justify-between hover:bg-secondary/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{problem.problemNumber}</h3>
+                        </div>
+                        {problem.memo && (
+                          <p className="text-sm text-gray-600 mt-1">{problem.memo}</p>
                         )}
                       </div>
-                      {problem.memo && (
-                        <p className="text-sm text-gray-600 mt-1">{problem.memo}</p>
-                      )}
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleStartStudy(problem.id)}
-                      >
-                        <Play size={16} className="mr-1" />
-                        学習
-                      </Button>
-                      <button
-                        onClick={() => handleEdit(problem)}
-                        className="p-2 hover:bg-blue-100 rounded transition-colors"
-                      >
-                        <Edit2 size={16} className="text-primary" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(problem.id)}
-                        className="p-2 hover:bg-red-100 rounded transition-colors"
-                      >
-                        <Trash2 size={16} className="text-error" />
-                      </button>
-                    </div>
-                  </Card>
-                ))}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(problem)}
+                          className="p-2 hover:bg-blue-100 rounded transition-colors"
+                        >
+                          <Edit2 size={16} className="text-primary" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(problem.id)}
+                          className="p-2 hover:bg-red-100 rounded transition-colors"
+                        >
+                          <Trash2 size={16} className="text-error" />
+                        </button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -289,6 +366,67 @@ export default function WorkbookDetail() {
             <Button type="submit">
               {editingProblem ? '更新' : '追加'}
             </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isGroupModalOpen}
+        onClose={handleCloseGroupModal}
+        title="目次タイトルの編集"
+      >
+        <form onSubmit={handleGroupSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              タイトル <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={groupFormData.groupName}
+              onChange={(e) =>
+                setGroupFormData({ ...groupFormData, groupName: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 第1章"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              このグループ内のすべての問題番号のプレフィックスが更新されます
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">ページ番号</label>
+            <input
+              type="number"
+              min="1"
+              value={groupFormData.page}
+              onChange={(e) =>
+                setGroupFormData({ ...groupFormData, page: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 45"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              このグループ内のすべての問題に同じページ数が設定されます
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              このグループには {editingGroup?.problems.length || 0} 問が含まれています
+            </p>
+          </div>
+
+          <div className="flex gap-3 justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCloseGroupModal}
+            >
+              キャンセル
+            </Button>
+            <Button type="submit">更新</Button>
           </div>
         </form>
       </Modal>
