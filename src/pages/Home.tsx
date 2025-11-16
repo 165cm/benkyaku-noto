@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, RotateCcw } from 'lucide-react'
+import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import { calculateStudyStats, getTodayReviewList } from '@/lib/review'
+import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
 import { getWorkbooks } from '@/lib/db'
-import { generateStudySet, generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
-import { createStudySession } from '@/lib/studySession'
-import type { StudyStats, ReviewSchedule, Workbook, Problem } from '@/types'
+import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
+import type { StudyStats, ReviewSchedule, Workbook } from '@/types'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -15,15 +14,10 @@ export default function Home() {
   const [reviewList, setReviewList] = useState<ReviewSchedule[]>([])
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [loading, setLoading] = useState(true)
-  const [generatingStudySet, setGeneratingStudySet] = useState(false)
-  const [studySetPreview, setStudySetPreview] = useState<{
-    minutes: number
-    problems: Problem[]
-    isFirstTime: boolean
-  } | null>(null)
   const [activeTab, setActiveTab] = useState<'review' | 'firstTime'>('review')
   const [unstudiedCount, setUnstudiedCount] = useState(0)
-  const [reviewCount, setReviewCount] = useState(0)
+  const [weakSections, setWeakSections] = useState<SectionStats[]>([])
+  const [startingReview, setStartingReview] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -31,18 +25,19 @@ export default function Home() {
 
   const loadData = async () => {
     setLoading(true)
-    const [statsData, reviewData, workbooksData, unstudiedCount] = await Promise.all([
+    const [statsData, reviewData, workbooksData, unstudiedCount, sectionStats] = await Promise.all([
       calculateStudyStats(),
       getTodayReviewList(),
       getWorkbooks(),
       getUnstudiedProblemsCount(),
+      calculateSectionStats(),
     ])
 
     setStats(statsData)
     setReviewList(reviewData.slice(0, 5)) // 上位5件
     setWorkbooks(workbooksData.slice(0, 3)) // 最新3件
     setUnstudiedCount(unstudiedCount)
-    setReviewCount(reviewData.length)
+    setWeakSections(sectionStats.slice(0, 5)) // 苦手セクション上位5件
     setLoading(false)
   }
 
@@ -77,33 +72,25 @@ export default function Home() {
     }
   }
 
-  const handleStartReviewStudy = async (minutes: number) => {
-    setGeneratingStudySet(true)
+  const handleStartWeakSectionReview = async () => {
+    setStartingReview(true)
     try {
-      const problems = await generateStudySet(minutes)
+      // 苦手セクションから次の問題を取得
+      const problem = await getWeakSectionProblem()
 
-      if (problems.length === 0) {
-        alert('復習する問題がありません。')
+      if (!problem) {
+        alert('復習する問題がありません。まず初回学習を進めてください。')
         return
       }
 
-      setStudySetPreview({ minutes, problems, isFirstTime: false })
+      // 問題に直接ナビゲート
+      navigate(`/study/${problem.id}`)
     } catch (error) {
-      console.error('Error generating review study set:', error)
-      alert('学習セットの生成に失敗しました')
+      console.error('Error starting weak section review:', error)
+      alert('復習を開始できませんでした')
     } finally {
-      setGeneratingStudySet(false)
+      setStartingReview(false)
     }
-  }
-
-  const startStudySession = () => {
-    if (!studySetPreview || studySetPreview.problems.length === 0) return
-
-    // セッションを作成
-    createStudySession(studySetPreview.minutes, studySetPreview.problems)
-
-    // 最初の問題に移動
-    navigate(`/study/${studySetPreview.problems[0].id}`)
   }
 
   if (loading) {
@@ -165,29 +152,23 @@ export default function Home() {
         {/* タブヘッダー */}
         <div className="flex border-b border-border mb-6">
           <button
-            onClick={() => {
-              setActiveTab('review')
-              setStudySetPreview(null)
-            }}
+            onClick={() => setActiveTab('review')}
             className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
               activeTab === 'review'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <RotateCcw size={18} />
-            <span>復習</span>
-            {reviewCount > 0 && (
+            <Target size={18} />
+            <span>苦手克服</span>
+            {weakSections.length > 0 && (
               <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                {reviewCount}
+                {weakSections.length}
               </span>
             )}
           </button>
           <button
-            onClick={() => {
-              setActiveTab('firstTime')
-              setStudySetPreview(null)
-            }}
+            onClick={() => setActiveTab('firstTime')}
             className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
               activeTab === 'firstTime'
                 ? 'text-green-600 border-b-2 border-green-600'
@@ -207,69 +188,81 @@ export default function Home() {
         {/* 復習モードのコンテンツ */}
         {activeTab === 'review' && (
           <div>
-            <div className="mb-4">
+            <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <RotateCcw size={20} className="text-blue-600" />
-                <h2 className="text-xl font-semibold">復習モード</h2>
+                <Target size={20} className="text-blue-600" />
+                <h2 className="text-xl font-semibold">苦手克服モード</h2>
               </div>
               <p className="text-sm text-gray-600">
-                間違えた問題をランダムに復習します
+                平均点の低いセクションの問題を優先的に復習します
               </p>
             </div>
 
-            <div className="grid grid-cols-5 gap-3 mb-4">
-              {[5, 10, 15, 30, 45].map((minutes) => (
-                <Button
-                  key={minutes}
-                  variant="secondary"
-                  onClick={() => handleStartReviewStudy(minutes)}
-                  disabled={generatingStudySet}
-                  className="flex flex-col items-center gap-1 h-20"
-                >
-                  <span className="text-2xl font-bold">{minutes}</span>
-                  <span className="text-xs">分</span>
-                </Button>
-              ))}
+            {/* 苦手セクション一覧 */}
+            {weakSections.length > 0 && (
+              <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-orange-900 mb-3">📊 苦手セクション（正解率の低い順）</h3>
+                <div className="space-y-2">
+                  {weakSections.map((section, index) => {
+                    const colorClass = section.accuracy !== null && section.accuracy >= 80
+                      ? 'text-green-700'
+                      : section.accuracy !== null && section.accuracy >= 50
+                      ? 'text-yellow-700'
+                      : 'text-red-700'
+                    return (
+                      <div key={section.sectionKey} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-400 font-bold">{index + 1}.</span>
+                          <span className="font-medium text-gray-700">
+                            {section.category} {section.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold ${colorClass}`}>
+                            {section.accuracy}%
+                          </span>
+                          <span className="text-gray-500 text-xs">
+                            ({section.studiedCount}/{section.problems.length}問学習済)
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 復習開始ボタン */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+              <div className="mb-4">
+                <p className="text-blue-900 font-medium mb-2">
+                  {weakSections.length > 0
+                    ? `次は「${weakSections[0].category} ${weakSections[0].title}」から出題されます`
+                    : '復習できる問題があります'}
+                </p>
+                <p className="text-sm text-blue-700">
+                  苦手な分野を1問ずつ淡々と克服していきましょう
+                </p>
+              </div>
+              <Button
+                onClick={handleStartWeakSectionReview}
+                disabled={weakSections.length === 0 || startingReview}
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {startingReview ? (
+                  <>
+                    <Loader2 size={20} className="mr-2 animate-spin" />
+                    開始中...
+                  </>
+                ) : (
+                  <>
+                    <Target size={20} className="mr-2" />
+                    苦手克服を開始
+                  </>
+                )}
+              </Button>
             </div>
-
-            {generatingStudySet && (
-              <div className="flex items-center justify-center gap-2 py-4 text-gray-600">
-                <Loader2 size={20} className="animate-spin" />
-                <span>学習セットを生成中...</span>
-              </div>
-            )}
-
-            {studySetPreview && !studySetPreview.isFirstTime && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-blue-900">
-                      {studySetPreview.minutes}分の学習セット
-                    </p>
-                    <p className="text-sm text-blue-700">
-                      {studySetPreview.problems.length}問が選択されました（ランダム）
-                    </p>
-                  </div>
-                  <Button onClick={startStudySession}>
-                    <Play size={16} className="mr-1" />
-                    開始
-                  </Button>
-                </div>
-                <div className="space-y-1">
-                  {studySetPreview.problems.slice(0, 3).map((problem) => (
-                    <p key={problem.id} className="text-xs text-blue-600">
-                      · {problem.problemNumber}
-                      {problem.page && ` (p.${problem.page})`}
-                    </p>
-                  ))}
-                  {studySetPreview.problems.length > 3 && (
-                    <p className="text-xs text-blue-500">
-                      ...他 {studySetPreview.problems.length - 3}問
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
