@@ -43,6 +43,24 @@ export default function StudyReport() {
     navigate('/')
   }
 
+  // 問題番号の表示用フォーマット
+  const getDisplayProblemNumber = (problemNumber: string) => {
+    const parts = problemNumber.split('-')
+
+    // 小問の場合（例: "代金精算-3-1" → "3-1"）
+    if (parts.length >= 3) {
+      return parts.slice(-2).join('-')
+    }
+
+    // 通常の問題（例: "代金精算-3" → "3"）
+    if (parts.length >= 2) {
+      return parts[parts.length - 1]
+    }
+
+    // ハイフンがない場合はそのまま
+    return problemNumber
+  }
+
   if (loading || !session) {
     return <div>読み込み中...</div>
   }
@@ -162,7 +180,7 @@ export default function StudyReport() {
                 <div className="flex items-center gap-3">
                   <ScoreIcon className={scoreColor} size={24} />
                   <div>
-                    <p className="font-medium">{problem.problemNumber}</p>
+                    <p className="font-medium">問題 {getDisplayProblemNumber(problem.problemNumber)}</p>
                     {problem.page && (
                       <p className="text-xs text-gray-500">p.{problem.page}</p>
                     )}

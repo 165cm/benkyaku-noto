@@ -287,6 +287,24 @@ export default function Study() {
     }
   }
 
+  // 問題番号の表示用フォーマット
+  const getDisplayProblemNumber = (problemNumber: string) => {
+    const parts = problemNumber.split('-')
+
+    // 小問の場合（例: "代金精算-3-1" → "3-1"）
+    if (parts.length >= 3) {
+      return parts.slice(-2).join('-')
+    }
+
+    // 通常の問題（例: "代金精算-3" → "3"）
+    if (parts.length >= 2) {
+      return parts[parts.length - 1]
+    }
+
+    // ハイフンがない場合はそのまま
+    return problemNumber
+  }
+
   if (!problem || !workbook) {
     return <div>読み込み中...</div>
   }
@@ -323,7 +341,7 @@ export default function Study() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold truncate">
-              問題 {problem.problemNumber}
+              問題 {getDisplayProblemNumber(problem.problemNumber)}
             </h1>
             {problem.memo && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
