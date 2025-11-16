@@ -278,3 +278,24 @@ export async function getCategoriesForWorkbook(workbookId: string): Promise<stri
 
   return Array.from(categories).sort()
 }
+
+// 問題が親問題（箱）かどうかを判定
+export async function isParentProblem(problemId: string): Promise<boolean> {
+  const subProblems = await getSubProblems(problemId)
+  return subProblems.length > 0
+}
+
+// 学習可能な問題のみを取得（親問題を除外）
+export async function getLearnableProblems(workbookId: string): Promise<Problem[]> {
+  const allProblems = await getProblems(workbookId)
+  const learnableProblems: Problem[] = []
+
+  for (const problem of allProblems) {
+    const hasSubProblems = await isParentProblem(problem.id)
+    if (!hasSubProblems) {
+      learnableProblems.push(problem)
+    }
+  }
+
+  return learnableProblems
+}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import {
   getSession,
   addResult,
@@ -242,6 +242,12 @@ export default function Study() {
 
     // 次の未学習問題を探す
     for (const p of allProblems) {
+      // 親問題（箱）はスキップ
+      const hasSubProblems = await isParentProblem(p.id)
+      if (hasSubProblems) {
+        continue
+      }
+
       const records = await db.studyRecords
         .where('problemId')
         .equals(p.id)
