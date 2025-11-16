@@ -9,6 +9,9 @@ import {
   addProblem,
   deleteProblem,
   db,
+  makeSubProblem,
+  makeIndependentProblem,
+  getSubProblems,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
@@ -52,6 +55,9 @@ export default function WorkbookDetail() {
   const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false)
   const [bulkCategoryValue, setBulkCategoryValue] = useState('')
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
+  const [subProblemsMap, setSubProblemsMap] = useState<Map<string, Problem[]>>(new Map())
+  const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (id) {
@@ -99,6 +105,16 @@ export default function WorkbookDetail() {
 
     setWorkbook(workbookData || null)
     setProblems(problemsData)
+
+    // 各親問題の小問を読み込む
+    const subProblemsMapTemp = new Map<string, Problem[]>()
+    for (const problem of problemsData) {
+      const subProblems = await getSubProblems(problem.id)
+      if (subProblems.length > 0) {
+        subProblemsMapTemp.set(problem.id, subProblems)
+      }
+    }
+    setSubProblemsMap(subProblemsMapTemp)
 
     // 問題数を更新
     if (workbookData && workbookData.totalProblems !== problemsData.length) {
@@ -466,6 +482,70 @@ export default function WorkbookDetail() {
     loadData()
   }
 
+  // ドラッグアンドドロップのハンドラー
+  const handleDragStart = (problem: Problem) => {
+    setDraggedProblem(problem)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault() // ドロップを有効にする
+  }
+
+  const handleDrop = async (targetProblem: Problem) => {
+    if (!draggedProblem || draggedProblem.id === targetProblem.id) {
+      setDraggedProblem(null)
+      return
+    }
+
+    // ドラッグした問題を対象問題の小問にする
+    await makeSubProblem(draggedProblem.id, targetProblem.id)
+    setDraggedProblem(null)
+    loadData()
+  }
+
+  const handleDropToIndependent = async (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!draggedProblem) return
+
+    // 小問を独立した問題にする
+    if (draggedProblem.parentProblemId) {
+      await makeIndependentProblem(draggedProblem.id)
+      setDraggedProblem(null)
+      loadData()
+    }
+  }
+
+  // 親問題の折りたたみ切り替え
+  const toggleParent = (problemId: string) => {
+    const newExpanded = new Set(expandedParents)
+    if (newExpanded.has(problemId)) {
+      newExpanded.delete(problemId)
+    } else {
+      newExpanded.add(problemId)
+    }
+    setExpandedParents(newExpanded)
+  }
+
+  // 小問を追加
+  const handleAddSubProblem = async (parentProblem: Problem) => {
+    if (!id) return
+
+    const subProblems = subProblemsMap.get(parentProblem.id) || []
+    const nextSubNumber = subProblems.length + 1
+
+    const newProblemNumber = `${parentProblem.problemNumber}-${nextSubNumber}`
+
+    await addProblem({
+      workbookId: id,
+      problemNumber: newProblemNumber,
+      category: parentProblem.category,
+      page: parentProblem.page,
+      parentProblemId: parentProblem.id,
+    })
+
+    loadData()
+  }
+
   const handleExportCSV = () => {
     if (!workbook) return
 
@@ -750,40 +830,122 @@ export default function WorkbookDetail() {
                             {/* 問題リスト（折りたたみ可能） */}
                             {isTitleExpanded && (
                               <div className="border-t border-border p-3 space-y-2 bg-gray-50">
-                                {titleProblems.map((problem) => (
-                                  <div
-                                    key={problem.id}
-                                    className="flex items-center justify-between p-2 bg-white rounded hover:bg-secondary/50 transition-colors"
-                                  >
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">
-                                          {problem.problemNumber.split('-').pop()}
-                                        </span>
+                                {titleProblems.map((problem) => {
+                                  const subProblems = subProblemsMap.get(problem.id) || []
+                                  const hasSubProblems = subProblems.length > 0
+                                  const isParentExpanded = expandedParents.has(problem.id)
+
+                                  return (
+                                    <div key={problem.id}>
+                                      {/* 親問題 */}
+                                      <div
+                                        draggable
+                                        onDragStart={() => handleDragStart(problem)}
+                                        onDragOver={handleDragOver}
+                                        onDrop={() => handleDrop(problem)}
+                                        className="flex items-center justify-between p-2 bg-white rounded hover:bg-secondary/50 transition-colors cursor-move border-2 border-transparent hover:border-blue-200"
+                                      >
+                                        <div className="flex items-center gap-2 flex-1">
+                                          {hasSubProblems && (
+                                            <button
+                                              onClick={() => toggleParent(problem.id)}
+                                              className="p-0.5 hover:bg-gray-200 rounded"
+                                            >
+                                              {isParentExpanded ? (
+                                                <ChevronDown size={14} className="text-gray-600" />
+                                              ) : (
+                                                <ChevronRight size={14} className="text-gray-600" />
+                                              )}
+                                            </button>
+                                          )}
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-medium">
+                                                {problem.problemNumber.split('-').pop()}
+                                              </span>
+                                              {hasSubProblems && (
+                                                <span className="text-xs text-gray-500">
+                                                  ({subProblems.length}小問)
+                                                </span>
+                                              )}
+                                            </div>
+                                            {problem.memo && (
+                                              <p className="text-xs text-gray-600 mt-1">
+                                                {problem.memo}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => handleAddSubProblem(problem)}
+                                            className="p-1.5 hover:bg-green-100 rounded transition-colors"
+                                            title="小問を追加"
+                                          >
+                                            <Plus size={14} className="text-green-600" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleEdit(problem)}
+                                            className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                                          >
+                                            <Edit2 size={14} className="text-primary" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDelete(problem.id)}
+                                            className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                                          >
+                                            <Trash2 size={14} className="text-error" />
+                                          </button>
+                                        </div>
                                       </div>
-                                      {problem.memo && (
-                                        <p className="text-xs text-gray-600 mt-1">
-                                          {problem.memo}
-                                        </p>
+
+                                      {/* 小問リスト */}
+                                      {hasSubProblems && isParentExpanded && (
+                                        <div className="ml-6 mt-1 space-y-1">
+                                          {subProblems.map((subProblem) => (
+                                            <div
+                                              key={subProblem.id}
+                                              draggable
+                                              onDragStart={() => handleDragStart(subProblem)}
+                                              onDragOver={handleDragOver}
+                                              onDrop={handleDropToIndependent}
+                                              className="flex items-center justify-between p-2 bg-blue-50 rounded hover:bg-blue-100 transition-colors cursor-move border-2 border-transparent hover:border-blue-300"
+                                            >
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium text-blue-700">
+                                                    {subProblem.problemNumber.split('-').pop()}
+                                                  </span>
+                                                </div>
+                                                {subProblem.memo && (
+                                                  <p className="text-xs text-gray-600 mt-1">
+                                                    {subProblem.memo}
+                                                  </p>
+                                                )}
+                                              </div>
+
+                                              <div className="flex items-center gap-1">
+                                                <button
+                                                  onClick={() => handleEdit(subProblem)}
+                                                  className="p-1.5 hover:bg-blue-200 rounded transition-colors"
+                                                >
+                                                  <Edit2 size={14} className="text-primary" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDelete(subProblem.id)}
+                                                  className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                                                >
+                                                  <Trash2 size={14} className="text-error" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
                                       )}
                                     </div>
-
-                                    <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => handleEdit(problem)}
-                                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
-                                      >
-                                        <Edit2 size={14} className="text-primary" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDelete(problem.id)}
-                                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
-                                      >
-                                        <Trash2 size={14} className="text-error" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                               </div>
                             )}
                           </div>

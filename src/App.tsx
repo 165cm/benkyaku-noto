@@ -9,6 +9,7 @@ import Review from '@/pages/Review'
 import Stats from '@/pages/Stats'
 import Settings from '@/pages/Settings'
 import ImportFromImage from '@/pages/ImportFromImage'
+import Trash from '@/pages/Trash'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/review" element={<Review />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/trash" element={<Trash />} />
         </Routes>
       </Layout>
     </BrowserRouter>

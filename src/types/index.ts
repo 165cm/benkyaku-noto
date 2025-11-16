@@ -14,9 +14,11 @@ export interface Problem {
   workbookId: string
   problemNumber: string // "1-5" など
   category?: string // 親カテゴリ（例: "言語", "数学"）
+  parentProblemId?: string // 親問題のID（小問の場合）
   page?: number // ページ数
   memo?: string
   createdAt: Date
+  deletedAt?: Date // 論理削除用
 }
 
 // 学習記録
