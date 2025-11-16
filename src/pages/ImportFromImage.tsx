@@ -7,32 +7,46 @@ import { hasOpenAIApiKey } from '@/lib/storage'
 import { imageToBase64, parseTableOfContents, type ParsedTableOfContents } from '@/lib/openai'
 import { addWorkbook, addProblem } from '@/lib/db'
 
+const MAX_IMAGES = 5
+
 export default function ImportFromImage() {
   const navigate = useNavigate()
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parsedData, setParsedData] = useState<ParsedTableOfContents | null>(null)
   const [problemCounts, setProblemCounts] = useState<{ [sectionId: string]: number }>({})
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-      setError(null)
+    const selectedFiles = Array.from(e.target.files || [])
 
-      // プレビュー表示
+    if (files.length + selectedFiles.length > MAX_IMAGES) {
+      setError(`画像は最大${MAX_IMAGES}枚までアップロードできます`)
+      return
+    }
+
+    setError(null)
+
+    // プレビュー表示
+    selectedFiles.forEach((file) => {
       const reader = new FileReader()
       reader.onload = (event) => {
-        setPreview(event.target?.result as string)
+        setPreviews((prev) => [...prev, event.target?.result as string])
       }
-      reader.readAsDataURL(selectedFile)
-    }
+      reader.readAsDataURL(file)
+    })
+
+    setFiles((prev) => [...prev, ...selectedFiles])
+  }
+
+  const removeImage = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+    setPreviews((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleAnalyze = async () => {
-    if (!file) return
+    if (files.length === 0) return
 
     if (!hasOpenAIApiKey()) {
       setError('OpenAI APIキーが設定されていません。設定ページで設定してください。')
@@ -43,8 +57,9 @@ export default function ImportFromImage() {
     setError(null)
 
     try {
-      const base64 = await imageToBase64(file)
-      const data = await parseTableOfContents(base64)
+      // 全ての画像をBase64に変換
+      const base64Images = await Promise.all(files.map((file) => imageToBase64(file)))
+      const data = await parseTableOfContents(base64Images)
       setParsedData(data)
 
       // セクションごとの問題数を初期化
@@ -138,40 +153,70 @@ export default function ImportFromImage() {
         <Card className="mb-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                目次画像をアップロード
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium">
+                  目次画像をアップロード
+                </label>
+                <span className="text-sm text-gray-500">
+                  {files.length} / {MAX_IMAGES}枚
+                </span>
+              </div>
               <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleFileChange}
                   className="hidden"
                   id="image-upload"
+                  disabled={files.length >= MAX_IMAGES}
                 />
                 <label
                   htmlFor="image-upload"
-                  className="cursor-pointer flex flex-col items-center gap-3"
+                  className={`cursor-pointer flex flex-col items-center gap-3 ${
+                    files.length >= MAX_IMAGES ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   <Upload size={48} className="text-gray-400" />
                   <div>
-                    <p className="font-medium">クリックして画像を選択</p>
+                    <p className="font-medium">
+                      {files.length >= MAX_IMAGES
+                        ? '最大枚数に達しました'
+                        : 'クリックして画像を選択'}
+                    </p>
                     <p className="text-sm text-gray-500">
-                      JPG, PNG形式に対応
+                      JPG, PNG形式に対応（最大{MAX_IMAGES}枚）
                     </p>
                   </div>
                 </label>
               </div>
             </div>
 
-            {preview && (
+            {previews.length > 0 && (
               <div>
-                <p className="text-sm font-medium mb-2">プレビュー</p>
-                <img
-                  src={preview}
-                  alt="Preview"
-                  className="max-w-full h-auto rounded-lg border border-border"
-                />
+                <p className="text-sm font-medium mb-2">
+                  プレビュー ({previews.length}枚)
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {previews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-48 object-cover rounded-lg border border-border"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -183,7 +228,7 @@ export default function ImportFromImage() {
 
             <Button
               onClick={handleAnalyze}
-              disabled={!file || loading}
+              disabled={files.length === 0 || loading}
               className="w-full"
             >
               {loading ? (
@@ -192,7 +237,7 @@ export default function ImportFromImage() {
                   解析中...
                 </>
               ) : (
-                '解析開始'
+                `解析開始 (${files.length}枚)`
               )}
             </Button>
           </div>
@@ -316,8 +361,8 @@ export default function ImportFromImage() {
               variant="secondary"
               onClick={() => {
                 setParsedData(null)
-                setFile(null)
-                setPreview(null)
+                setFiles([])
+                setPreviews([])
               }}
             >
               やり直す
