@@ -96,6 +96,7 @@ export default function ImportFromImage() {
           await addProblem({
             workbookId,
             problemNumber: `${section.title}-${j}`,
+            page: section.page,
             memo: `${section.title} の問題 ${j}`,
           })
         }
@@ -119,6 +120,13 @@ export default function ImportFromImage() {
     if (!parsedData) return
     const newSections = [...parsedData.sections]
     newSections[index] = { ...newSections[index], title: newTitle }
+    setParsedData({ ...parsedData, sections: newSections })
+  }
+
+  const updateSectionPage = (index: number, newPage: number | undefined) => {
+    if (!parsedData) return
+    const newSections = [...parsedData.sections]
+    newSections[index] = { ...newSections[index], page: newPage }
     setParsedData({ ...parsedData, sections: newSections })
   }
 
@@ -329,25 +337,38 @@ export default function ImportFromImage() {
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">問題数:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={problemCounts[index] || 0}
-                          onChange={(e) =>
-                            updateProblemCount(
-                              index,
-                              parseInt(e.target.value) || 0
-                            )
-                          }
-                          className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                        />
-                        {section.page && (
-                          <span className="text-xs text-gray-500">
-                            p.{section.page}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600">ページ:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={section.page || ''}
+                            onChange={(e) =>
+                              updateSectionPage(
+                                index,
+                                e.target.value ? parseInt(e.target.value) : undefined
+                              )
+                            }
+                            placeholder="未設定"
+                            className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600">問題数:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={problemCounts[index] || 0}
+                            onChange={(e) =>
+                              updateProblemCount(
+                                index,
+                                parseInt(e.target.value) || 0
+                              )
+                            }
+                            className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

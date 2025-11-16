@@ -13,6 +13,7 @@ export interface Problem {
   id: string
   workbookId: string
   problemNumber: string // "1-5" など
+  page?: number // ページ数
   memo?: string
   createdAt: Date
 }

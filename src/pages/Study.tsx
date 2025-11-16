@@ -30,6 +30,30 @@ export default function Study() {
     return () => clearInterval(timer)
   }, [startTime])
 
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // テキスト入力中は無効
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return
+      }
+
+      if (e.key === '1') {
+        handleRecord('correct')
+      } else if (e.key === '2') {
+        handleRecord('partial')
+      } else if (e.key === '3') {
+        handleRecord('incorrect')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [problem, elapsedTime, memo])
+
   const loadData = async () => {
     if (!id) return
 
@@ -122,34 +146,42 @@ export default function Study() {
       </Card>
 
       <div className="mb-6">
-        <h2 className="text-lg font-semibold mb-3">解答結果を記録</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">解答結果を記録</h2>
+          <p className="text-xs text-gray-500">
+            キーボード: 1=正解, 2=部分正解, 3=不正解
+          </p>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <Button
             variant="success"
             size="lg"
             onClick={() => handleRecord('correct')}
-            className="flex flex-col items-center gap-2 h-24"
+            className="flex flex-col items-center gap-2 h-24 relative"
           >
             <Circle size={32} />
             <span>正解</span>
+            <span className="absolute top-2 right-2 text-xs opacity-70">1</span>
           </Button>
           <Button
             variant="warning"
             size="lg"
             onClick={() => handleRecord('partial')}
-            className="flex flex-col items-center gap-2 h-24"
+            className="flex flex-col items-center gap-2 h-24 relative"
           >
             <Triangle size={32} />
             <span>部分正解</span>
+            <span className="absolute top-2 right-2 text-xs opacity-70">2</span>
           </Button>
           <Button
             variant="error"
             size="lg"
             onClick={() => handleRecord('incorrect')}
-            className="flex flex-col items-center gap-2 h-24"
+            className="flex flex-col items-center gap-2 h-24 relative"
           >
             <X size={32} />
             <span>不正解</span>
+            <span className="absolute top-2 right-2 text-xs opacity-70">3</span>
           </Button>
         </div>
       </div>
