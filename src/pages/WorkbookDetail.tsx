@@ -47,6 +47,9 @@ export default function WorkbookDetail() {
   const [categoryFormData, setCategoryFormData] = useState({
     categoryName: '',
   })
+  const [selectedProblems, setSelectedProblems] = useState<Set<string>>(new Set())
+  const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false)
+  const [bulkCategoryValue, setBulkCategoryValue] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -355,6 +358,62 @@ export default function WorkbookDetail() {
     setCategoryFormData({ categoryName: '' })
   }
 
+  const toggleProblemSelection = (problemId: string) => {
+    const newSelected = new Set(selectedProblems)
+    if (newSelected.has(problemId)) {
+      newSelected.delete(problemId)
+    } else {
+      newSelected.add(problemId)
+    }
+    setSelectedProblems(newSelected)
+  }
+
+  const toggleAllProblems = () => {
+    if (selectedProblems.size === problems.length) {
+      setSelectedProblems(new Set())
+    } else {
+      setSelectedProblems(new Set(problems.map(p => p.id)))
+    }
+  }
+
+  const handleBulkCategoryChange = async () => {
+    if (selectedProblems.size === 0) return
+
+    setIsBulkCategoryModalOpen(true)
+  }
+
+  const handleBulkCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const categoryToSet = bulkCategoryValue.trim() !== '' ? bulkCategoryValue.trim() : undefined
+
+    for (const problemId of selectedProblems) {
+      await db.problems.update(problemId, {
+        category: categoryToSet,
+      })
+    }
+
+    setIsBulkCategoryModalOpen(false)
+    setBulkCategoryValue('')
+    setSelectedProblems(new Set())
+    loadData()
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedProblems.size === 0) return
+
+    if (!confirm(`選択した${selectedProblems.size}問の問題を削除しますか？学習記録もすべて削除されます。`)) {
+      return
+    }
+
+    for (const problemId of selectedProblems) {
+      await deleteProblem(problemId)
+    }
+
+    setSelectedProblems(new Set())
+    loadData()
+  }
+
   const handleExportCSV = () => {
     if (!workbook) return
 
@@ -459,6 +518,53 @@ export default function WorkbookDetail() {
             </Button>
           </div>
         </div>
+
+        {/* 一括操作バー */}
+        {problems.length > 0 && (
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedProblems.size === problems.length && problems.length > 0}
+                    onChange={toggleAllProblems}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium">
+                    すべて選択
+                  </span>
+                </label>
+                {selectedProblems.size > 0 && (
+                  <span className="text-sm text-gray-600">
+                    {selectedProblems.size}問選択中
+                  </span>
+                )}
+              </div>
+              {selectedProblems.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleBulkCategoryChange}
+                  >
+                    <Edit2 size={14} className="mr-1" />
+                    カテゴリ変更
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    className="hover:bg-red-100"
+                  >
+                    <Trash2 size={14} className="mr-1" />
+                    削除
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {problems.length === 0 ? (
@@ -573,17 +679,26 @@ export default function WorkbookDetail() {
                                     key={problem.id}
                                     className="flex items-center justify-between p-2 bg-white rounded hover:bg-secondary/50 transition-colors"
                                   >
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">
-                                          {problem.problemNumber.split('-').pop()}
-                                        </span>
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedProblems.has(problem.id)}
+                                        onChange={() => toggleProblemSelection(problem.id)}
+                                        className="w-4 h-4 rounded border-gray-300"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-medium">
+                                            {problem.problemNumber.split('-').pop()}
+                                          </span>
+                                        </div>
+                                        {problem.memo && (
+                                          <p className="text-xs text-gray-600 mt-1">
+                                            {problem.memo}
+                                          </p>
+                                        )}
                                       </div>
-                                      {problem.memo && (
-                                        <p className="text-xs text-gray-600 mt-1">
-                                          {problem.memo}
-                                        </p>
-                                      )}
                                     </div>
 
                                     <div className="flex items-center gap-1">
@@ -815,6 +930,54 @@ export default function WorkbookDetail() {
               キャンセル
             </Button>
             <Button type="submit">更新</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isBulkCategoryModalOpen}
+        onClose={() => {
+          setIsBulkCategoryModalOpen(false)
+          setBulkCategoryValue('')
+        }}
+        title="選択した問題のカテゴリを変更"
+      >
+        <form onSubmit={handleBulkCategorySubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              カテゴリ名
+            </label>
+            <input
+              type="text"
+              value={bulkCategoryValue}
+              onChange={(e) => setBulkCategoryValue(e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 言語（空欄の場合はカテゴリをクリア）"
+              autoFocus
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              選択した問題すべてに同じカテゴリを設定します
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              {selectedProblems.size}問が選択されています
+            </p>
+          </div>
+
+          <div className="flex gap-3 justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsBulkCategoryModalOpen(false)
+                setBulkCategoryValue('')
+              }}
+            >
+              キャンセル
+            </Button>
+            <Button type="submit">変更</Button>
           </div>
         </form>
       </Modal>

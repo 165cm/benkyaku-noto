@@ -94,7 +94,8 @@ export default function ImportFromImage() {
       for (let i = 0; i < parsedData.sections.length; i++) {
         const section = parsedData.sections[i]
         const count = problemCounts[i] || 0
-        const category = categories[i] || undefined
+        const categoryValue = categories[i]
+        const category = categoryValue && categoryValue.trim() !== '' ? categoryValue.trim() : undefined
 
         // 問題数が設定されていればその数だけ問題を作成
         for (let j = 1; j <= count; j++) {
