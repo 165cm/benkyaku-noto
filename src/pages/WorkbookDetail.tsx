@@ -12,10 +12,13 @@ import {
   makeSubProblem,
   makeIndependentProblem,
   getSubProblems,
+  getStudyRecords,
+  calculateAccuracyForProblem,
+  getCategoriesForWorkbook,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
-import type { Workbook, Problem } from '@/types'
+import type { Workbook, Problem, StudyRecord } from '@/types'
 
 export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -58,6 +61,10 @@ export default function WorkbookDetail() {
   const [subProblemsMap, setSubProblemsMap] = useState<Map<string, Problem[]>>(new Map())
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
+  const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
+  const [problemAccuracy, setProblemAccuracy] = useState<number | null>(null)
+  const [availableCategories, setAvailableCategories] = useState<string[]>([])
+  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -116,6 +123,10 @@ export default function WorkbookDetail() {
     }
     setSubProblemsMap(subProblemsMapTemp)
 
+    // 既存のカテゴリを読み込む
+    const categories = await getCategoriesForWorkbook(id)
+    setAvailableCategories(categories)
+
     // 問題数を更新
     if (workbookData && workbookData.totalProblems !== problemsData.length) {
       await db.workbooks.update(id, {
@@ -154,7 +165,7 @@ export default function WorkbookDetail() {
     loadData()
   }
 
-  const handleEdit = (problem: Problem) => {
+  const handleEdit = async (problem: Problem) => {
     setEditingProblem(problem)
     setFormData({
       problemNumber: problem.problemNumber,
@@ -162,6 +173,20 @@ export default function WorkbookDetail() {
       page: problem.page?.toString() || '',
       memo: problem.memo || '',
     })
+
+    // 学習記録と正答率を読み込む
+    const records = await getStudyRecords(problem.id)
+    const accuracy = await calculateAccuracyForProblem(problem.id)
+    setStudyRecords(records)
+    setProblemAccuracy(accuracy)
+
+    // カテゴリが既存のものでない場合、カスタム入力を表示
+    setShowCustomCategoryInput(
+      problem.category !== undefined &&
+      problem.category !== '' &&
+      !availableCategories.includes(problem.category)
+    )
+
     setIsModalOpen(true)
   }
 
@@ -233,6 +258,9 @@ export default function WorkbookDetail() {
     setIsModalOpen(false)
     setEditingProblem(null)
     setFormData({ problemNumber: '', category: '', page: '', memo: '' })
+    setStudyRecords([])
+    setProblemAccuracy(null)
+    setShowCustomCategoryInput(false)
   }
 
   const handleCloseGroupModal = () => {
@@ -966,6 +994,56 @@ export default function WorkbookDetail() {
         title={editingProblem ? '問題の編集' : '問題の追加'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 学習履歴と正答率を表示（編集モード時のみ） */}
+          {editingProblem && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+              <h3 className="font-semibold text-sm text-blue-900">学習状況</h3>
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-xs text-gray-600">学習回数: </span>
+                  <span className="text-sm font-medium">{studyRecords.length}回</span>
+                </div>
+                {problemAccuracy !== null && (
+                  <div>
+                    <span className="text-xs text-gray-600">正答率: </span>
+                    <span className={`text-sm font-medium ${
+                      problemAccuracy >= 80
+                        ? 'text-green-600'
+                        : problemAccuracy >= 50
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
+                    }`}>
+                      {problemAccuracy}%
+                    </span>
+                  </div>
+                )}
+              </div>
+              {studyRecords.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-600 mb-1">最近の学習記録:</p>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {studyRecords.slice(0, 5).map((record) => (
+                      <div key={record.id} className="text-xs flex items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded ${
+                          record.result === 'correct'
+                            ? 'bg-green-100 text-green-700'
+                            : record.result === 'partial'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {record.result === 'correct' ? '◯' : record.result === 'partial' ? '△' : '×'}
+                        </span>
+                        <span className="text-gray-600">
+                          {new Date(record.studiedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-2">
               問題番号 <span className="text-error">*</span>
@@ -987,18 +1065,57 @@ export default function WorkbookDetail() {
 
           <div>
             <label className="block text-sm font-medium mb-2">カテゴリ</label>
-            <input
-              type="text"
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="例: 言語"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              親カテゴリを指定（空欄の場合は問題番号から自動抽出）
-            </p>
+            {!showCustomCategoryInput && availableCategories.length > 0 ? (
+              <div className="space-y-2">
+                <select
+                  value={formData.category}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setShowCustomCategoryInput(true)
+                      setFormData({ ...formData, category: '' })
+                    } else {
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">選択してください</option>
+                  {availableCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ 新しいカテゴリを作成</option>
+                </select>
+                <p className="text-xs text-gray-500">
+                  既存のカテゴリから選択するか、新しいカテゴリを作成できます
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="例: 言語"
+                />
+                {availableCategories.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomCategoryInput(false)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    既存のカテゴリから選択
+                  </button>
+                )}
+                <p className="text-xs text-gray-500">
+                  親カテゴリを指定（空欄の場合は問題番号から自動抽出）
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
