@@ -17,6 +17,7 @@ export default function ImportFromImage() {
   const [error, setError] = useState<string | null>(null)
   const [parsedData, setParsedData] = useState<ParsedTableOfContents | null>(null)
   const [problemCounts, setProblemCounts] = useState<{ [sectionId: string]: number }>({})
+  const [categories, setCategories] = useState<{ [sectionId: string]: string }>({})
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -62,12 +63,15 @@ export default function ImportFromImage() {
       const data = await parseTableOfContents(base64Images)
       setParsedData(data)
 
-      // セクションごとの問題数を初期化
+      // セクションごとの問題数とカテゴリを初期化
       const counts: { [key: string]: number } = {}
+      const cats: { [key: string]: string } = {}
       data.sections.forEach((_, index) => {
         counts[index] = 0
+        cats[index] = '' // 初期値は空
       })
       setProblemCounts(counts)
+      setCategories(cats)
     } catch (err) {
       setError(err instanceof Error ? err.message : '解析に失敗しました')
     } finally {
@@ -90,12 +94,14 @@ export default function ImportFromImage() {
       for (let i = 0; i < parsedData.sections.length; i++) {
         const section = parsedData.sections[i]
         const count = problemCounts[i] || 0
+        const category = categories[i] || undefined
 
         // 問題数が設定されていればその数だけ問題を作成
         for (let j = 1; j <= count; j++) {
           await addProblem({
             workbookId,
             problemNumber: `${section.title}-${j}`,
+            category,
             page: section.page,
             memo: `${section.title} の問題 ${j}`,
           })
@@ -130,6 +136,13 @@ export default function ImportFromImage() {
     setParsedData({ ...parsedData, sections: newSections })
   }
 
+  const updateCategory = (index: number, category: string) => {
+    setCategories({
+      ...categories,
+      [index]: category,
+    })
+  }
+
   const removeSection = (index: number) => {
     if (!parsedData) return
     const newSections = parsedData.sections.filter((_, i) => i !== index)
@@ -138,6 +151,10 @@ export default function ImportFromImage() {
     const newCounts = { ...problemCounts }
     delete newCounts[index]
     setProblemCounts(newCounts)
+
+    const newCategories = { ...categories }
+    delete newCategories[index]
+    setCategories(newCategories)
   }
 
   const totalProblems = Object.values(problemCounts).reduce((sum, count) => sum + count, 0)
@@ -337,37 +354,51 @@ export default function ImportFromImage() {
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-600">ページ:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={section.page || ''}
-                            onChange={(e) =>
-                              updateSectionPage(
-                                index,
-                                e.target.value ? parseInt(e.target.value) : undefined
-                              )
-                            }
-                            placeholder="未設定"
-                            className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-600">問題数:</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={problemCounts[index] || 0}
-                            onChange={(e) =>
-                              updateProblemCount(
-                                index,
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                          />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-600 w-16">カテゴリ:</label>
+                            <input
+                              type="text"
+                              value={categories[index] || ''}
+                              onChange={(e) =>
+                                updateCategory(index, e.target.value)
+                              }
+                              placeholder="例: 言語"
+                              className="w-32 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-600 w-12">ページ:</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={section.page || ''}
+                              onChange={(e) =>
+                                updateSectionPage(
+                                  index,
+                                  e.target.value ? parseInt(e.target.value) : undefined
+                                )
+                              }
+                              placeholder="未設定"
+                              className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-600 w-12">問題数:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={problemCounts[index] || 0}
+                              onChange={(e) =>
+                                updateProblemCount(
+                                  index,
+                                  parseInt(e.target.value) || 0
+                                )
+                              }
+                              className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

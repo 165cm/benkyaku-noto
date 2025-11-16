@@ -35,6 +35,14 @@ export default function WorkbookDetail() {
   })
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set())
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<{
+    oldCategory: string
+    problems: Problem[]
+  } | null>(null)
+  const [categoryFormData, setCategoryFormData] = useState({
+    categoryName: '',
+  })
 
   useEffect(() => {
     if (id) {
@@ -177,8 +185,20 @@ export default function WorkbookDetail() {
     setGroupFormData({ groupName: '', page: '' })
   }
 
-  // 問題番号から親カテゴリと目次タイトルを抽出
-  const parseGroupInfo = (problemNumber: string) => {
+  // 問題からカテゴリと目次タイトルを抽出
+  const parseGroupInfo = (problem: Problem) => {
+    // categoryフィールドが設定されている場合はそれを優先
+    if (problem.category) {
+      const parts = problem.problemNumber.split('-')
+      return {
+        category: problem.category,
+        title: parts.length > 1 ? parts.slice(0, -1).join('-') : '問題',
+      }
+    }
+
+    // categoryフィールドがない場合は問題番号から抽出（後方互換性）
+    const problemNumber = problem.problemNumber
+
     // "[言語]熟語の成り立ち-109" → { category: "[言語]", title: "熟語の成り立ち" }
     const match = problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
     if (match) {
@@ -213,7 +233,7 @@ export default function WorkbookDetail() {
     } = {}
 
     problems.forEach((problem) => {
-      const { category, title } = parseGroupInfo(problem.problemNumber)
+      const { category, title } = parseGroupInfo(problem)
 
       if (!hierarchy[category]) {
         hierarchy[category] = {}
@@ -282,6 +302,44 @@ export default function WorkbookDetail() {
     setExpandedTitles(newExpanded)
   }
 
+  const handleEditCategory = (category: string, categoryProblems: Problem[][]) => {
+    // カテゴリ内のすべての問題をフラット化
+    const allProblems = categoryProblems.flat()
+
+    setEditingCategory({
+      oldCategory: category,
+      problems: allProblems,
+    })
+    setCategoryFormData({ categoryName: category })
+    setIsCategoryModalOpen(true)
+  }
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCategory) return
+
+    const newCategory = categoryFormData.categoryName.trim()
+    if (!newCategory) return
+
+    // カテゴリ内のすべての問題のcategoryフィールドを更新
+    for (const problem of editingCategory.problems) {
+      await db.problems.update(problem.id, {
+        category: newCategory,
+      })
+    }
+
+    setIsCategoryModalOpen(false)
+    setEditingCategory(null)
+    setCategoryFormData({ categoryName: '' })
+    loadData()
+  }
+
+  const handleCloseCategoryModal = () => {
+    setIsCategoryModalOpen(false)
+    setEditingCategory(null)
+    setCategoryFormData({ categoryName: '' })
+  }
+
   if (!workbook) {
     return <div>読み込み中...</div>
   }
@@ -330,11 +388,11 @@ export default function WorkbookDetail() {
             return (
               <div key={category}>
                 {/* 親カテゴリヘッダー */}
-                <div
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => toggleCategory(category)}
-                >
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div
+                    className="flex items-center gap-3 flex-1 cursor-pointer"
+                    onClick={() => toggleCategory(category)}
+                  >
                     {isCategoryExpanded ? (
                       <ChevronDown size={20} className="text-gray-600" />
                     ) : (
@@ -345,6 +403,15 @@ export default function WorkbookDetail() {
                       {Object.keys(titles).length}セクション · {totalProblems}問
                     </span>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEditCategory(category, Object.values(titles))
+                    }}
+                    className="p-2 hover:bg-blue-100 rounded transition-colors"
+                  >
+                    <Edit2 size={16} className="text-primary" />
+                  </button>
                 </div>
 
                 {/* 目次タイトルリスト */}
@@ -576,6 +643,50 @@ export default function WorkbookDetail() {
               type="button"
               variant="secondary"
               onClick={handleCloseGroupModal}
+            >
+              キャンセル
+            </Button>
+            <Button type="submit">更新</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={handleCloseCategoryModal}
+        title="親カテゴリの編集"
+      >
+        <form onSubmit={handleCategorySubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              カテゴリ名 <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={categoryFormData.categoryName}
+              onChange={(e) =>
+                setCategoryFormData({ categoryName: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 言語"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              このカテゴリ内のすべての問題に適用されます
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              このカテゴリには {editingCategory?.problems.length || 0} 問が含まれています
+            </p>
+          </div>
+
+          <div className="flex gap-3 justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCloseCategoryModal}
             >
               キャンセル
             </Button>

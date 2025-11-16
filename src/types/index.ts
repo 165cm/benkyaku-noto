@@ -13,6 +13,7 @@ export interface Problem {
   id: string
   workbookId: string
   problemNumber: string // "1-5" など
+  category?: string // 親カテゴリ（例: "言語", "数学"）
   page?: number // ページ数
   memo?: string
   createdAt: Date
