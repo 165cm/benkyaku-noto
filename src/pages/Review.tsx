@@ -40,6 +40,24 @@ export default function Review() {
     return '通常'
   }
 
+  // 問題番号の表示用フォーマット
+  const getDisplayProblemNumber = (problemNumber: string) => {
+    const parts = problemNumber.split('-')
+
+    // 小問の場合（例: "代金精算-3-1" → "3-1"）
+    if (parts.length >= 3) {
+      return parts.slice(-2).join('-')
+    }
+
+    // 通常の問題（例: "代金精算-3" → "3"）
+    if (parts.length >= 2) {
+      return parts[parts.length - 1]
+    }
+
+    // ハイフンがない場合はそのまま
+    return problemNumber
+  }
+
   if (loading) {
     return <div>読み込み中...</div>
   }
@@ -76,7 +94,7 @@ export default function Review() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium">
-                      問題 {review.problemNumber}
+                      問題 {getDisplayProblemNumber(review.problemNumber)}
                     </h3>
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded ${getPriorityColor(
