@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -10,11 +10,13 @@ import {
   deleteProblem,
   db,
 } from '@/lib/db'
+import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import type { Workbook, Problem } from '@/types'
 
 export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
   const [problems, setProblems] = useState<Problem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -32,6 +34,7 @@ export default function WorkbookDetail() {
   } | null>(null)
   const [groupFormData, setGroupFormData] = useState({
     groupName: '',
+    category: '',
     page: '',
   })
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -135,11 +138,13 @@ export default function WorkbookDetail() {
   const handleEditGroup = (groupKey: string, groupProblems: Problem[]) => {
     setEditingGroup({ groupKey, problems: groupProblems })
 
-    // グループ内の最初の問題のページ数を取得
+    // グループ内の最初の問題のページ数とカテゴリを取得
     const firstProblemWithPage = groupProblems.find(p => p.page !== undefined)
+    const firstProblemWithCategory = groupProblems.find(p => p.category !== undefined)
 
     setGroupFormData({
       groupName: groupKey,
+      category: firstProblemWithCategory?.category || '',
       page: firstProblemWithPage?.page?.toString() || '',
     })
     setIsGroupModalOpen(true)
@@ -150,10 +155,12 @@ export default function WorkbookDetail() {
     if (!editingGroup) return
 
     const newPage = groupFormData.page ? parseInt(groupFormData.page) : undefined
+    const newCategory = groupFormData.category || undefined
 
-    // グループ内のすべての問題のページ数を更新
+    // グループ内のすべての問題のページ数とカテゴリを更新
     for (const problem of editingGroup.problems) {
       await db.problems.update(problem.id, {
+        category: newCategory,
         page: newPage,
       })
     }
@@ -173,7 +180,7 @@ export default function WorkbookDetail() {
 
     setIsGroupModalOpen(false)
     setEditingGroup(null)
-    setGroupFormData({ groupName: '', page: '' })
+    setGroupFormData({ groupName: '', category: '', page: '' })
     loadData()
   }
 
@@ -186,7 +193,7 @@ export default function WorkbookDetail() {
   const handleCloseGroupModal = () => {
     setIsGroupModalOpen(false)
     setEditingGroup(null)
-    setGroupFormData({ groupName: '', page: '' })
+    setGroupFormData({ groupName: '', category: '', page: '' })
   }
 
   // 問題からカテゴリと目次タイトルを抽出
@@ -250,11 +257,21 @@ export default function WorkbookDetail() {
       hierarchy[category][title].push(problem)
     })
 
-    // 各グループ内の問題を数値でソート
+    // 各グループ内の問題をページ数と数値でソート
     Object.keys(hierarchy).forEach((category) => {
       Object.keys(hierarchy[category]).forEach((title) => {
         hierarchy[category][title].sort((a, b) => {
-          // 問題番号の最後の数値部分を抽出して比較
+          // ページ番号でソート（優先）
+          if (a.page !== undefined && b.page !== undefined) {
+            if (a.page !== b.page) {
+              return a.page - b.page
+            }
+          }
+          // ページ番号がある方を優先
+          if (a.page !== undefined && b.page === undefined) return -1
+          if (a.page === undefined && b.page !== undefined) return 1
+
+          // ページ番号が同じ（または両方なし）場合は問題番号の最後の数値部分で比較
           const getLastNumber = (problemNumber: string) => {
             const parts = problemNumber.split('-')
             const lastPart = parts[parts.length - 1]
@@ -265,17 +282,11 @@ export default function WorkbookDetail() {
           const numA = getLastNumber(a.problemNumber)
           const numB = getLastNumber(b.problemNumber)
 
-          // 数値で比較
           if (numA !== numB) {
             return numA - numB
           }
 
-          // 数値が同じ場合はページ番号で比較
-          if (a.page !== undefined && b.page !== undefined) {
-            return a.page - b.page
-          }
-
-          // ページ番号がない場合は文字列で比較
+          // 最後の手段として文字列で比較
           return a.problemNumber.localeCompare(b.problemNumber)
         })
       })
@@ -344,6 +355,57 @@ export default function WorkbookDetail() {
     setCategoryFormData({ categoryName: '' })
   }
 
+  const handleExportCSV = () => {
+    if (!workbook) return
+
+    const csvContent = exportProblemsToCSV(problems)
+    const filename = `${workbook.title}_問題集_${new Date().toISOString().split('T')[0]}.csv`
+    downloadCSV(csvContent, filename)
+  }
+
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const csvText = e.target?.result as string
+        const parsedProblems = parseCSV(csvText)
+
+        // インポート前に確認
+        if (!confirm(`${parsedProblems.length}問の問題をインポートします。よろしいですか？`)) {
+          return
+        }
+
+        // 問題を追加
+        for (const problemData of parsedProblems) {
+          await addProblem({
+            workbookId: id,
+            problemNumber: problemData.problemNumber,
+            category: problemData.category,
+            page: problemData.page,
+            memo: problemData.memo,
+          })
+        }
+
+        // データを再読み込み
+        await loadData()
+        alert(`${parsedProblems.length}問の問題をインポートしました`)
+      } catch (error) {
+        console.error('CSV import error:', error)
+        alert(error instanceof Error ? error.message : 'CSVのインポートに失敗しました')
+      }
+    }
+
+    reader.readAsText(file, 'UTF-8')
+
+    // ファイル選択をリセット
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   if (!workbook) {
     return <div>読み込み中...</div>
   }
@@ -366,10 +428,36 @@ export default function WorkbookDetail() {
             <h1 className="text-2xl font-bold">{workbook.title}</h1>
             <p className="text-gray-600">{workbook.subject}</p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus size={20} className="mr-2" />
-            問題を追加
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={problems.length === 0}
+            >
+              <Download size={16} className="mr-1" />
+              CSV出力
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={16} className="mr-1" />
+              CSV取込
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus size={20} className="mr-2" />
+              問題を追加
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -632,6 +720,22 @@ export default function WorkbookDetail() {
             />
             <p className="text-xs text-gray-500 mt-1">
               このグループ内のすべての問題番号のプレフィックスが更新されます
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">カテゴリ</label>
+            <input
+              type="text"
+              value={groupFormData.category}
+              onChange={(e) =>
+                setGroupFormData({ ...groupFormData, category: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="例: 言語"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              このグループ内のすべての問題に同じカテゴリが設定されます
             </p>
           </div>
 
