@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Clock } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, db } from '@/lib/db'
 import {
   getSession,
   addResult,
@@ -123,7 +123,58 @@ export default function Study() {
       return
     }
 
-    // セッションがない場合は通常通り戻る
+    // セッションがない場合（初回学習モード）は次の未学習問題を探す
+    const allProblems = await db.problems
+      .where('workbookId')
+      .equals(problem.workbookId)
+      .toArray()
+
+    // ページ番号と問題番号でソート
+    allProblems.sort((a, b) => {
+      // ページ番号でソート（優先）
+      if (a.page !== undefined && b.page !== undefined) {
+        if (a.page !== b.page) {
+          return a.page - b.page
+        }
+      }
+      // ページ番号がある方を優先
+      if (a.page !== undefined && b.page === undefined) return -1
+      if (a.page === undefined && b.page !== undefined) return 1
+
+      // 問題番号の最後の数値部分で比較
+      const getLastNumber = (problemNumber: string) => {
+        const parts = problemNumber.split('-')
+        const lastPart = parts[parts.length - 1]
+        const num = parseInt(lastPart)
+        return isNaN(num) ? 0 : num
+      }
+
+      const numA = getLastNumber(a.problemNumber)
+      const numB = getLastNumber(b.problemNumber)
+
+      if (numA !== numB) {
+        return numA - numB
+      }
+
+      // 最後の手段として文字列で比較
+      return a.problemNumber.localeCompare(b.problemNumber)
+    })
+
+    // 次の未学習問題を探す
+    for (const p of allProblems) {
+      const records = await db.studyRecords
+        .where('problemId')
+        .equals(p.id)
+        .toArray()
+
+      if (records.length === 0) {
+        // 未学習の問題が見つかった
+        navigate(`/study/${p.id}`)
+        return
+      }
+    }
+
+    // 未学習問題がない場合は問題集詳細ページに戻る
     navigate(`/workbooks/${problem.workbookId}`)
   }
 
