@@ -317,6 +317,12 @@ export default function WorkbookDetail() {
     } = {}
 
     problems.forEach((problem) => {
+      // 小問（parentProblemIdがある問題）はスキップ
+      // 小問は親問題の下に表示されるため、セクションレベルでグループ化しない
+      if (problem.parentProblemId) {
+        return
+      }
+
       const { category, title } = parseGroupInfo(problem)
 
       if (!hierarchy[category]) {
