@@ -220,3 +220,131 @@ export async function calculateRecentAccuracyForProblems(problems: Problem[]): P
   const average = recentScores.reduce((sum, score) => sum + score, 0) / recentScores.length
   return Math.round(average)
 }
+
+// セクション情報の型定義
+export interface SectionStats {
+  sectionKey: string
+  category: string
+  title: string
+  problems: Problem[]
+  accuracy: number | null
+  studiedCount: number
+}
+
+// セクション別の正解率を計算
+export async function calculateSectionStats(): Promise<SectionStats[]> {
+  const allProblems = await db.problems.toArray()
+
+  // 問題をセクション（カテゴリ×タイトル）でグルーピング
+  const sectionMap = new Map<string, Problem[]>()
+
+  allProblems.forEach((problem) => {
+    // categoryフィールドが設定されている場合はそれを優先
+    let category = problem.category || '未分類'
+    let title = '問題'
+
+    if (problem.category) {
+      // カテゴリが設定されている場合、問題番号からタイトルを抽出
+      const parts = problem.problemNumber.split('-')
+      title = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
+    } else {
+      // カテゴリがない場合は問題番号から抽出（後方互換性）
+      const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
+      if (match) {
+        category = match[1]
+        title = match[2]
+      } else {
+        const parts = problem.problemNumber.split('-')
+        if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
+          category = parts[0]
+          title = parts.slice(1, -1).join('-') || '問題'
+        } else {
+          title = parts.length > 1 ? parts[0] : '問題'
+        }
+      }
+    }
+
+    const sectionKey = `${category}-${title}`
+    const existing = sectionMap.get(sectionKey) || []
+    existing.push(problem)
+    sectionMap.set(sectionKey, existing)
+  })
+
+  // 各セクションの統計を計算
+  const sectionStats: SectionStats[] = []
+
+  for (const [sectionKey, problems] of sectionMap.entries()) {
+    const [category, ...titleParts] = sectionKey.split('-')
+    const title = titleParts.join('-')
+
+    // このセクションの正解率を計算
+    const accuracy = await calculateRecentAccuracyForProblems(problems)
+
+    // 学習済みの問題数をカウント
+    let studiedCount = 0
+    for (const problem of problems) {
+      const records = await db.studyRecords
+        .where('problemId')
+        .equals(problem.id)
+        .count()
+      if (records > 0) studiedCount++
+    }
+
+    sectionStats.push({
+      sectionKey,
+      category,
+      title,
+      problems,
+      accuracy,
+      studiedCount,
+    })
+  }
+
+  // 学習済みセクションのみを、正解率の低い順にソート（nullは除外）
+  return sectionStats
+    .filter((s) => s.accuracy !== null)
+    .sort((a, b) => {
+      if (a.accuracy === null && b.accuracy === null) return 0
+      if (a.accuracy === null) return 1
+      if (b.accuracy === null) return -1
+      return a.accuracy - b.accuracy
+    })
+}
+
+// 苦手克服用の次の問題を取得
+export async function getWeakSectionProblem(): Promise<Problem | null> {
+  const sectionStats = await calculateSectionStats()
+
+  // 学習済みセクションがない場合
+  if (sectionStats.length === 0) {
+    return null
+  }
+
+  // 最も正解率の低いセクションを取得
+  const weakestSection = sectionStats[0]
+
+  // そのセクション内で、最も正解率の低い問題を選択
+  const problemScores: { problem: Problem; score: number }[] = []
+
+  for (const problem of weakestSection.problems) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .reverse()
+      .sortBy('studiedAt')
+
+    if (records.length > 0) {
+      const latestRecord = records[0]
+      const score = latestRecord.result === 'correct' ? 100
+                  : latestRecord.result === 'partial' ? 50
+                  : 0
+      problemScores.push({ problem, score })
+    }
+  }
+
+  // スコアの低い順にソート
+  problemScores.sort((a, b) => a.score - b.score)
+
+  // 最もスコアの低い問題を返す
+  return problemScores.length > 0 ? problemScores[0].problem : weakestSection.problems[0]
+}
