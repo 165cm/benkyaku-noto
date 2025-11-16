@@ -681,6 +681,7 @@ export default function WorkbookDetail() {
                             <div
                               className="flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
                             >
+                              {/* 左側：チェックボックス、展開アイコン、タイトル */}
                               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleTitle(titleKey)}>
                                 <input
                                   type="checkbox"
@@ -695,8 +696,14 @@ export default function WorkbookDetail() {
                                   <ChevronRight size={16} className="text-gray-600" />
                                 )}
                                 <h3 className="font-semibold">{title}</h3>
+                              </div>
+                              {/* 右側：ラベル群とボタン（固定位置） */}
+                              <div
+                                className="flex items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 {firstProblemWithPage?.page && (
-                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded whitespace-nowrap">
                                     p.{firstProblemWithPage.page}
                                   </span>
                                 )}
@@ -709,21 +716,16 @@ export default function WorkbookDetail() {
                                       ? 'bg-yellow-100 text-yellow-700'
                                       : 'bg-red-100 text-red-700'
                                     return (
-                                      <span className={`text-xs px-2 py-0.5 rounded ${colorClass}`}>
+                                      <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${colorClass}`}>
                                         正解率 {accuracy}%
                                       </span>
                                     )
                                   }
                                   return null
                                 })()}
-                                <span className="text-sm text-gray-500">
+                                <span className="text-sm text-gray-500 whitespace-nowrap">
                                   {titleProblems.length}問
                                 </span>
-                              </div>
-                              <div
-                                className="flex items-center gap-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
                                 <Button
                                   size="sm"
                                   onClick={() => handleStartGroupStudy(titleProblems)}

@@ -4,7 +4,8 @@ import { Plus, BookOpen, Trash2, Image } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
-import { getWorkbooks, addWorkbook, deleteWorkbook } from '@/lib/db'
+import { getWorkbooks, addWorkbook, deleteWorkbook, getProblems } from '@/lib/db'
+import { calculateRecentAccuracyForProblems } from '@/lib/review'
 import type { Workbook } from '@/types'
 
 export default function Workbooks() {
@@ -15,10 +16,36 @@ export default function Workbooks() {
     title: '',
     subject: '',
   })
+  const [workbookAccuracies, setWorkbookAccuracies] = useState<Map<string, number | null>>(new Map())
 
   useEffect(() => {
     loadWorkbooks()
   }, [])
+
+  // 各問題集の直近回答の正解率を計算
+  useEffect(() => {
+    const calculateAccuracies = async () => {
+      const accuracyMap = new Map<string, number | null>()
+
+      for (const workbook of workbooks) {
+        const problems = await getProblems(workbook.id)
+        if (problems.length > 0) {
+          const accuracy = await calculateRecentAccuracyForProblems(problems)
+          accuracyMap.set(workbook.id, accuracy)
+        } else {
+          accuracyMap.set(workbook.id, null)
+        }
+      }
+
+      setWorkbookAccuracies(accuracyMap)
+    }
+
+    if (workbooks.length > 0) {
+      calculateAccuracies()
+    } else {
+      setWorkbookAccuracies(new Map())
+    }
+  }, [workbooks])
 
   const loadWorkbooks = async () => {
     const data = await getWorkbooks()
@@ -74,31 +101,60 @@ export default function Workbooks() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-2">
           {workbooks.map((workbook) => (
-            <Card
+            <div
               key={workbook.id}
-              hover
-              className="cursor-pointer relative group"
+              className="bg-white border border-border rounded-lg hover:bg-secondary/50 transition-colors"
             >
-              <div onClick={() => navigate(`/workbooks/${workbook.id}`)}>
-                <h3 className="font-semibold text-lg mb-2">{workbook.title}</h3>
-                <p className="text-sm text-gray-600 mb-4">{workbook.subject}</p>
-                <p className="text-sm text-gray-500">
-                  問題数: {workbook.totalProblems}
-                </p>
-              </div>
+              <div className="flex items-center justify-between p-4">
+                {/* 左側：タイトルと科目 */}
+                <div
+                  className="flex-1 cursor-pointer"
+                  onClick={() => navigate(`/workbooks/${workbook.id}`)}
+                >
+                  <h3 className="font-semibold text-lg">{workbook.title}</h3>
+                  <p className="text-sm text-gray-600">{workbook.subject}</p>
+                </div>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDelete(workbook.id)
-                }}
-                className="absolute top-2 right-2 p-2 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-all"
-              >
-                <Trash2 size={16} className="text-error" />
-              </button>
-            </Card>
+                {/* 右側：ラベル群 */}
+                <div className="flex items-center gap-2">
+                  {/* 正解率 */}
+                  {(() => {
+                    const accuracy = workbookAccuracies.get(workbook.id)
+                    if (accuracy !== null && accuracy !== undefined) {
+                      const colorClass = accuracy >= 80
+                        ? 'bg-green-100 text-green-700'
+                        : accuracy >= 50
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-red-100 text-red-700'
+                      return (
+                        <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${colorClass}`}>
+                          正解率 {accuracy}%
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  {/* 問題数 */}
+                  <span className="text-sm text-gray-500 whitespace-nowrap">
+                    {workbook.totalProblems}問
+                  </span>
+
+                  {/* 削除ボタン */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(workbook.id)
+                    }}
+                    className="p-2 hover:bg-red-100 rounded transition-colors"
+                  >
+                    <Trash2 size={16} className="text-error" />
+                  </button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
