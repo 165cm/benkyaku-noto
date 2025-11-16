@@ -95,6 +95,82 @@ export async function generateStudySet(targetMinutes: number): Promise<Problem[]
   return shuffleArray(selectedProblems)
 }
 
+// 初回学習用の学習セット生成（順番に問題を解く）
+export async function generateFirstTimeStudySet(targetMinutes: number): Promise<Problem[]> {
+  const targetSeconds = targetMinutes * 60
+
+  // 未学習の問題をすべて取得
+  const allProblems = await db.problems.toArray()
+  const unstudiedProblems: Problem[] = []
+
+  for (const problem of allProblems) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .toArray()
+
+    if (records.length === 0) {
+      unstudiedProblems.push(problem)
+    }
+  }
+
+  // ページ番号と問題番号で順番にソート
+  unstudiedProblems.sort((a, b) => {
+    // ページ番号でソート（優先）
+    if (a.page !== undefined && b.page !== undefined) {
+      if (a.page !== b.page) {
+        return a.page - b.page
+      }
+    }
+    // ページ番号がある方を優先
+    if (a.page !== undefined && b.page === undefined) return -1
+    if (a.page === undefined && b.page !== undefined) return 1
+
+    // 問題番号の最後の数値部分で比較
+    const getLastNumber = (problemNumber: string) => {
+      const parts = problemNumber.split('-')
+      const lastPart = parts[parts.length - 1]
+      const num = parseInt(lastPart)
+      return isNaN(num) ? 0 : num
+    }
+
+    const numA = getLastNumber(a.problemNumber)
+    const numB = getLastNumber(b.problemNumber)
+
+    if (numA !== numB) {
+      return numA - numB
+    }
+
+    // 最後の手段として文字列で比較
+    return a.problemNumber.localeCompare(b.problemNumber)
+  })
+
+  // 時間内に収まる問題数を計算（1問3分と仮定）
+  const estimatedTimePerProblem = 180 // 3分
+  const maxProblems = Math.max(1, Math.floor(targetSeconds / estimatedTimePerProblem))
+
+  // 先頭から指定数の問題を返す（シャッフルせず順番に）
+  return unstudiedProblems.slice(0, maxProblems)
+}
+
+// 未学習問題があるかチェック
+export async function hasUnstudiedProblems(): Promise<boolean> {
+  const allProblems = await db.problems.toArray()
+
+  for (const problem of allProblems) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .toArray()
+
+    if (records.length === 0) {
+      return true
+    }
+  }
+
+  return false
+}
+
 // 配列をシャッフル
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
