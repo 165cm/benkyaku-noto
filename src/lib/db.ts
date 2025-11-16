@@ -124,6 +124,25 @@ export async function getStudyRecords(problemId: string) {
     .sortBy('studiedAt')
 }
 
+// 問題の正答率を計算
+export async function calculateAccuracyForProblem(problemId: string): Promise<number | null> {
+  const records = await db.studyRecords
+    .where('problemId')
+    .equals(problemId)
+    .toArray()
+
+  if (records.length === 0) return null
+
+  const correctCount = records.filter(r => r.result === 'correct').length
+  const partialCount = records.filter(r => r.result === 'partial').length
+
+  // 正解を1点、部分正解を0.5点として計算
+  const totalScore = correctCount + (partialCount * 0.5)
+  const accuracy = (totalScore / records.length) * 100
+
+  return Math.round(accuracy)
+}
+
 export async function deleteWorkbook(id: string) {
   // 問題集に紐づく問題と学習記録も削除
   const problems = await db.problems.where('workbookId').equals(id).toArray()
@@ -161,9 +180,71 @@ export async function deleteStudyRecord(id: string) {
   await db.studyRecords.delete(id)
 }
 
-// 問題を親問題の小問にする
+// 問題を親問題の小問にする（親問題を箱として扱う）
 export async function makeSubProblem(problemId: string, parentProblemId: string) {
-  await db.problems.update(problemId, { parentProblemId })
+  const parentProblem = await db.problems.get(parentProblemId)
+  const draggedProblem = await db.problems.get(problemId)
+
+  if (!parentProblem || !draggedProblem) return
+
+  // 既存の小問を取得
+  const existingSubProblems = await getSubProblems(parentProblemId)
+
+  if (existingSubProblems.length === 0) {
+    // 親問題に初めて小問を追加する場合
+    // 1. 親問題のデータを「親-1」という新しい小問として作成
+    const parentAsSubProblemId = crypto.randomUUID()
+    await db.problems.add({
+      id: parentAsSubProblemId,
+      workbookId: parentProblem.workbookId,
+      problemNumber: `${parentProblem.problemNumber}-1`,
+      category: parentProblem.category,
+      page: parentProblem.page,
+      memo: parentProblem.memo,
+      parentProblemId: parentProblemId,
+      createdAt: new Date(),
+    })
+
+    // 親問題の学習記録を新しい小問に移動
+    const parentStudyRecords = await db.studyRecords
+      .where('problemId')
+      .equals(parentProblemId)
+      .toArray()
+
+    for (const record of parentStudyRecords) {
+      await db.studyRecords.update(record.id, {
+        problemId: parentAsSubProblemId,
+      })
+    }
+
+    // 2. ドラッグされた問題を「親-2」として設定
+    await db.problems.update(problemId, {
+      problemNumber: `${parentProblem.problemNumber}-2`,
+      parentProblemId: parentProblemId,
+      category: parentProblem.category,
+      page: parentProblem.page,
+    })
+
+    // 3. 親問題のメモをクリア（箱としてのみ機能させる）
+    await db.problems.update(parentProblemId, {
+      memo: undefined,
+    })
+  } else {
+    // 既に小問がある場合は、次の番号を割り当てる
+    const maxSubNumber = Math.max(
+      ...existingSubProblems.map(p => {
+        const parts = p.problemNumber.split('-')
+        return parseInt(parts[parts.length - 1]) || 0
+      })
+    )
+
+    await db.problems.update(problemId, {
+      problemNumber: `${parentProblem.problemNumber}-${maxSubNumber + 1}`,
+      parentProblemId: parentProblemId,
+      category: parentProblem.category,
+      page: parentProblem.page,
+    })
+  }
 }
 
 // 小問を独立した問題にする
@@ -182,4 +263,18 @@ export async function getSubProblems(parentProblemId: string) {
   return problems
     .filter(p => !p.deletedAt)
     .sort((a, b) => a.problemNumber.localeCompare(b.problemNumber))
+}
+
+// 問題集内の既存カテゴリを取得
+export async function getCategoriesForWorkbook(workbookId: string): Promise<string[]> {
+  const problems = await getProblems(workbookId)
+  const categories = new Set<string>()
+
+  problems.forEach(p => {
+    if (p.category) {
+      categories.add(p.category)
+    }
+  })
+
+  return Array.from(categories).sort()
 }
