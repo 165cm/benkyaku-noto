@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, BookOpen, Trash2, Image } from 'lucide-react'
-import Card from '@/components/Card'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import { getWorkbooks, addWorkbook, deleteWorkbook, getProblems } from '@/lib/db'
