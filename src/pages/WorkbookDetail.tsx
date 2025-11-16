@@ -11,6 +11,7 @@ import {
   db,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
+import { calculateRecentAccuracyForProblems } from '@/lib/review'
 import type { Workbook, Problem } from '@/types'
 
 export default function WorkbookDetail() {
@@ -50,12 +51,37 @@ export default function WorkbookDetail() {
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
   const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false)
   const [bulkCategoryValue, setBulkCategoryValue] = useState('')
+  const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
 
   useEffect(() => {
     if (id) {
       loadData()
     }
   }, [id])
+
+  // 各セクションの直近回答の正解率を計算
+  useEffect(() => {
+    const calculateAccuracyRates = async () => {
+      const hierarchy = groupProblemsByHierarchy()
+      const accuracyMap = new Map<string, number | null>()
+
+      for (const [category, titles] of Object.entries(hierarchy)) {
+        for (const [title, titleProblems] of Object.entries(titles)) {
+          const sectionKey = `${category}-${title}`
+          const accuracy = await calculateRecentAccuracyForProblems(titleProblems)
+          accuracyMap.set(sectionKey, accuracy)
+        }
+      }
+
+      setSectionAccuracyRates(accuracyMap)
+    }
+
+    if (problems.length > 0) {
+      calculateAccuracyRates()
+    } else {
+      setSectionAccuracyRates(new Map())
+    }
+  }, [problems])
 
   const loadData = async () => {
     if (!id) return
@@ -674,6 +700,22 @@ export default function WorkbookDetail() {
                                     p.{firstProblemWithPage.page}
                                   </span>
                                 )}
+                                {(() => {
+                                  const accuracy = sectionAccuracyRates.get(titleKey)
+                                  if (accuracy !== null && accuracy !== undefined) {
+                                    const colorClass = accuracy >= 80
+                                      ? 'bg-green-100 text-green-700'
+                                      : accuracy >= 50
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-700'
+                                    return (
+                                      <span className={`text-xs px-2 py-0.5 rounded ${colorClass}`}>
+                                        正解率 {accuracy}%
+                                      </span>
+                                    )
+                                  }
+                                  return null
+                                })()}
                                 <span className="text-sm text-gray-500">
                                   {titleProblems.length}問
                                 </span>

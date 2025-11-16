@@ -1,5 +1,5 @@
 import { db } from './db'
-import type { StudyRecord, ReviewSchedule } from '@/types'
+import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
 
 // 正答率の計算
 export function calculateAverageScore(records: StudyRecord[]): number {
@@ -129,4 +129,35 @@ export async function calculateStudyStats() {
     correctRate: Math.round(correctRate),
     weeklyData,
   }
+}
+
+// 問題セットの直近回答の正解率を計算
+export async function calculateRecentAccuracyForProblems(problems: Problem[]): Promise<number | null> {
+  if (problems.length === 0) return null
+
+  const recentScores: number[] = []
+
+  // 各問題の最新の学習記録を取得してスコア化
+  for (const problem of problems) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .reverse()
+      .sortBy('studiedAt')
+
+    if (records.length > 0) {
+      const latestRecord = records[0] // 最新の記録
+      const score = latestRecord.result === 'correct' ? 100
+                  : latestRecord.result === 'partial' ? 50
+                  : 0
+      recentScores.push(score)
+    }
+  }
+
+  // 学習記録がある問題が1つもない場合はnullを返す
+  if (recentScores.length === 0) return null
+
+  // 平均を計算
+  const average = recentScores.reduce((sum, score) => sum + score, 0) / recentScores.length
+  return Math.round(average)
 }
