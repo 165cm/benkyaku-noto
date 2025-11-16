@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Clock } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Clock, Pause, Play } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, db } from '@/lib/db'
@@ -23,6 +23,11 @@ export default function Study() {
   const [memo, setMemo] = useState('')
   const [timeExpired, setTimeExpired] = useState(false)
 
+  // 一時停止機能
+  const [isPaused, setIsPaused] = useState(false)
+  const [pausedTime, setPausedTime] = useState(0) // 累計一時停止時間（秒）
+  const [pauseStartTime, setPauseStartTime] = useState<number | null>(null) // 一時停止開始時刻（ミリ秒）
+
   useEffect(() => {
     if (id) {
       loadData()
@@ -30,21 +35,26 @@ export default function Study() {
   }, [id])
 
   useEffect(() => {
+    if (isPaused) return // 一時停止中は何もしない
+
     const timer = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
+      // 一時停止中でない場合のみ時間を更新
+      const rawElapsed = Math.floor((Date.now() - startTime) / 1000)
+      const actualElapsed = rawElapsed - pausedTime
+      setElapsedTime(actualElapsed)
 
       // セッションがある場合、制限時間をチェック
       const session = getSession()
       if (session && !timeExpired) {
-        const elapsedMinutes = (Date.now() - session.startTime.getTime()) / 1000 / 60
-        if (elapsedMinutes >= session.targetMinutes) {
+        const targetSeconds = session.targetMinutes * 60
+        if (actualElapsed >= targetSeconds) {
           setTimeExpired(true)
         }
       }
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [startTime, timeExpired])
+  }, [startTime, timeExpired, isPaused, pausedTime])
 
   // キーボードショートカット
   useEffect(() => {
@@ -82,6 +92,23 @@ export default function Study() {
 
       const records = await getStudyRecords(id)
       setStudyRecords(records)
+    }
+  }
+
+  // 一時停止/再開のハンドラー
+  const togglePause = () => {
+    if (isPaused) {
+      // 再開
+      if (pauseStartTime !== null) {
+        const pauseDuration = Math.floor((Date.now() - pauseStartTime) / 1000)
+        setPausedTime((prev) => prev + pauseDuration)
+        setPauseStartTime(null)
+      }
+      setIsPaused(false)
+    } else {
+      // 一時停止
+      setPauseStartTime(Date.now())
+      setIsPaused(true)
     }
   }
 
@@ -179,9 +206,21 @@ export default function Study() {
   }
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+    const mins = Math.floor(Math.abs(seconds) / 60)
+    const secs = Math.abs(seconds) % 60
+    const sign = seconds < 0 ? '-' : ''
+    return `${sign}${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // 表示する時間を計算（セッションがある場合はカウントダウン）
+  const getDisplayTime = () => {
+    const session = getSession()
+    if (session) {
+      const targetSeconds = session.targetMinutes * 60
+      const remaining = targetSeconds - elapsedTime
+      return remaining
+    }
+    return elapsedTime
   }
 
   const getResultIcon = (result: StudyResult) => {
@@ -246,9 +285,37 @@ export default function Study() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 text-gray-600">
-          <Clock size={20} />
-          <span className="text-lg font-mono">{formatTime(elapsedTime)}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-gray-600">
+            <Clock size={20} />
+            <span className={`text-lg font-mono ${getDisplayTime() < 0 ? 'text-red-600 font-bold' : ''}`}>
+              {getSession() ? '残り ' : '経過 '}
+              {formatTime(getDisplayTime())}
+            </span>
+            {isPaused && (
+              <span className="text-sm text-orange-600 font-medium ml-2">
+                一時停止中
+              </span>
+            )}
+          </div>
+
+          <Button
+            variant={isPaused ? "primary" : "secondary"}
+            size="sm"
+            onClick={togglePause}
+          >
+            {isPaused ? (
+              <>
+                <Play size={16} className="mr-1" />
+                再開
+              </>
+            ) : (
+              <>
+                <Pause size={16} className="mr-1" />
+                一時停止
+              </>
+            )}
+          </Button>
         </div>
       </Card>
 
