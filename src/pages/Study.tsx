@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Clock, Pause, Play, Edit2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db } from '@/lib/db'
@@ -20,8 +20,10 @@ export default function Study() {
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
   const [startTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
   const [memo, setMemo] = useState('')
   const [timeExpired, setTimeExpired] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   // 一時停止機能
   const [isPaused, setIsPaused] = useState(false)
@@ -49,12 +51,18 @@ export default function Study() {
       const actualElapsed = rawElapsed - pausedTime
       setElapsedTime(actualElapsed)
 
-      // セッションがある場合、制限時間をチェック
+      // セッション全体の経過時間を計算
       const session = getSession()
-      if (session && !timeExpired) {
-        const targetSeconds = session.targetMinutes * 60
-        if (actualElapsed >= targetSeconds) {
-          setTimeExpired(true)
+      if (session) {
+        const sessionElapsed = Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000)
+        setSessionElapsedTime(sessionElapsed)
+
+        // 制限時間をチェック
+        if (!timeExpired) {
+          const targetSeconds = session.targetMinutes * 60
+          if (sessionElapsed >= targetSeconds) {
+            setTimeExpired(true)
+          }
         }
       }
     }, 1000)
@@ -257,17 +265,6 @@ export default function Study() {
     return `${sign}${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // 表示する時間を計算（セッションがある場合はカウントダウン）
-  const getDisplayTime = () => {
-    const session = getSession()
-    if (session) {
-      const targetSeconds = session.targetMinutes * 60
-      const remaining = targetSeconds - elapsedTime
-      return remaining
-    }
-    return elapsedTime
-  }
-
   const getResultIcon = (result: StudyResult) => {
     switch (result) {
       case 'correct':
@@ -295,164 +292,164 @@ export default function Study() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-2xl mx-auto px-2 sm:px-4">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between mb-4">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate(`/workbooks/${problem.workbookId}`)}
+        >
+          <ArrowLeft size={16} />
+        </Button>
+        <p className="text-sm text-gray-600 truncate mx-2">{workbook.title}</p>
+        <button
+          onClick={togglePause}
+          className="p-2 rounded hover:bg-gray-100 transition-colors"
+        >
+          {isPaused ? <Play size={20} className="text-primary" /> : <Pause size={20} className="text-gray-600" />}
+        </button>
+      </div>
+
       {/* 時間終了メッセージ */}
       {timeExpired && (
-        <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-400 rounded-lg">
-          <div className="flex items-center gap-3">
-            <Clock size={24} className="text-orange-600" />
-            <div>
-              <p className="text-lg font-bold text-orange-900">時間です！</p>
-              <p className="text-sm text-orange-700">
-                この問題がとき終わったら終了してください
+        <div className="mb-3 p-3 bg-orange-50 border border-orange-400 rounded-lg">
+          <p className="text-sm font-bold text-orange-900">⏰ 時間です！この問題で終了してください</p>
+        </div>
+      )}
+
+      {/* 問題情報カード */}
+      <Card className="mb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">
+              問題 {problem.problemNumber}
+            </h1>
+            {problem.memo && (
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
+            )}
+          </div>
+          {/* ページ数を大きく表示 */}
+          {problem.page && (
+            <div className="flex-shrink-0 text-center bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-2">
+              <p className="text-xs text-blue-600 font-medium">ページ</p>
+              <p className="text-3xl sm:text-4xl font-bold text-blue-700">{problem.page}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 時間表示 */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="grid grid-cols-2 gap-3 text-center">
+            {getSession() && (
+              <div className="bg-purple-50 rounded-lg p-2">
+                <p className="text-xs text-purple-600">セッション時間</p>
+                <p className="text-lg font-bold font-mono text-purple-700">
+                  {formatTime(sessionElapsedTime)}
+                </p>
+              </div>
+            )}
+            <div className={`bg-gray-50 rounded-lg p-2 ${!getSession() ? 'col-span-2' : ''}`}>
+              <p className="text-xs text-gray-600">この問題</p>
+              <p className={`text-lg font-bold font-mono ${isPaused ? 'text-orange-600' : 'text-gray-700'}`}>
+                {isPaused && '⏸ '}{formatTime(elapsedTime)}
               </p>
             </div>
           </div>
         </div>
-      )}
-
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => navigate(`/workbooks/${problem.workbookId}`)}
-        className="mb-4"
-      >
-        <ArrowLeft size={16} className="mr-2" />
-        戻る
-      </Button>
-
-      <Card className="mb-6">
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">{workbook.title}</p>
-          <h1 className="text-2xl font-bold">問題 {problem.problemNumber}</h1>
-          {problem.memo && (
-            <p className="text-gray-600 mt-2">{problem.memo}</p>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-gray-600">
-            <Clock size={20} />
-            <span className={`text-lg font-mono ${getDisplayTime() < 0 ? 'text-red-600 font-bold' : ''}`}>
-              {getSession() ? '残り ' : '経過 '}
-              {formatTime(getDisplayTime())}
-            </span>
-            {isPaused && (
-              <span className="text-sm text-orange-600 font-medium ml-2">
-                一時停止中
-              </span>
-            )}
-          </div>
-
-          <Button
-            variant={isPaused ? "primary" : "secondary"}
-            size="sm"
-            onClick={togglePause}
-          >
-            {isPaused ? (
-              <>
-                <Play size={16} className="mr-1" />
-                再開
-              </>
-            ) : (
-              <>
-                <Pause size={16} className="mr-1" />
-                一時停止
-              </>
-            )}
-          </Button>
-        </div>
       </Card>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">解答結果を記録</h2>
-          <p className="text-xs text-gray-500">
-            キーボード: 1=正解, 2=部分正解, 3=不正解
-          </p>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Button
-            variant="success"
-            size="lg"
-            onClick={() => handleRecord('correct')}
-            className="flex flex-col items-center gap-2 h-24 relative"
-          >
-            <Circle size={32} />
-            <span>正解</span>
-            <span className="absolute top-2 right-2 text-xs opacity-70">1</span>
-          </Button>
-          <Button
-            variant="warning"
-            size="lg"
-            onClick={() => handleRecord('partial')}
-            className="flex flex-col items-center gap-2 h-24 relative"
-          >
-            <Triangle size={32} />
-            <span>部分正解</span>
-            <span className="absolute top-2 right-2 text-xs opacity-70">2</span>
-          </Button>
-          <Button
-            variant="error"
-            size="lg"
-            onClick={() => handleRecord('incorrect')}
-            className="flex flex-col items-center gap-2 h-24 relative"
-          >
-            <X size={32} />
-            <span>不正解</span>
-            <span className="absolute top-2 right-2 text-xs opacity-70">3</span>
-          </Button>
-        </div>
+      {/* 解答ボタン */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <Button
+          variant="success"
+          size="lg"
+          onClick={() => handleRecord('correct')}
+          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
+        >
+          <Circle size={24} className="sm:w-8 sm:h-8" />
+          <span className="text-sm sm:text-base">正解</span>
+        </Button>
+        <Button
+          variant="warning"
+          size="lg"
+          onClick={() => handleRecord('partial')}
+          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
+        >
+          <Triangle size={24} className="sm:w-8 sm:h-8" />
+          <span className="text-sm sm:text-base">部分正解</span>
+        </Button>
+        <Button
+          variant="error"
+          size="lg"
+          onClick={() => handleRecord('incorrect')}
+          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
+        >
+          <X size={24} className="sm:w-8 sm:h-8" />
+          <span className="text-sm sm:text-base">不正解</span>
+        </Button>
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">メモ</label>
+      {/* メモ入力（コンパクト） */}
+      <div className="mb-4">
         <textarea
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
-          className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary h-24"
-          placeholder="間違えた点や気づきなど（任意）"
+          className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          placeholder="メモ（任意）"
+          rows={2}
         />
       </div>
 
+      {/* 学習履歴（折りたたみ可能） */}
       {studyRecords.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold mb-3">学習履歴</h2>
-          <div className="space-y-2">
-            {studyRecords.map((record) => (
-              <Card key={record.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {getResultIcon(record.result)}
-                  <div>
-                    <p className="font-medium">{getResultText(record.result)}</p>
-                    <p className="text-sm text-gray-600">
-                      {new Date(record.studiedAt).toLocaleString('ja-JP')} ·{' '}
-                      {formatTime(record.studyTime)}
-                    </p>
-                    {record.memo && (
-                      <p className="text-sm text-gray-600 mt-1">{record.memo}</p>
-                    )}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors mb-2"
+          >
+            <span className="text-sm font-medium text-gray-700">
+              学習履歴 ({studyRecords.length}回)
+            </span>
+            {showHistory ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+
+          {showHistory && (
+            <div className="space-y-2 mb-4">
+              {studyRecords.map((record) => (
+                <Card key={record.id} className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {getResultIcon(record.result)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{getResultText(record.result)}</p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(record.studiedAt).toLocaleDateString('ja-JP')} · {formatTime(record.studyTime)}
+                        </p>
+                        {record.memo && (
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{record.memo}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => openEditModal(record)}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                      >
+                        <Edit2 size={14} className="text-primary" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecord(record.id)}
+                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                      >
+                        <Trash2 size={14} className="text-error" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => openEditModal(record)}
-                  >
-                    <Edit2 size={16} />
-                  </Button>
-                  <Button
-                    variant="error"
-                    size="sm"
-                    onClick={() => handleDeleteRecord(record.id)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
