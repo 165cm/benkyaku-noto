@@ -17,6 +17,7 @@ export interface Problem {
   page?: number // ページ数
   memo?: string
   createdAt: Date
+  deletedAt?: Date // 論理削除用
 }
 
 // 学習記録

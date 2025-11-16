@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Key, AlertCircle, CheckCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Key, AlertCircle, CheckCircle, Trash2 } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { saveOpenAIApiKey, getOpenAIApiKey, removeOpenAIApiKey } from '@/lib/storage'
 
 export default function Settings() {
+  const navigate = useNavigate()
   const [apiKey, setApiKey] = useState('')
   const [isApiKeySet, setIsApiKeySet] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -137,6 +139,25 @@ export default function Settings() {
           <li>AIが自動的に章・節・タグを抽出</li>
           <li>内容を確認・編集して問題集を作成</li>
         </ol>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <Trash2 className="text-gray-600 mt-1" size={24} />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold mb-2">ゴミ箱</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              削除した問題を復元または完全削除できます
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/trash')}
+            >
+              <Trash2 size={16} className="mr-2" />
+              ゴミ箱を開く
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   )
