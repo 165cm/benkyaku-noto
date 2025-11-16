@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Clock, Pause, Play } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Clock, Pause, Play, Edit2, Trash2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, db } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db } from '@/lib/db'
 import {
   getSession,
   addResult,
@@ -27,6 +27,12 @@ export default function Study() {
   const [isPaused, setIsPaused] = useState(false)
   const [pausedTime, setPausedTime] = useState(0) // 累計一時停止時間（秒）
   const [pauseStartTime, setPauseStartTime] = useState<number | null>(null) // 一時停止開始時刻（ミリ秒）
+
+  // 編集機能
+  const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null)
+  const [editResult, setEditResult] = useState<StudyResult>('correct')
+  const [editTime, setEditTime] = useState('')
+  const [editMemo, setEditMemo] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -110,6 +116,45 @@ export default function Study() {
       setPauseStartTime(Date.now())
       setIsPaused(true)
     }
+  }
+
+  // 編集モーダルを開く
+  const openEditModal = (record: StudyRecord) => {
+    setEditingRecord(record)
+    setEditResult(record.result)
+    setEditTime(formatTime(record.studyTime))
+    setEditMemo(record.memo || '')
+  }
+
+  // 編集を保存
+  const handleSaveEdit = async () => {
+    if (!editingRecord) return
+
+    // 時間を秒に変換
+    const [mins, secs] = editTime.split(':').map(Number)
+    const studyTime = (mins || 0) * 60 + (secs || 0)
+
+    await updateStudyRecord(editingRecord.id, {
+      result: editResult,
+      studyTime,
+      memo: editMemo || undefined,
+    })
+
+    setEditingRecord(null)
+    await loadData()
+  }
+
+  // 編集をキャンセル
+  const cancelEdit = () => {
+    setEditingRecord(null)
+  }
+
+  // 学習記録を削除
+  const handleDeleteRecord = async (recordId: string) => {
+    if (!confirm('この学習記録を削除しますか？')) return
+
+    await deleteStudyRecord(recordId)
+    await loadData()
   }
 
   const handleRecord = async (result: StudyResult) => {
@@ -389,9 +434,101 @@ export default function Study() {
                     )}
                   </div>
                 </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openEditModal(record)}
+                  >
+                    <Edit2 size={16} />
+                  </Button>
+                  <Button
+                    variant="error"
+                    size="sm"
+                    onClick={() => handleDeleteRecord(record.id)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 編集モーダル */}
+      {editingRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">学習記録を編集</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">結果</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    variant={editResult === 'correct' ? 'success' : 'secondary'}
+                    size="sm"
+                    onClick={() => setEditResult('correct')}
+                    className="flex flex-col items-center gap-1 h-16"
+                  >
+                    <Circle size={20} />
+                    <span className="text-xs">正解</span>
+                  </Button>
+                  <Button
+                    variant={editResult === 'partial' ? 'warning' : 'secondary'}
+                    size="sm"
+                    onClick={() => setEditResult('partial')}
+                    className="flex flex-col items-center gap-1 h-16"
+                  >
+                    <Triangle size={20} />
+                    <span className="text-xs">部分正解</span>
+                  </Button>
+                  <Button
+                    variant={editResult === 'incorrect' ? 'error' : 'secondary'}
+                    size="sm"
+                    onClick={() => setEditResult('incorrect')}
+                    className="flex flex-col items-center gap-1 h-16"
+                  >
+                    <X size={20} />
+                    <span className="text-xs">不正解</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  学習時間（分:秒）
+                </label>
+                <input
+                  type="text"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="例: 5:30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">メモ</label>
+                <textarea
+                  value={editMemo}
+                  onChange={(e) => setEditMemo(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary h-20"
+                  placeholder="メモ（任意）"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="secondary" onClick={cancelEdit}>
+                  キャンセル
+                </Button>
+                <Button variant="primary" onClick={handleSaveEdit}>
+                  保存
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>

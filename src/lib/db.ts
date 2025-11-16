@@ -100,3 +100,14 @@ export async function deleteProblem(id: string) {
   await db.studyRecords.where('problemId').equals(id).delete()
   await db.problems.delete(id)
 }
+
+export async function updateStudyRecord(
+  id: string,
+  updates: Partial<Pick<StudyRecord, 'result' | 'studyTime' | 'memo'>>
+) {
+  await db.studyRecords.update(id, updates)
+}
+
+export async function deleteStudyRecord(id: string) {
+  await db.studyRecords.delete(id)
+}
