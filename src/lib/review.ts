@@ -131,6 +131,65 @@ export async function calculateStudyStats() {
   }
 }
 
+// 問題集別の学習統計の計算（日別正答率を含む）
+export async function calculateStudyStatsByWorkbook(workbookId?: string) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - 6)
+
+  let allRecords = await db.studyRecords.toArray()
+
+  // 問題集でフィルタリング
+  if (workbookId) {
+    allRecords = allRecords.filter((r) => r.workbookId === workbookId)
+  }
+
+  const todayRecords = allRecords.filter((r) => r.studiedAt >= today)
+  const weekRecords = allRecords.filter((r) => r.studiedAt >= weekStart)
+
+  const totalStudyTime = allRecords.reduce((sum, r) => sum + r.studyTime, 0)
+  const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
+  const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
+
+  const correctCount = allRecords.filter((r) => r.result === 'correct').length
+  const correctRate = allRecords.length > 0 ? (correctCount / allRecords.length) * 100 : 0
+
+  // 週間データ（学習時間、問題数、正答率）
+  const weeklyData = []
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+
+    const dayRecords = allRecords.filter((r) => {
+      const recordDate = new Date(r.studiedAt)
+      recordDate.setHours(0, 0, 0, 0)
+      return recordDate.getTime() === date.getTime()
+    })
+
+    const dayCorrectCount = dayRecords.filter((r) => r.result === 'correct').length
+    const dayAccuracy = dayRecords.length > 0 ? Math.round((dayCorrectCount / dayRecords.length) * 100) : null
+
+    weeklyData.push({
+      date: dateStr,
+      studyTime: dayRecords.reduce((sum, r) => sum + r.studyTime, 0),
+      problemsSolved: dayRecords.length,
+      accuracy: dayAccuracy,
+    })
+  }
+
+  return {
+    totalStudyTime,
+    todayStudyTime,
+    weekStudyTime,
+    totalProblemsSolved: allRecords.length,
+    correctRate: Math.round(correctRate),
+    weeklyData,
+  }
+}
+
 // 問題セットの直近回答の正解率を計算
 export async function calculateRecentAccuracyForProblems(problems: Problem[]): Promise<number | null> {
   if (problems.length === 0) return null

@@ -55,5 +55,6 @@ export interface StudyStats {
     date: string
     studyTime: number
     problemsSolved: number
+    accuracy?: number | null
   }[]
 }
