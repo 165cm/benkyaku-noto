@@ -15,6 +15,7 @@ import {
   getStudyRecords,
   calculateAccuracyForProblem,
   getCategoriesForWorkbook,
+  isParentProblem,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
@@ -197,11 +198,31 @@ export default function WorkbookDetail() {
     }
   }
 
-  const handleStartGroupStudy = (groupProblems: Problem[]) => {
+  const handleStartGroupStudy = async (groupProblems: Problem[]) => {
     if (groupProblems.length === 0) return
 
+    // 親問題（箱）を除外して学習可能な問題のみを抽出
+    const learnableProblems: Problem[] = []
+    for (const problem of groupProblems) {
+      const hasSubProblems = await isParentProblem(problem.id)
+      if (!hasSubProblems) {
+        learnableProblems.push(problem)
+      }
+    }
+
+    // 学習可能な小問も追加
+    for (const problem of groupProblems) {
+      const subProblems = subProblemsMap.get(problem.id) || []
+      learnableProblems.push(...subProblems)
+    }
+
+    if (learnableProblems.length === 0) {
+      alert('学習可能な問題がありません')
+      return
+    }
+
     // グループ内の問題からランダムに1つ選択
-    const randomProblem = groupProblems[Math.floor(Math.random() * groupProblems.length)]
+    const randomProblem = learnableProblems[Math.floor(Math.random() * learnableProblems.length)]
     navigate(`/study/${randomProblem.id}`)
   }
 

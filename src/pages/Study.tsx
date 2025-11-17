@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import {
   getSession,
   addResult,
@@ -242,6 +242,12 @@ export default function Study() {
 
     // 次の未学習問題を探す
     for (const p of allProblems) {
+      // 親問題（箱）はスキップ
+      const hasSubProblems = await isParentProblem(p.id)
+      if (hasSubProblems) {
+        continue
+      }
+
       const records = await db.studyRecords
         .where('problemId')
         .equals(p.id)
@@ -305,6 +311,30 @@ export default function Study() {
     return problemNumber
   }
 
+  // セクションタイトルを取得
+  const getSectionTitle = (problem: Problem) => {
+    // categoryフィールドがある場合はそれを使用
+    if (problem.category) {
+      return problem.category
+    }
+
+    // 問題番号から抽出
+    const parts = problem.problemNumber.split('-')
+
+    // 小問の場合（例: "代金精算-3-1" → "代金精算"）
+    if (parts.length >= 3) {
+      return parts.slice(0, -2).join('-')
+    }
+
+    // 通常の問題（例: "代金精算-3" → "代金精算"）
+    if (parts.length >= 2) {
+      return parts.slice(0, -1).join('-')
+    }
+
+    // ハイフンがない場合は空文字
+    return ''
+  }
+
   if (!problem || !workbook) {
     return <div>読み込み中...</div>
   }
@@ -340,6 +370,11 @@ export default function Study() {
       <Card className="mb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            {getSectionTitle(problem) && (
+              <p className="text-xs sm:text-sm text-gray-500 mb-1 truncate">
+                {getSectionTitle(problem)}
+              </p>
+            )}
             <h1 className="text-xl sm:text-2xl font-bold truncate">
               問題 {getDisplayProblemNumber(problem.problemNumber)}
             </h1>
