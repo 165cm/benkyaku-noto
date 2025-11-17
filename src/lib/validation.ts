@@ -16,7 +16,7 @@ export class ValidationError extends Error {
  */
 export async function validateProblem(
   problem: Partial<Problem>,
-  isUpdate = false
+  _isUpdate = false
 ): Promise<void> {
   // 必須フィールドのチェック
   if (!problem.workbookId) {
@@ -96,7 +96,7 @@ async function checkCircularReference(
 
     visited.add(currentId)
 
-    const parent = await db.problems.get(currentId)
+    const parent: Problem | undefined = await db.problems.get(currentId)
     currentId = parent?.parentProblemId
   }
 }
@@ -106,7 +106,7 @@ async function checkCircularReference(
  */
 export async function validateWorkbook(
   workbook: Partial<Workbook>,
-  isUpdate = false
+  _isUpdate = false
 ): Promise<void> {
   // 必須フィールドのチェック
   if (!workbook.title || workbook.title.trim() === '') {
