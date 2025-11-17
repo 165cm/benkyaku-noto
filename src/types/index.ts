@@ -12,7 +12,8 @@ export interface Workbook {
 export interface Problem {
   id: string
   workbookId: string
-  problemNumber: string // "1-5" など
+  problemNumber: string // "1-5" など（表示用）
+  sortOrder: number // 並び替え用（システムが自動管理）
   category?: string // 親カテゴリ（例: "言語", "数学"）
   parentProblemId?: string // 親問題のID（小問の場合）
   page?: number // ページ数
