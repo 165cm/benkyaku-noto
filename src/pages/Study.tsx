@@ -358,7 +358,7 @@ export default function Study() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => navigate(`/workbooks/${problem.workbookId}`)}
+          onClick={() => navigate('/')}
         >
           <ArrowLeft size={16} />
         </Button>
