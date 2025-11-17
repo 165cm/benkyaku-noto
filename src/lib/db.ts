@@ -237,6 +237,31 @@ export async function deleteStudyRecord(id: string) {
   await db.studyRecords.delete(id)
 }
 
+// 問題番号から最後の数値部分を抽出
+function extractLastNumber(problemNumber: string): number {
+  const parts = problemNumber.split('-')
+  const lastPart = parts[parts.length - 1]
+  const num = parseInt(lastPart)
+  return isNaN(num) ? 0 : num
+}
+
+// 問題番号のプレフィックスを取得（最後の数値部分を除く）
+function getProblemPrefix(problemNumber: string): string {
+  const parts = problemNumber.split('-')
+  if (parts.length <= 1) return ''
+  return parts.slice(0, -1).join('-')
+}
+
+// 問題番号の最後の数値部分を1つ減らす
+function decrementLastNumber(problemNumber: string): string {
+  const parts = problemNumber.split('-')
+  const lastPart = parts[parts.length - 1]
+  const num = parseInt(lastPart)
+  if (isNaN(num) || num <= 1) return problemNumber
+  parts[parts.length - 1] = (num - 1).toString()
+  return parts.join('-')
+}
+
 // 問題を親問題の小問にする（親問題を箱として扱う）
 export async function makeSubProblem(problemId: string, parentProblemId: string) {
   // トランザクションで安全に実行
@@ -327,6 +352,45 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
         category: parentProblem.category,
         page: parentProblem.page,
       })
+    }
+
+    // ドロップした問題より後ろの問題を繰り上げる
+    // 例: 問題4に問題5をドロップした場合、問題6→問題5、問題7→問題6に繰り上げる
+    const draggedNumber = extractLastNumber(draggedProblem.problemNumber)
+    const draggedPrefix = getProblemPrefix(draggedProblem.problemNumber)
+
+    // 同じworkbookIdの問題を取得
+    const allProblems = await db.problems
+      .where('workbookId')
+      .equals(draggedProblem.workbookId)
+      .toArray()
+
+    // ドロップした問題より大きい番号を持つ問題を繰り上げる
+    for (const problem of allProblems) {
+      // スキップする条件：
+      // - ドロップした問題自身
+      // - 親問題
+      // - 小問（parentProblemIdが設定されている問題）
+      // - 削除された問題
+      if (
+        problem.id === draggedProblem.id ||
+        problem.id === parentProblemId ||
+        problem.parentProblemId ||
+        problem.deletedAt
+      ) {
+        continue
+      }
+
+      const problemNumber = extractLastNumber(problem.problemNumber)
+      const problemPrefix = getProblemPrefix(problem.problemNumber)
+
+      // 同じプレフィックスで、ドロップした問題より大きい番号を持つ問題を繰り上げる
+      if (problemPrefix === draggedPrefix && problemNumber > draggedNumber) {
+        const newProblemNumber = decrementLastNumber(problem.problemNumber)
+        await db.problems.update(problem.id, {
+          problemNumber: newProblemNumber,
+        })
+      }
     }
   })
 }

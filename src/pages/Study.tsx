@@ -42,6 +42,18 @@ export default function Study() {
     }
   }, [id])
 
+  // ウィンドウがフォーカスされた時にデータを再読み込み（問題番号の編集が反映されるように）
+  useEffect(() => {
+    const handleFocus = () => {
+      if (id) {
+        loadData()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [id])
+
   useEffect(() => {
     if (isPaused) return // 一時停止中は何もしない
 
