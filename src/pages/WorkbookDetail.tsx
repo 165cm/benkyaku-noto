@@ -521,10 +521,10 @@ export default function WorkbookDetail() {
     loadData()
   }
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!workbook) return
 
-    const csvContent = exportProblemsToCSV(problems)
+    const csvContent = await exportProblemsToCSV(problems)
     const filename = `${workbook.title}_問題集_${new Date().toISOString().split('T')[0]}.csv`
     downloadCSV(csvContent, filename)
   }

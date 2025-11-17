@@ -1,19 +1,56 @@
 import type { Problem } from '@/types'
+import { db } from './db'
 
-// 問題をCSV形式にエクスポート
-export function exportProblemsToCSV(problems: Problem[]): string {
+// 問題をCSV形式にエクスポート（学習統計情報付き）
+export async function exportProblemsToCSV(problems: Problem[]): Promise<string> {
   // CSVヘッダー
-  const headers = ['問題番号', 'カテゴリ', 'ページ', 'メモ']
+  const headers = ['問題番号', 'カテゴリ', 'ページ', 'メモ', '学習回数', '正答率', '最新結果', '最新学習日']
 
-  // CSVデータ行
-  const rows = problems.map((problem) => {
+  // CSVデータ行（非同期処理）
+  const rows = await Promise.all(problems.map(async (problem) => {
+    // 学習記録を取得
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problem.id)
+      .toArray()
+
+    // 学習統計を計算
+    const studyCount = records.length
+    let accuracy = ''
+    let latestResult = ''
+    let latestDate = ''
+
+    if (records.length > 0) {
+      // 正答率を計算
+      const correctCount = records.filter(r => r.result === 'correct').length
+      accuracy = `${Math.round((correctCount / records.length) * 100)}%`
+
+      // 最新の学習記録を取得
+      const sortedRecords = records.sort((a, b) =>
+        new Date(b.studiedAt).getTime() - new Date(a.studiedAt).getTime()
+      )
+      const latest = sortedRecords[0]
+
+      // 結果を日本語に変換
+      latestResult = latest.result === 'correct' ? '正解'
+                   : latest.result === 'partial' ? '部分正解'
+                   : '不正解'
+
+      // 日付をフォーマット
+      latestDate = new Date(latest.studiedAt).toLocaleDateString('ja-JP')
+    }
+
     return [
       escapeCSVField(problem.problemNumber),
       escapeCSVField(problem.category || ''),
       problem.page?.toString() || '',
       escapeCSVField(problem.memo || ''),
+      studyCount.toString(),
+      accuracy,
+      latestResult,
+      latestDate,
     ].join(',')
-  })
+  }))
 
   // ヘッダーとデータを結合
   return [headers.join(','), ...rows].join('\n')
@@ -45,6 +82,7 @@ export function downloadCSV(csvContent: string, filename: string): void {
 }
 
 // CSVからインポート（データのパース）
+// 注: 学習統計情報（学習回数、正答率、最新結果、最新学習日）はインポート時に無視されます
 export interface ParsedProblemData {
   problemNumber: string
   category?: string
@@ -69,6 +107,8 @@ export function parseCSV(csvText: string): ParsedProblemData[] {
 
     if (fields.length < 1) continue
 
+    // 問題情報のみをインポート（フィールド0-3）
+    // フィールド4以降（学習統計情報）は無視
     const problem: ParsedProblemData = {
       problemNumber: fields[0] || '',
       category: fields[1] || undefined,
