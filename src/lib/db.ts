@@ -1,6 +1,7 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
 import type { Workbook, Problem, StudyRecord } from '@/types'
+import { validateProblem, validateWorkbook, validateStudyRecord } from './validation'
 
 export class BenkyakuDB extends Dexie {
   workbooks!: Table<Workbook>
@@ -29,6 +30,40 @@ export class BenkyakuDB extends Dexie {
       problems: 'id, workbookId, problemNumber, createdAt, deletedAt, parentProblemId',
       studyRecords: 'id, problemId, workbookId, studiedAt',
     })
+
+    // sortOrderフィールドを追加（並び替え用）
+    this.version(4).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sortOrder, createdAt, deletedAt, parentProblemId',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+    }).upgrade(async (tx) => {
+      // 既存の問題にsortOrderを割り当て
+      // 作成日時順に番号を振る
+      const problems = await tx.table('problems').toArray()
+
+      // workbookId ごとにグループ化してソート
+      const problemsByWorkbook = new Map<string, any[]>()
+
+      problems.forEach((problem) => {
+        if (!problemsByWorkbook.has(problem.workbookId)) {
+          problemsByWorkbook.set(problem.workbookId, [])
+        }
+        problemsByWorkbook.get(problem.workbookId)!.push(problem)
+      })
+
+      // 各問題集ごとにsortOrderを割り当て
+      for (const [, workbookProblems] of problemsByWorkbook) {
+        // 作成日時順にソート
+        workbookProblems.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+
+        // sortOrderを割り当て
+        for (let i = 0; i < workbookProblems.length; i++) {
+          await tx.table('problems').update(workbookProblems[i].id, {
+            sortOrder: (i + 1) * 100, // 100刻みで割り当て（間に挿入できるようにする）
+          })
+        }
+      }
+    })
   }
 }
 
@@ -36,6 +71,9 @@ export const db = new BenkyakuDB()
 
 // ユーティリティ関数
 export async function addWorkbook(workbook: Omit<Workbook, 'id' | 'createdAt' | 'updatedAt'>) {
+  // バリデーション
+  await validateWorkbook(workbook)
+
   const id = crypto.randomUUID()
   const now = new Date()
 
@@ -49,12 +87,28 @@ export async function addWorkbook(workbook: Omit<Workbook, 'id' | 'createdAt' | 
   return id
 }
 
-export async function addProblem(problem: Omit<Problem, 'id' | 'createdAt'>) {
+export async function addProblem(problem: Omit<Problem, 'id' | 'createdAt' | 'sortOrder'>) {
+  // バリデーション
+  await validateProblem(problem)
+
   const id = crypto.randomUUID()
+
+  // sortOrderを自動計算：同じworkbookId内の最大値 + 100
+  const existingProblems = await db.problems
+    .where('workbookId')
+    .equals(problem.workbookId)
+    .toArray()
+
+  const maxSortOrder = existingProblems.length > 0
+    ? Math.max(...existingProblems.map(p => p.sortOrder || 0))
+    : 0
+
+  const sortOrder = maxSortOrder + 100
 
   await db.problems.add({
     ...problem,
     id,
+    sortOrder,
     createdAt: new Date(),
   })
 
@@ -62,6 +116,9 @@ export async function addProblem(problem: Omit<Problem, 'id' | 'createdAt'>) {
 }
 
 export async function addStudyRecord(record: Omit<StudyRecord, 'id' | 'studiedAt'>) {
+  // バリデーション
+  await validateStudyRecord(record)
+
   const id = crypto.randomUUID()
 
   await db.studyRecords.add({
@@ -90,7 +147,7 @@ export async function getProblems(workbookId: string) {
   // 削除されていない問題のみを返す
   return problems
     .filter(p => !p.deletedAt)
-    .sort((a, b) => a.problemNumber.localeCompare(b.problemNumber))
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) // sortOrder順に並べる
 }
 
 export async function getProblem(id: string) {
@@ -182,69 +239,96 @@ export async function deleteStudyRecord(id: string) {
 
 // 問題を親問題の小問にする（親問題を箱として扱う）
 export async function makeSubProblem(problemId: string, parentProblemId: string) {
-  const parentProblem = await db.problems.get(parentProblemId)
-  const draggedProblem = await db.problems.get(problemId)
+  // トランザクションで安全に実行
+  return await db.transaction('rw', db.problems, db.studyRecords, async () => {
+    const parentProblem = await db.problems.get(parentProblemId)
+    const draggedProblem = await db.problems.get(problemId)
 
-  if (!parentProblem || !draggedProblem) return
-
-  // 既存の小問を取得
-  const existingSubProblems = await getSubProblems(parentProblemId)
-
-  if (existingSubProblems.length === 0) {
-    // 親問題に初めて小問を追加する場合
-    // 1. 親問題のデータを「親-1」という新しい小問として作成
-    const parentAsSubProblemId = crypto.randomUUID()
-    await db.problems.add({
-      id: parentAsSubProblemId,
-      workbookId: parentProblem.workbookId,
-      problemNumber: `${parentProblem.problemNumber}-1`,
-      category: parentProblem.category,
-      page: parentProblem.page,
-      memo: parentProblem.memo,
-      parentProblemId: parentProblemId,
-      createdAt: new Date(),
-    })
-
-    // 親問題の学習記録を新しい小問に移動
-    const parentStudyRecords = await db.studyRecords
-      .where('problemId')
-      .equals(parentProblemId)
-      .toArray()
-
-    for (const record of parentStudyRecords) {
-      await db.studyRecords.update(record.id, {
-        problemId: parentAsSubProblemId,
-      })
+    if (!parentProblem || !draggedProblem) {
+      throw new Error('問題が見つかりません')
     }
 
-    // 2. ドラッグされた問題を「親-2」として設定
-    await db.problems.update(problemId, {
-      problemNumber: `${parentProblem.problemNumber}-2`,
-      parentProblemId: parentProblemId,
-      category: parentProblem.category,
-      page: parentProblem.page,
-    })
+    // バリデーション
+    if (draggedProblem.workbookId !== parentProblem.workbookId) {
+      throw new Error('異なる問題集の問題は関連付けできません')
+    }
 
-    // 3. 親問題のメモをクリア（箱としてのみ機能させる）
-    await db.problems.update(parentProblemId, {
-      memo: undefined,
-    })
-  } else {
-    // 既に小問がある場合は、次の番号を割り当てる
-    const maxSubNumber = Math.max(
-      ...existingSubProblems.map(p => {
-        const parts = p.problemNumber.split('-')
-        return parseInt(parts[parts.length - 1]) || 0
+    if (problemId === parentProblemId) {
+      throw new Error('問題を自分自身の小問にすることはできません')
+    }
+
+    if (parentProblem.deletedAt || draggedProblem.deletedAt) {
+      throw new Error('削除された問題を操作することはできません')
+    }
+
+    // 既存の小問を取得
+    const existingSubProblems = await getSubProblems(parentProblemId)
+
+    // sortOrderを計算（親問題の直後に配置）
+    const parentSortOrder = parentProblem.sortOrder || 0
+    const baseSortOrder = parentSortOrder + 10 // 親問題の10後に配置
+
+    if (existingSubProblems.length === 0) {
+      // 親問題に初めて小問を追加する場合
+      // 1. 親問題のデータを「親-1」という新しい小問として作成
+      const parentAsSubProblemId = crypto.randomUUID()
+      await db.problems.add({
+        id: parentAsSubProblemId,
+        workbookId: parentProblem.workbookId,
+        problemNumber: `${parentProblem.problemNumber}-1`,
+        sortOrder: baseSortOrder,
+        category: parentProblem.category,
+        page: parentProblem.page,
+        memo: parentProblem.memo,
+        parentProblemId: parentProblemId,
+        createdAt: new Date(),
       })
-    )
 
-    await db.problems.update(problemId, {
-      problemNumber: `${parentProblem.problemNumber}-${maxSubNumber + 1}`,
-      parentProblemId: parentProblemId,
-      category: parentProblem.category,
-      page: parentProblem.page,
-    })
-  }
+      // 親問題の学習記録を新しい小問に移動
+      const parentStudyRecords = await db.studyRecords
+        .where('problemId')
+        .equals(parentProblemId)
+        .toArray()
+
+      for (const record of parentStudyRecords) {
+        await db.studyRecords.update(record.id, {
+          problemId: parentAsSubProblemId,
+        })
+      }
+
+      // 2. ドラッグされた問題を「親-2」として設定
+      await db.problems.update(problemId, {
+        problemNumber: `${parentProblem.problemNumber}-2`,
+        sortOrder: baseSortOrder + 1,
+        parentProblemId: parentProblemId,
+        category: parentProblem.category,
+        page: parentProblem.page,
+      })
+
+      // 3. 親問題のメモをクリア（箱としてのみ機能させる）
+      await db.problems.update(parentProblemId, {
+        memo: undefined,
+      })
+    } else {
+      // 既に小問がある場合は、次の番号を割り当てる
+      const maxSubNumber = Math.max(
+        ...existingSubProblems.map(p => {
+          const parts = p.problemNumber.split('-')
+          return parseInt(parts[parts.length - 1]) || 0
+        })
+      )
+
+      const maxSubSortOrder = Math.max(...existingSubProblems.map(p => p.sortOrder || 0))
+
+      await db.problems.update(problemId, {
+        problemNumber: `${parentProblem.problemNumber}-${maxSubNumber + 1}`,
+        sortOrder: maxSubSortOrder + 1,
+        parentProblemId: parentProblemId,
+        category: parentProblem.category,
+        page: parentProblem.page,
+      })
+    }
+  })
 }
 
 // 小問を独立した問題にする
@@ -262,7 +346,7 @@ export async function getSubProblems(parentProblemId: string) {
   // 削除されていない問題のみを返す
   return problems
     .filter(p => !p.deletedAt)
-    .sort((a, b) => a.problemNumber.localeCompare(b.problemNumber))
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) // sortOrder順に並べる
 }
 
 // 問題集内の既存カテゴリを取得

@@ -18,6 +18,7 @@ import {
   isParentProblem,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
+import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
 import type { Workbook, Problem, StudyRecord } from '@/types'
 
@@ -613,11 +614,23 @@ export default function WorkbookDetail() {
     const file = event.target.files?.[0]
     if (!file || !id) return
 
+    // ファイルサイズチェック（5MB制限）
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ファイルサイズが大きすぎます（5MB以下にしてください）')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
         const csvText = e.target?.result as string
         const parsedProblems = parseCSV(csvText)
+
+        // バリデーション
+        validateCSVData(parsedProblems)
 
         // インポート前に確認
         if (!confirm(`${parsedProblems.length}問の問題をインポートします。よろしいですか？`)) {
@@ -625,22 +638,47 @@ export default function WorkbookDetail() {
         }
 
         // 問題を追加
-        for (const problemData of parsedProblems) {
-          await addProblem({
-            workbookId: id,
-            problemNumber: problemData.problemNumber,
-            category: problemData.category,
-            page: problemData.page,
-            memo: problemData.memo,
-          })
+        let successCount = 0
+        let errorCount = 0
+        const errors: string[] = []
+
+        for (let i = 0; i < parsedProblems.length; i++) {
+          try {
+            const problemData = parsedProblems[i]
+            await addProblem({
+              workbookId: id,
+              problemNumber: problemData.problemNumber,
+              category: problemData.category,
+              page: problemData.page,
+              memo: problemData.memo,
+            })
+            successCount++
+          } catch (error) {
+            errorCount++
+            const errorMsg = error instanceof Error ? error.message : '不明なエラー'
+            errors.push(`${i + 1}行目: ${errorMsg}`)
+          }
         }
 
         // データを再読み込み
         await loadData()
-        alert(`${parsedProblems.length}問の問題をインポートしました`)
+
+        if (errorCount > 0) {
+          const errorSummary = errors.slice(0, 5).join('\n')
+          const moreErrors = errors.length > 5 ? `\n...他${errors.length - 5}件` : ''
+          alert(
+            `${successCount}問の問題をインポートしました。\n${errorCount}問でエラーが発生しました：\n\n${errorSummary}${moreErrors}`
+          )
+        } else {
+          alert(`${successCount}問の問題をインポートしました`)
+        }
       } catch (error) {
         console.error('CSV import error:', error)
-        alert(error instanceof Error ? error.message : 'CSVのインポートに失敗しました')
+        if (error instanceof ValidationError) {
+          alert(`バリデーションエラー: ${error.message}`)
+        } else {
+          alert(error instanceof Error ? error.message : 'CSVのインポートに失敗しました')
+        }
       }
     }
 
