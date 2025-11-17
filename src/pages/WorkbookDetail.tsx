@@ -56,9 +56,6 @@ export default function WorkbookDetail() {
   const [categoryFormData, setCategoryFormData] = useState({
     categoryName: '',
   })
-  const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
-  const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false)
-  const [bulkCategoryValue, setBulkCategoryValue] = useState('')
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [subProblemsMap, setSubProblemsMap] = useState<Map<string, Problem[]>>(new Map())
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
@@ -222,9 +219,12 @@ export default function WorkbookDetail() {
       return
     }
 
-    // グループ内の問題からランダムに1つ選択
-    const randomProblem = learnableProblems[Math.floor(Math.random() * learnableProblems.length)]
-    navigate(`/study/${randomProblem.id}`)
+    // sortOrder順にソート（順番に学習）
+    learnableProblems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+    // 最初の問題を選択
+    const firstProblem = learnableProblems[0]
+    navigate(`/study/${firstProblem.id}`)
   }
 
   const handleEditGroup = (groupKey: string, groupProblems: Problem[]) => {
@@ -456,87 +456,6 @@ export default function WorkbookDetail() {
     setCategoryFormData({ categoryName: '' })
   }
 
-  const toggleSectionSelection = (sectionKey: string) => {
-    const newSelected = new Set(selectedSections)
-    if (newSelected.has(sectionKey)) {
-      newSelected.delete(sectionKey)
-    } else {
-      newSelected.add(sectionKey)
-    }
-    setSelectedSections(newSelected)
-  }
-
-  const toggleAllSections = () => {
-    const problemHierarchy = groupProblemsByHierarchy()
-    const allSectionKeys: string[] = []
-    Object.entries(problemHierarchy).forEach(([category, titles]) => {
-      Object.keys(titles).forEach((title) => {
-        allSectionKeys.push(`${category}-${title}`)
-      })
-    })
-
-    if (selectedSections.size === allSectionKeys.length) {
-      setSelectedSections(new Set())
-    } else {
-      setSelectedSections(new Set(allSectionKeys))
-    }
-  }
-
-  const getSelectedProblems = (): Problem[] => {
-    const problemHierarchy = groupProblemsByHierarchy()
-    const selectedProblems: Problem[] = []
-
-    selectedSections.forEach((sectionKey) => {
-      const [category, ...titleParts] = sectionKey.split('-')
-      const title = titleParts.join('-')
-      if (problemHierarchy[category] && problemHierarchy[category][title]) {
-        selectedProblems.push(...problemHierarchy[category][title])
-      }
-    })
-
-    return selectedProblems
-  }
-
-  const handleBulkCategoryChange = async () => {
-    if (selectedSections.size === 0) return
-
-    setIsBulkCategoryModalOpen(true)
-  }
-
-  const handleBulkCategorySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const categoryToSet = bulkCategoryValue.trim() !== '' ? bulkCategoryValue.trim() : undefined
-    const problemsToUpdate = getSelectedProblems()
-
-    for (const problem of problemsToUpdate) {
-      await db.problems.update(problem.id, {
-        category: categoryToSet,
-      })
-    }
-
-    setIsBulkCategoryModalOpen(false)
-    setBulkCategoryValue('')
-    setSelectedSections(new Set())
-    loadData()
-  }
-
-  const handleBulkDelete = async () => {
-    if (selectedSections.size === 0) return
-
-    const problemsToDelete = getSelectedProblems()
-
-    if (!confirm(`選択した${selectedSections.size}セクション（${problemsToDelete.length}問）の問題を削除しますか？学習記録もすべて削除されます。`)) {
-      return
-    }
-
-    for (const problem of problemsToDelete) {
-      await deleteProblem(problem.id)
-    }
-
-    setSelectedSections(new Set())
-    loadData()
-  }
 
   // ドラッグアンドドロップのハンドラー
   const handleDragStart = (problem: Problem) => {
@@ -744,52 +663,6 @@ export default function WorkbookDetail() {
           </div>
         </div>
 
-        {/* 一括操作バー */}
-        {problems.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedSections.size > 0 && selectedSections.size === Object.entries(groupProblemsByHierarchy()).reduce((count, [, titles]) => count + Object.keys(titles).length, 0)}
-                    onChange={toggleAllSections}
-                    className="w-4 h-4 rounded border-gray-300"
-                  />
-                  <span className="text-sm font-medium">
-                    すべて選択
-                  </span>
-                </label>
-                {selectedSections.size > 0 && (
-                  <span className="text-sm text-gray-600">
-                    {selectedSections.size}セクション（{getSelectedProblems().length}問）選択中
-                  </span>
-                )}
-              </div>
-              {selectedSections.size > 0 && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleBulkCategoryChange}
-                  >
-                    <Edit2 size={14} className="mr-1" />
-                    カテゴリ変更
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    className="hover:bg-red-100"
-                  >
-                    <Trash2 size={14} className="mr-1" />
-                    削除
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {problems.length === 0 ? (
@@ -854,15 +727,8 @@ export default function WorkbookDetail() {
                             <div
                               className="flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
                             >
-                              {/* 左側：チェックボックス、展開アイコン、タイトル */}
+                              {/* 左側：展開アイコン、タイトル */}
                               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleTitle(titleKey)}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSections.has(titleKey)}
-                                  onChange={() => toggleSectionSelection(titleKey)}
-                                  className="w-4 h-4 rounded border-gray-300"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
                                 {isTitleExpanded ? (
                                   <ChevronDown size={16} className="text-gray-600" />
                                 ) : (
@@ -1341,54 +1207,6 @@ export default function WorkbookDetail() {
               キャンセル
             </Button>
             <Button type="submit">更新</Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isBulkCategoryModalOpen}
-        onClose={() => {
-          setIsBulkCategoryModalOpen(false)
-          setBulkCategoryValue('')
-        }}
-        title="選択した問題のカテゴリを変更"
-      >
-        <form onSubmit={handleBulkCategorySubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              カテゴリ名
-            </label>
-            <input
-              type="text"
-              value={bulkCategoryValue}
-              onChange={(e) => setBulkCategoryValue(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="例: 言語（空欄の場合はカテゴリをクリア）"
-              autoFocus
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              選択した問題すべてに同じカテゴリを設定します
-            </p>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              {selectedSections.size}セクション（{getSelectedProblems().length}問）が選択されています
-            </p>
-          </div>
-
-          <div className="flex gap-3 justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsBulkCategoryModalOpen(false)
-                setBulkCategoryValue('')
-              }}
-            >
-              キャンセル
-            </Button>
-            <Button type="submit">変更</Button>
           </div>
         </form>
       </Modal>
