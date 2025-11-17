@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
@@ -15,6 +15,7 @@ import type { Problem, Workbook, StudyRecord, StudyResult } from '@/types'
 export default function Study() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [problem, setProblem] = useState<Problem | null>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
@@ -40,7 +41,7 @@ export default function Study() {
     if (id) {
       loadData()
     }
-  }, [id])
+  }, [id, location.pathname]) // location.pathnameを追加して、URLが変わるたびに再読み込み
 
   useEffect(() => {
     if (isPaused) return // 一時停止中は何もしない
@@ -97,6 +98,7 @@ export default function Study() {
   const loadData = async () => {
     if (!id) return
 
+    // 問題データを取得（データベースから最新のデータを確実に取得）
     const problemData = await getProblem(id)
     if (problemData) {
       setProblem(problemData)
@@ -106,6 +108,9 @@ export default function Study() {
 
       const records = await getStudyRecords(id)
       setStudyRecords(records)
+    } else {
+      // 問題が見つからない場合はホームに戻る
+      navigate('/')
     }
   }
 
