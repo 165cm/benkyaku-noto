@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getDeletedProblems, restoreProblem, permanentlyDeleteProblem, getWorkbook } from '@/lib/db'
+import { getDeletedProblems, restoreProblem, permanentlyDeleteProblem, getWorkbook, emptyTrash } from '@/lib/db'
 import type { Problem } from '@/types'
 
 export default function Trash() {
@@ -49,6 +49,13 @@ export default function Trash() {
     }
   }
 
+  const handleEmptyTrash = async () => {
+    if (confirm(`ゴミ箱を空にしますか？\n\n${deletedProblems.length}件の問題と学習記録が完全に削除されます。\nこの操作は取り消せません。`)) {
+      await emptyTrash()
+      await loadData()
+    }
+  }
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('ja-JP', {
       year: 'numeric',
@@ -76,8 +83,21 @@ export default function Trash() {
           設定に戻る
         </Button>
 
-        <h1 className="text-2xl font-bold mb-2">ゴミ箱</h1>
-        <p className="text-gray-600">削除した問題を復元または完全に削除できます</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">ゴミ箱</h1>
+            <p className="text-gray-600">削除した問題を復元または完全に削除できます</p>
+          </div>
+          {deletedProblems.length > 0 && (
+            <Button
+              variant="error"
+              onClick={handleEmptyTrash}
+            >
+              <Trash2 size={16} className="mr-2" />
+              ゴミ箱を空にする
+            </Button>
+          )}
+        </div>
       </div>
 
       {deletedProblems.length === 0 ? (
