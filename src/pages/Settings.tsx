@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Key, AlertCircle, CheckCircle, Trash2 } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Trash2, Bug } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { saveOpenAIApiKey, getOpenAIApiKey, removeOpenAIApiKey } from '@/lib/storage'
@@ -155,6 +155,25 @@ export default function Settings() {
             >
               <Trash2 size={16} className="mr-2" />
               ゴミ箱を開く
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <Bug className="text-gray-600 mt-1" size={24} />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold mb-2">デバッグ</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              問題データの詳細を確認できます（開発用）
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/debug')}
+            >
+              <Bug size={16} className="mr-2" />
+              デバッグページを開く
             </Button>
           </div>
         </div>

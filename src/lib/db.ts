@@ -452,3 +452,12 @@ export async function getLearnableProblems(workbookId: string): Promise<Problem[
 export async function deleteStudyRecordsForWorkbook(workbookId: string) {
   await db.studyRecords.where('workbookId').equals(workbookId).delete()
 }
+
+// ゴミ箱を空にする（全ての削除済み問題を完全削除）
+export async function emptyTrash() {
+  const deletedProblems = await getDeletedProblems()
+
+  for (const problem of deletedProblems) {
+    await permanentlyDeleteProblem(problem.id)
+  }
+}

@@ -1,4 +1,4 @@
-import { db } from './db'
+import { db, isParentProblem } from './db'
 import { getTodayReviewList } from './review'
 import type { Problem } from '@/types'
 
@@ -52,7 +52,16 @@ export async function generateStudySet(targetMinutes: number): Promise<Problem[]
   // 削除された問題を除外
   const activeProblems = allProblems.filter(p => !p.deletedAt)
 
-  const newProblems = activeProblems.filter(
+  // 親問題（箱）を除外
+  const learnableProblems: Problem[] = []
+  for (const problem of activeProblems) {
+    const isParent = await isParentProblem(problem.id)
+    if (!isParent) {
+      learnableProblems.push(problem)
+    }
+  }
+
+  const newProblems = learnableProblems.filter(
     (p) => !reviewProblems.some((rp) => rp.id === p.id)
   )
 
@@ -109,9 +118,18 @@ export async function generateFirstTimeStudySet(targetMinutes: number): Promise<
   // 削除された問題を除外
   const activeProblems = allProblems.filter(p => !p.deletedAt)
 
+  // 親問題（箱）を除外
+  const learnableProblems: Problem[] = []
+  for (const problem of activeProblems) {
+    const isParent = await isParentProblem(problem.id)
+    if (!isParent) {
+      learnableProblems.push(problem)
+    }
+  }
+
   const unstudiedProblems: Problem[] = []
 
-  for (const problem of activeProblems) {
+  for (const problem of learnableProblems) {
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)
@@ -181,6 +199,12 @@ export async function hasUnstudiedProblems(): Promise<boolean> {
   const activeProblems = allProblems.filter(p => !p.deletedAt)
 
   for (const problem of activeProblems) {
+    // 親問題（箱）はスキップ
+    const isParent = await isParentProblem(problem.id)
+    if (isParent) {
+      continue
+    }
+
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)
@@ -204,6 +228,12 @@ export async function getUnstudiedProblemsCount(): Promise<number> {
   let count = 0
 
   for (const problem of activeProblems) {
+    // 親問題（箱）はスキップ
+    const isParent = await isParentProblem(problem.id)
+    if (isParent) {
+      continue
+    }
+
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)
