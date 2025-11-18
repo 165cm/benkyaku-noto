@@ -398,6 +398,22 @@ export default function WorkbookDetail() {
 
   const problemHierarchy = groupProblemsByHierarchy()
 
+  // 実際の学習可能な問題数を計算（親問題を除き、小問を含む）
+  const getActualProblemCount = (problems: Problem[]) => {
+    let count = 0
+    for (const problem of problems) {
+      const subProblems = subProblemsMap.get(problem.id) || []
+      if (subProblems.length > 0) {
+        // 親問題（箱）の場合は、小問の数だけカウント
+        count += subProblems.length
+      } else {
+        // 通常の問題の場合は1つカウント
+        count += 1
+      }
+    }
+    return count
+  }
+
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories)
     if (newExpanded.has(category)) {
@@ -677,7 +693,7 @@ export default function WorkbookDetail() {
           {Object.entries(problemHierarchy).map(([category, titles]) => {
             const isCategoryExpanded = expandedCategories.has(category)
             const totalProblems = Object.values(titles).reduce(
-              (sum, problems) => sum + problems.length,
+              (sum, problems) => sum + getActualProblemCount(problems),
               0
             )
 
@@ -763,7 +779,7 @@ export default function WorkbookDetail() {
                                   return null
                                 })()}
                                 <span className="text-sm text-gray-500 whitespace-nowrap">
-                                  {titleProblems.length}問
+                                  {getActualProblemCount(titleProblems)}問
                                 </span>
                                 <Button
                                   size="sm"
