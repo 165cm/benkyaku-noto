@@ -233,23 +233,35 @@ export default function Study() {
       if (a.page !== undefined && b.page === undefined) return -1
       if (a.page === undefined && b.page !== undefined) return 1
 
-      // 問題番号の最後の数値部分で比較
-      const getLastNumber = (problemNumber: string) => {
-        const parts = problemNumber.split('-')
-        const lastPart = parts[parts.length - 1]
-        const num = parseInt(lastPart)
-        return isNaN(num) ? 0 : num
+      // 問題番号を階層的に比較（例: 1-1, 1-2, 2-1, 2-2の順）
+      const partsA = a.problemNumber.split('-')
+      const partsB = b.problemNumber.split('-')
+
+      // 各階層を順番に数値として比較
+      const maxLength = Math.max(partsA.length, partsB.length)
+      for (let i = 0; i < maxLength; i++) {
+        const partA = partsA[i] || ''
+        const partB = partsB[i] || ''
+
+        // 数値として解釈できる場合は数値比較
+        const numA = parseInt(partA)
+        const numB = parseInt(partB)
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          if (numA !== numB) {
+            return numA - numB
+          }
+        } else {
+          // 数値でない場合は文字列比較
+          const cmp = partA.localeCompare(partB)
+          if (cmp !== 0) {
+            return cmp
+          }
+        }
       }
 
-      const numA = getLastNumber(a.problemNumber)
-      const numB = getLastNumber(b.problemNumber)
-
-      if (numA !== numB) {
-        return numA - numB
-      }
-
-      // 最後の手段として文字列で比較
-      return a.problemNumber.localeCompare(b.problemNumber)
+      // 完全に同じ
+      return 0
     })
 
     // 次の未学習問題を探す
