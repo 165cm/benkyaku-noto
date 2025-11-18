@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -16,6 +16,7 @@ import {
   calculateAccuracyForProblem,
   getCategoriesForWorkbook,
   isParentProblem,
+  deleteStudyRecordsForWorkbook,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
@@ -557,6 +558,22 @@ export default function WorkbookDetail() {
     downloadCSV(csvContent, filename)
   }
 
+  const handleResetStudyRecords = async () => {
+    if (!id || !workbook) return
+
+    const confirmMessage = `「${workbook.title}」の学習履歴を全て削除しますか？\n\nこの操作は取り消せません。`
+    if (!confirm(confirmMessage)) return
+
+    try {
+      await deleteStudyRecordsForWorkbook(id)
+      alert('学習履歴をリセットしました')
+      loadData() // データを再読み込み
+    } catch (error) {
+      console.error('学習履歴のリセットに失敗しました:', error)
+      alert('学習履歴のリセットに失敗しました')
+    }
+  }
+
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !id) return
@@ -683,6 +700,15 @@ export default function WorkbookDetail() {
             >
               <Upload size={16} className="mr-1" />
               CSV取込
+            </Button>
+            <Button
+              variant="error"
+              size="sm"
+              onClick={handleResetStudyRecords}
+              disabled={problems.length === 0}
+            >
+              <RotateCcw size={16} className="mr-1" />
+              学習履歴リセット
             </Button>
             <Button onClick={() => setIsModalOpen(true)}>
               <Plus size={20} className="mr-2" />

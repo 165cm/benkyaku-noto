@@ -447,3 +447,8 @@ export async function getLearnableProblems(workbookId: string): Promise<Problem[
 
   return learnableProblems
 }
+
+// 問題集の学習記録を全て削除（リセット）
+export async function deleteStudyRecordsForWorkbook(workbookId: string) {
+  await db.studyRecords.where('workbookId').equals(workbookId).delete()
+}
