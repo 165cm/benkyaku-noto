@@ -398,6 +398,22 @@ export default function WorkbookDetail() {
 
   const problemHierarchy = groupProblemsByHierarchy()
 
+  // 実際の学習可能な問題数を計算（親問題を除き、小問を含む）
+  const getActualProblemCount = (problems: Problem[]) => {
+    let count = 0
+    for (const problem of problems) {
+      const subProblems = subProblemsMap.get(problem.id) || []
+      if (subProblems.length > 0) {
+        // 親問題（箱）の場合は、小問の数だけカウント
+        count += subProblems.length
+      } else {
+        // 通常の問題の場合は1つカウント
+        count += 1
+      }
+    }
+    return count
+  }
+
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories)
     if (newExpanded.has(category)) {
@@ -677,7 +693,7 @@ export default function WorkbookDetail() {
           {Object.entries(problemHierarchy).map(([category, titles]) => {
             const isCategoryExpanded = expandedCategories.has(category)
             const totalProblems = Object.values(titles).reduce(
-              (sum, problems) => sum + problems.length,
+              (sum, problems) => sum + getActualProblemCount(problems),
               0
             )
 
@@ -763,7 +779,7 @@ export default function WorkbookDetail() {
                                   return null
                                 })()}
                                 <span className="text-sm text-gray-500 whitespace-nowrap">
-                                  {titleProblems.length}問
+                                  {getActualProblemCount(titleProblems)}問
                                 </span>
                                 <Button
                                   size="sm"
@@ -977,7 +993,7 @@ export default function WorkbookDetail() {
 
           <div>
             <label className="block text-sm font-medium mb-2">
-              問題番号 <span className="text-error">*</span>
+              問題番号（出題時の表示名） <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -990,12 +1006,12 @@ export default function WorkbookDetail() {
               placeholder="例: 第1章-基本問題-1"
             />
             <p className="text-xs text-gray-500 mt-1">
-              ハイフン（-）で区切ると自動的に階層表示されます
+              ハイフン（-）で区切ると階層表示され、出題時は最後の番号（例: 1）が表示されます
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">カテゴリ</label>
+            <label className="block text-sm font-medium mb-2">カテゴリ（出題時のセクション名）</label>
             {!showCustomCategoryInput && availableCategories.length > 0 ? (
               <div className="space-y-2">
                 <select
@@ -1019,7 +1035,7 @@ export default function WorkbookDetail() {
                   <option value="__custom__">+ 新しいカテゴリを作成</option>
                 </select>
                 <p className="text-xs text-gray-500">
-                  既存のカテゴリから選択するか、新しいカテゴリを作成できます
+                  出題時にこのカテゴリ名がセクション名として表示されます
                 </p>
               </div>
             ) : (
@@ -1043,7 +1059,7 @@ export default function WorkbookDetail() {
                   </button>
                 )}
                 <p className="text-xs text-gray-500">
-                  親カテゴリを指定（空欄の場合は問題番号から自動抽出）
+                  出題時にこのカテゴリ名がセクション名として表示されます（空欄の場合は問題番号から自動抽出）
                 </p>
               </div>
             )}
@@ -1116,7 +1132,7 @@ export default function WorkbookDetail() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">カテゴリ</label>
+            <label className="block text-sm font-medium mb-2">カテゴリ（出題時のセクション名）</label>
             <input
               type="text"
               value={groupFormData.category}
@@ -1127,7 +1143,7 @@ export default function WorkbookDetail() {
               placeholder="例: 言語"
             />
             <p className="text-xs text-gray-500 mt-1">
-              このグループ内のすべての問題に同じカテゴリが設定されます
+              出題時にこのカテゴリ名がセクション名として表示されます（グループ内すべての問題に適用）
             </p>
           </div>
 
@@ -1175,7 +1191,7 @@ export default function WorkbookDetail() {
         <form onSubmit={handleCategorySubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">
-              カテゴリ名 <span className="text-error">*</span>
+              カテゴリ名（出題時のセクション名） <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -1188,7 +1204,7 @@ export default function WorkbookDetail() {
               placeholder="例: 言語"
             />
             <p className="text-xs text-gray-500 mt-1">
-              このカテゴリ内のすべての問題に適用されます
+              出題時にこのカテゴリ名がセクション名として表示されます（カテゴリ内すべての問題に適用）
             </p>
           </div>
 
