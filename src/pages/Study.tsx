@@ -221,8 +221,11 @@ export default function Study() {
       .equals(problem.workbookId)
       .toArray()
 
+    // 削除された問題を除外
+    const activeProblems = allProblems.filter(p => !p.deletedAt)
+
     // ページ番号と問題番号でソート
-    allProblems.sort((a, b) => {
+    activeProblems.sort((a, b) => {
       // ページ番号でソート（優先）
       if (a.page !== undefined && b.page !== undefined) {
         if (a.page !== b.page) {
@@ -265,7 +268,7 @@ export default function Study() {
     })
 
     // 次の未学習問題を探す
-    for (const p of allProblems) {
+    for (const p of activeProblems) {
       // 親問題（箱）はスキップ
       const hasSubProblems = await isParentProblem(p.id)
       if (hasSubProblems) {

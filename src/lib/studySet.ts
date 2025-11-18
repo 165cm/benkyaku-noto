@@ -48,7 +48,11 @@ export async function generateStudySet(targetMinutes: number): Promise<Problem[]
 
   // 復習問題で時間が足りない場合は新規問題を追加
   const allProblems = await db.problems.toArray()
-  const newProblems = allProblems.filter(
+
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+  const newProblems = activeProblems.filter(
     (p) => !reviewProblems.some((rp) => rp.id === p.id)
   )
 
@@ -101,9 +105,13 @@ export async function generateFirstTimeStudySet(targetMinutes: number): Promise<
 
   // 未学習の問題をすべて取得
   const allProblems = await db.problems.toArray()
+
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
   const unstudiedProblems: Problem[] = []
 
-  for (const problem of allProblems) {
+  for (const problem of activeProblems) {
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)
@@ -169,7 +177,10 @@ export async function generateFirstTimeStudySet(targetMinutes: number): Promise<
 export async function hasUnstudiedProblems(): Promise<boolean> {
   const allProblems = await db.problems.toArray()
 
-  for (const problem of allProblems) {
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+  for (const problem of activeProblems) {
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)
@@ -186,9 +197,13 @@ export async function hasUnstudiedProblems(): Promise<boolean> {
 // 未学習問題数を取得
 export async function getUnstudiedProblemsCount(): Promise<number> {
   const allProblems = await db.problems.toArray()
+
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
   let count = 0
 
-  for (const problem of allProblems) {
+  for (const problem of activeProblems) {
     const records = await db.studyRecords
       .where('problemId')
       .equals(problem.id)

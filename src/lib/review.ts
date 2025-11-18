@@ -32,6 +32,10 @@ export function calculatePriorityScore(averageScore: number, daysSinceLastStudy:
 export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   const allRecords = await db.studyRecords.toArray()
   const allProblems = await db.problems.toArray()
+
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
   const allWorkbooks = await db.workbooks.toArray()
 
   // 問題ごとにグループ化
@@ -60,7 +64,7 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     const averageScore = calculateAverageScore(records)
     const priorityScore = calculatePriorityScore(averageScore, daysSince)
 
-    const problem = allProblems.find((p) => p.id === problemId)
+    const problem = activeProblems.find((p) => p.id === problemId)
     const workbook = allWorkbooks.find((w) => w.id === problem?.workbookId)
 
     if (problem && workbook) {
@@ -235,10 +239,13 @@ export interface SectionStats {
 export async function calculateSectionStats(): Promise<SectionStats[]> {
   const allProblems = await db.problems.toArray()
 
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
   // 問題をセクション（カテゴリ×タイトル）でグルーピング
   const sectionMap = new Map<string, Problem[]>()
 
-  allProblems.forEach((problem) => {
+  activeProblems.forEach((problem) => {
     // categoryフィールドが設定されている場合はそれを優先
     let category = problem.category || '未分類'
     let title = '問題'
