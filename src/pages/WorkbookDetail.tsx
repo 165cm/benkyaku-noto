@@ -22,6 +22,7 @@ import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
 import { uploadPDF, deletePDF } from '@/lib/storage'
+import { createStudySession } from '@/lib/studySession'
 import type { Workbook, Problem, StudyRecord } from '@/types'
 
 export default function WorkbookDetail() {
@@ -223,10 +224,53 @@ export default function WorkbookDetail() {
       return
     }
 
-    // sortOrder順にソート（順番に学習）
-    learnableProblems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    // 問題番号を階層的にソート（若い番号順）
+    learnableProblems.sort((a, b) => {
+      // ページ番号でソート（優先）
+      if (a.page !== undefined && b.page !== undefined) {
+        if (a.page !== b.page) {
+          return a.page - b.page
+        }
+      }
+      // ページ番号がある方を優先
+      if (a.page !== undefined && b.page === undefined) return -1
+      if (a.page === undefined && b.page !== undefined) return 1
 
-    // 最初の問題を選択
+      // 問題番号を階層的に比較（例: 1-1, 1-2, 2-1, 2-2の順）
+      const partsA = a.problemNumber.split('-')
+      const partsB = b.problemNumber.split('-')
+
+      // 各階層を順番に数値として比較
+      const maxLength = Math.max(partsA.length, partsB.length)
+      for (let i = 0; i < maxLength; i++) {
+        const partA = partsA[i] || ''
+        const partB = partsB[i] || ''
+
+        // 数値として解釈できる場合は数値比較
+        const numA = parseInt(partA)
+        const numB = parseInt(partB)
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          if (numA !== numB) {
+            return numA - numB
+          }
+        } else {
+          // 数値でない場合は文字列比較
+          const cmp = partA.localeCompare(partB)
+          if (cmp !== 0) {
+            return cmp
+          }
+        }
+      }
+
+      // 完全に同じ
+      return 0
+    })
+
+    // セクション学習用のセッションを作成（時間制限なし=999分）
+    createStudySession(999, learnableProblems)
+
+    // 最初の問題に遷移
     const firstProblem = learnableProblems[0]
     navigate(`/study/${firstProblem.id}`)
   }
