@@ -194,13 +194,13 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   }
 }
 
-// 問題セットの直近回答の正解率を計算
+// 問題セットの直近回答の正解率を計算（重み付け平均）
 export async function calculateRecentAccuracyForProblems(problems: Problem[]): Promise<number | null> {
   if (problems.length === 0) return null
 
   const recentScores: number[] = []
 
-  // 各問題の最新の学習記録を取得してスコア化
+  // 各問題の最新3回の学習記録を取得して重み付け平均でスコア化
   for (const problem of problems) {
     const records = await db.studyRecords
       .where('problemId')
@@ -209,11 +209,30 @@ export async function calculateRecentAccuracyForProblems(problems: Problem[]): P
       .sortBy('studiedAt')
 
     if (records.length > 0) {
-      const latestRecord = records[0] // 最新の記録
-      const score = latestRecord.result === 'correct' ? 100
-                  : latestRecord.result === 'partial' ? 50
-                  : 0
-      recentScores.push(score)
+      // 最新3回の記録を取得
+      const recent3 = records.slice(0, 3)
+
+      // スコア化
+      const scores = recent3.map(record =>
+        record.result === 'correct' ? 100
+        : record.result === 'partial' ? 50
+        : 0
+      )
+
+      // 重み付け平均を計算
+      // 最新: 50%, 1つ前: 30%, 2つ前: 20%
+      let weightedScore: number
+      if (scores.length === 1) {
+        weightedScore = scores[0]
+      } else if (scores.length === 2) {
+        // 2回の場合: 最新62.5%, 1つ前37.5%（比率を維持）
+        weightedScore = scores[0] * 0.625 + scores[1] * 0.375
+      } else {
+        // 3回以上: 最新50%, 1つ前30%, 2つ前20%
+        weightedScore = scores[0] * 0.5 + scores[1] * 0.3 + scores[2] * 0.2
+      }
+
+      recentScores.push(weightedScore)
     }
   }
 
