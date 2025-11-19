@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import PDFViewer from '@/components/PDFViewer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import {
   getSession,
@@ -366,8 +367,13 @@ export default function Study() {
     return <div>読み込み中...</div>
   }
 
+  const hasPDF = !!workbook.pdfUrl
+
   return (
-    <div className="max-w-2xl mx-auto px-2 sm:px-4">
+    <div className={`mx-auto px-2 sm:px-4 ${hasPDF ? 'max-w-7xl' : 'max-w-2xl'}`}>
+      <div className={`${hasPDF ? 'grid lg:grid-cols-2 gap-4' : ''}`}>
+        {/* 問題情報エリア */}
+        <div>
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4">
         <Button
@@ -608,6 +614,18 @@ export default function Study() {
           </Card>
         </div>
       )}
+        </div>
+
+        {/* PDFビューアエリア */}
+        {hasPDF && workbook.pdfUrl && (
+          <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+            <PDFViewer
+              pdfUrl={workbook.pdfUrl}
+              initialPage={problem.page || 1}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

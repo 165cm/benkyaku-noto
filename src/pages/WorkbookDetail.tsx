@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, FileText } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -21,13 +21,16 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
+import { uploadPDF, deletePDF } from '@/lib/storage'
 import type { Workbook, Problem, StudyRecord } from '@/types'
 
 export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
+  const [isUploadingPDF, setIsUploadingPDF] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
@@ -574,6 +577,64 @@ export default function WorkbookDetail() {
     }
   }
 
+  // PDFアップロード
+  const handleUploadPDF = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+
+    setIsUploadingPDF(true)
+    try {
+      // 既存のPDFがあれば削除
+      if (workbook?.pdfUrl) {
+        await deletePDF(workbook.pdfUrl)
+      }
+
+      // 新しいPDFをアップロード
+      const downloadURL = await uploadPDF(file, id)
+
+      // Workbookを更新
+      await db.workbooks.update(id, {
+        pdfUrl: downloadURL,
+        pdfFileName: file.name,
+        updatedAt: new Date(),
+      })
+
+      alert('PDFをアップロードしました')
+      loadData()
+    } catch (error: any) {
+      console.error('PDFアップロードエラー:', error)
+      alert(error.message || 'PDFのアップロードに失敗しました')
+    } finally {
+      setIsUploadingPDF(false)
+      if (pdfInputRef.current) {
+        pdfInputRef.current.value = ''
+      }
+    }
+  }
+
+  // PDF削除
+  const handleDeletePDF = async () => {
+    if (!id || !workbook?.pdfUrl) return
+
+    if (!confirm('PDFファイルを削除しますか？')) return
+
+    try {
+      await deletePDF(workbook.pdfUrl)
+
+      await db.workbooks.update(id, {
+        pdfUrl: undefined,
+        pdfFileName: undefined,
+        updatedAt: new Date(),
+      })
+
+      alert('PDFを削除しました')
+      loadData()
+    } catch (error) {
+      console.error('PDF削除エラー:', error)
+      alert('PDFの削除に失敗しました')
+    }
+  }
+
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !id) return
@@ -675,8 +736,42 @@ export default function WorkbookDetail() {
           <div>
             <h1 className="text-2xl font-bold">{workbook.title}</h1>
             <p className="text-gray-600">{workbook.subject}</p>
+            {workbook.pdfFileName && (
+              <p className="text-sm text-blue-600 flex items-center gap-1 mt-1">
+                <FileText size={14} />
+                {workbook.pdfFileName}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {/* PDF関連ボタン */}
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleUploadPDF}
+              className="hidden"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={isUploadingPDF}
+            >
+              <FileText size={16} className="mr-1" />
+              {workbook.pdfUrl ? 'PDF変更' : 'PDF追加'}
+            </Button>
+            {workbook.pdfUrl && (
+              <Button
+                variant="error"
+                size="sm"
+                onClick={handleDeletePDF}
+              >
+                <Trash2 size={16} className="mr-1" />
+                PDF削除
+              </Button>
+            )}
+            {/* CSV関連ボタン */}
             <Button
               variant="secondary"
               size="sm"
