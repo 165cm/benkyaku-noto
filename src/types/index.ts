@@ -4,6 +4,8 @@ export interface Workbook {
   title: string
   subject: string
   totalProblems: number
+  pdfUrl?: string // Firebase StorageのPDF URL
+  pdfFileName?: string // PDFファイル名
   createdAt: Date
   updatedAt: Date
 }
