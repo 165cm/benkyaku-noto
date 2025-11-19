@@ -85,7 +85,24 @@ export default function WorkbookDetail() {
       for (const [category, titles] of Object.entries(hierarchy)) {
         for (const [title, titleProblems] of Object.entries(titles)) {
           const sectionKey = `${category}-${title}`
-          const accuracy = await calculateRecentAccuracyForProblems(titleProblems)
+
+          // 学習可能な問題を抽出（親問題を除外し、小問を含める）
+          const learnableProblems: Problem[] = []
+          for (const problem of titleProblems) {
+            const hasSubProblems = await isParentProblem(problem.id)
+            if (!hasSubProblems) {
+              // 親問題でない場合、そのまま追加
+              learnableProblems.push(problem)
+            }
+          }
+
+          // 親問題の小問を追加
+          for (const problem of titleProblems) {
+            const subProblems = subProblemsMap.get(problem.id) || []
+            learnableProblems.push(...subProblems)
+          }
+
+          const accuracy = await calculateRecentAccuracyForProblems(learnableProblems)
           accuracyMap.set(sectionKey, accuracy)
         }
       }
@@ -98,7 +115,7 @@ export default function WorkbookDetail() {
     } else {
       setSectionAccuracyRates(new Map())
     }
-  }, [problems])
+  }, [problems, subProblemsMap])
 
   const loadData = async () => {
     if (!id) return
