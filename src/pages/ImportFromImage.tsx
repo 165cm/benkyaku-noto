@@ -530,7 +530,7 @@ export default function ImportFromImage() {
             >
               やり直す
             </Button>
-            <Button onClick={handleImport} disabled={totalProblems === 0 || isImporting}>
+            <Button onClick={handleImport} disabled={isImporting}>
               {isImporting ? (
                 <>
                   <Loader2 size={16} className="mr-2 animate-spin" />
