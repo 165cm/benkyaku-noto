@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from './Button'
 
 // PDF.js workerの設定
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 interface PDFViewerProps {
   pdfUrl: string
@@ -37,7 +37,13 @@ export default function PDFViewer({ pdfUrl, initialPage = 1, onPageChange }: PDF
 
   const onDocumentLoadError = (error: Error) => {
     console.error('PDF読み込みエラー:', error)
-    setError('PDFの読み込みに失敗しました')
+    console.error('PDF URL:', pdfUrl)
+    // CORSエラーの場合の詳細メッセージ
+    if (error.message?.includes('fetch') || error.message?.includes('CORS')) {
+      setError('PDFの読み込みに失敗しました（CORSエラーの可能性）')
+    } else {
+      setError(`PDFの読み込みに失敗しました: ${error.message || '不明なエラー'}`)
+    }
     setLoading(false)
   }
 
