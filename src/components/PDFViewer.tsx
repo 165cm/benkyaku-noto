@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from './Button'
@@ -18,10 +18,21 @@ export default function PDFViewer({ pdfUrl, initialPage = 1, onPageChange }: PDF
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // initialPageが変更されたら同期
+  useEffect(() => {
+    if (initialPage >= 1) {
+      setPageNumber(initialPage)
+    }
+  }, [initialPage])
+
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
     setLoading(false)
     setError(null)
+    // PDFロード完了後、initialPageに移動
+    if (initialPage >= 1 && initialPage <= numPages) {
+      setPageNumber(initialPage)
+    }
   }
 
   const onDocumentLoadError = (error: Error) => {
@@ -47,11 +58,6 @@ export default function PDFViewer({ pdfUrl, initialPage = 1, onPageChange }: PDF
       setPageNumber(page)
       onPageChange?.(page)
     }
-  }
-
-  // initialPageが変更されたら同期
-  if (initialPage !== pageNumber && initialPage >= 1 && initialPage <= numPages) {
-    setPageNumber(initialPage)
   }
 
   if (error) {
