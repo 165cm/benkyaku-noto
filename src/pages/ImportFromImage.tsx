@@ -125,8 +125,8 @@ export default function ImportFromImage() {
           })
         } catch (pdfError) {
           console.error('PDF upload failed:', pdfError)
-          // PDFアップロードが失敗しても問題集は作成済みなので続行
-          setError('問題集は作成されましたが、PDFのアップロードに失敗しました。問題集詳細から再度アップロードしてください。')
+          // PDFアップロードが失敗しても問題集は作成済みなので、エラーを表示して遷移
+          alert('問題集は作成されましたが、PDFのアップロードに失敗しました。\n\nエラー: ' + (pdfError instanceof Error ? pdfError.message : 'Unknown error') + '\n\n問題集詳細から再度アップロードしてください。')
         }
       }
 
