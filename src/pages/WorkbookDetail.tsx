@@ -648,12 +648,12 @@ export default function WorkbookDetail() {
 
   // PDF削除
   const handleDeletePDF = async () => {
-    if (!id || !workbook?.pdfUrl) return
+    if (!id || !workbook?.pdfFileName) return
 
     if (!confirm('PDFファイルを削除しますか？')) return
 
     try {
-      await deletePDF(workbook.pdfUrl)
+      await deletePDF(id, workbook.pdfFileName)
 
       await db.workbooks.update(id, {
         pdfUrl: undefined,

@@ -60,12 +60,12 @@ export async function uploadPDF(file: File, workbookId: string): Promise<string>
 
 /**
  * PDFファイルを削除
- * @param pdfUrl Firebase StorageのURL
+ * @param workbookId 問題集ID
+ * @param fileName ファイル名
  */
-export async function deletePDF(pdfUrl: string): Promise<void> {
+export async function deletePDF(workbookId: string, fileName: string): Promise<void> {
   try {
-    // URLからStorage参照を作成
-    const storageRef = ref(storage, pdfUrl)
+    const storageRef = ref(storage, `workbooks/${workbookId}/${fileName}`)
     await deleteObject(storageRef)
   } catch (error) {
     console.error('PDF削除エラー:', error)
