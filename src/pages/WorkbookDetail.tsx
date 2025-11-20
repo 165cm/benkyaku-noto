@@ -21,7 +21,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
-import { uploadPDF, deletePDF } from '@/lib/storage'
+import { deletePDF } from '@/lib/storage'
 import { createStudySession } from '@/lib/studySession'
 import type { Workbook, Problem, StudyRecord } from '@/types'
 
@@ -29,9 +29,7 @@ export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const pdfInputRef = useRef<HTMLInputElement>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
-  const [isUploadingPDF, setIsUploadingPDF] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
@@ -638,41 +636,6 @@ export default function WorkbookDetail() {
     }
   }
 
-  // PDFアップロード
-  const handleUploadPDF = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !id) return
-
-    setIsUploadingPDF(true)
-    try {
-      // 既存のPDFがあれば削除
-      if (workbook?.pdfUrl) {
-        await deletePDF(workbook.pdfUrl)
-      }
-
-      // 新しいPDFをアップロード
-      const downloadURL = await uploadPDF(file, id)
-
-      // Workbookを更新
-      await db.workbooks.update(id, {
-        pdfUrl: downloadURL,
-        pdfFileName: file.name,
-        updatedAt: new Date(),
-      })
-
-      alert('PDFをアップロードしました')
-      loadData()
-    } catch (error: any) {
-      console.error('PDFアップロードエラー:', error)
-      alert(error.message || 'PDFのアップロードに失敗しました')
-    } finally {
-      setIsUploadingPDF(false)
-      if (pdfInputRef.current) {
-        pdfInputRef.current.value = ''
-      }
-    }
-  }
-
   // PDF削除
   const handleDeletePDF = async () => {
     if (!id || !workbook?.pdfUrl) return
@@ -806,22 +769,6 @@ export default function WorkbookDetail() {
           </div>
           <div className="flex items-center gap-2">
             {/* PDF関連ボタン */}
-            <input
-              ref={pdfInputRef}
-              type="file"
-              accept=".pdf"
-              onChange={handleUploadPDF}
-              className="hidden"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => pdfInputRef.current?.click()}
-              disabled={isUploadingPDF}
-            >
-              <FileText size={16} className="mr-1" />
-              {workbook.pdfUrl ? 'PDF変更' : 'PDF追加'}
-            </Button>
             {workbook.pdfUrl && (
               <Button
                 variant="error"
