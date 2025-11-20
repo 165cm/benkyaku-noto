@@ -3,8 +3,8 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from './Button'
 
-// PDF.js workerの設定（unpkgを使用）
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// PDF.js workerの設定（ローカルファイルを使用してCORS問題を回避）
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface PDFViewerProps {
   pdfUrl: string
