@@ -146,6 +146,16 @@ export default function WorkbookDetail() {
     const categories = await getCategoriesForWorkbook(id)
     setAvailableCategories(categories)
 
+    // カテゴリをデフォルトで展開状態にする
+    const categorySet = new Set<string>()
+    problemsData.forEach((problem) => {
+      if (!problem.parentProblemId) {
+        const category = problem.category || '未分類'
+        categorySet.add(category)
+      }
+    })
+    setExpandedCategories(categorySet)
+
     // 問題数を更新
     if (workbookData && workbookData.totalProblems !== problemsData.length) {
       await db.workbooks.update(id, {
@@ -756,7 +766,7 @@ export default function WorkbookDetail() {
           戻る
         </Button>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">{workbook.title}</h1>
             <p className="text-gray-600">{workbook.subject}</p>
@@ -767,16 +777,17 @@ export default function WorkbookDetail() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             {/* PDF関連ボタン */}
             {workbook.pdfUrl && (
               <Button
                 variant="error"
                 size="sm"
                 onClick={handleDeletePDF}
+                title="PDF削除"
               >
-                <Trash2 size={16} className="mr-1" />
-                PDF削除
+                <Trash2 size={16} />
+                <span className="hidden sm:inline ml-1">PDF削除</span>
               </Button>
             )}
             {/* CSV関連ボタン */}
@@ -785,9 +796,10 @@ export default function WorkbookDetail() {
               size="sm"
               onClick={handleExportCSV}
               disabled={problems.length === 0}
+              title="CSV出力"
             >
-              <Download size={16} className="mr-1" />
-              CSV出力
+              <Download size={16} />
+              <span className="hidden sm:inline ml-1">CSV出力</span>
             </Button>
             <input
               ref={fileInputRef}
@@ -800,22 +812,24 @@ export default function WorkbookDetail() {
               variant="secondary"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
+              title="CSV取込"
             >
-              <Upload size={16} className="mr-1" />
-              CSV取込
+              <Upload size={16} />
+              <span className="hidden sm:inline ml-1">CSV取込</span>
             </Button>
             <Button
               variant="error"
               size="sm"
               onClick={handleResetStudyRecords}
               disabled={problems.length === 0}
+              title="学習履歴リセット"
             >
-              <RotateCcw size={16} className="mr-1" />
-              学習履歴リセット
+              <RotateCcw size={16} />
+              <span className="hidden sm:inline ml-1">リセット</span>
             </Button>
-            <Button onClick={() => setIsModalOpen(true)}>
-              <Plus size={20} className="mr-2" />
-              問題を追加
+            <Button onClick={() => setIsModalOpen(true)} title="問題を追加">
+              <Plus size={20} />
+              <span className="hidden sm:inline ml-1">問題を追加</span>
             </Button>
           </div>
         </div>
