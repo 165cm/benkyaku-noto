@@ -18,6 +18,9 @@ export default function PDFViewer({ pdfUrl, initialPage = 1, onPageChange }: PDF
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // デバッグ用ログ
+  console.log('PDFViewer rendering, pdfUrl:', pdfUrl, 'loading:', loading, 'error:', error)
+
   // initialPageが変更されたら同期
   useEffect(() => {
     if (initialPage >= 1) {
