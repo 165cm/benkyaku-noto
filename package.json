@@ -15,7 +15,7 @@
     "dexie": "^4.2.1",
     "firebase": "^12.6.0",
     "lucide-react": "^0.553.0",
-    "pdfjs-dist": "^5.4.394",
+    "pdfjs-dist": "5.4.296",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-pdf": "^10.2.0",
