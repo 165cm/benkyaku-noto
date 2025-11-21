@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from './Button'
 
 // PDF.js workerの設定（ローカルファイルを使用してCORS問題を回避）
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+pdfjs.GlobalWorkerOptions.workerSrc = '/benkyaku-noto/pdf.worker.min.mjs'
 
 interface PDFViewerProps {
   pdfUrl: string
