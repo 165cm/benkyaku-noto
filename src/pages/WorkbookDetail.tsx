@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, FileText } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -21,7 +21,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
-import { deletePDF } from '@/lib/storage'
+// import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Workbook, Problem, StudyRecord } from '@/types'
 
@@ -646,28 +646,24 @@ export default function WorkbookDetail() {
     }
   }
 
-  // PDF削除
-  const handleDeletePDF = async () => {
-    if (!id || !workbook?.pdfFileName) return
-
-    if (!confirm('PDFファイルを削除しますか？')) return
-
-    try {
-      await deletePDF(id, workbook.pdfFileName)
-
-      await db.workbooks.update(id, {
-        pdfUrl: undefined,
-        pdfFileName: undefined,
-        updatedAt: new Date(),
-      })
-
-      alert('PDFを削除しました')
-      loadData()
-    } catch (error) {
-      console.error('PDF削除エラー:', error)
-      alert('PDFの削除に失敗しました')
-    }
-  }
+  // PDF削除 - 一時的に無効化
+  // const handleDeletePDF = async () => {
+  //   if (!id || !workbook?.pdfFileName) return
+  //   if (!confirm('PDFファイルを削除しますか？')) return
+  //   try {
+  //     await deletePDF(id, workbook.pdfFileName)
+  //     await db.workbooks.update(id, {
+  //       pdfUrl: undefined,
+  //       pdfFileName: undefined,
+  //       updatedAt: new Date(),
+  //     })
+  //     alert('PDFを削除しました')
+  //     loadData()
+  //   } catch (error) {
+  //     console.error('PDF削除エラー:', error)
+  //     alert('PDFの削除に失敗しました')
+  //   }
+  // }
 
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -770,15 +766,17 @@ export default function WorkbookDetail() {
           <div>
             <h1 className="text-2xl font-bold">{workbook.title}</h1>
             <p className="text-gray-600">{workbook.subject}</p>
+            {/* PDF機能は一時的に無効化
             {workbook.pdfFileName && (
               <p className="text-sm text-blue-600 flex items-center gap-1 mt-1">
                 <FileText size={14} />
                 {workbook.pdfFileName}
               </p>
             )}
+            */}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-            {/* PDF関連ボタン */}
+            {/* PDF関連ボタン - 一時的に無効化
             {workbook.pdfUrl && (
               <Button
                 variant="error"
@@ -790,6 +788,7 @@ export default function WorkbookDetail() {
                 <span className="hidden sm:inline ml-1">PDF削除</span>
               </Button>
             )}
+            */}
             {/* CSV関連ボタン */}
             <Button
               variant="secondary"
