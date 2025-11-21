@@ -128,6 +128,21 @@ export default function Study() {
           console.error('PDF URL取得エラー:', error)
           setPdfUrl(null)
         }
+      } else if (workbookData?.pdfUrl) {
+        // 後方互換: pdfFileNameがない場合はpdfUrlから抽出して再取得
+        try {
+          const urlParts = decodeURIComponent(workbookData.pdfUrl).match(/\/([^/?]+)\?/)
+          if (urlParts && urlParts[1]) {
+            const fileName = urlParts[1]
+            const url = await getPDFUrl(problemData.workbookId, fileName)
+            setPdfUrl(url)
+          } else {
+            setPdfUrl(null)
+          }
+        } catch (error) {
+          console.error('PDF URL取得エラー:', error)
+          setPdfUrl(null)
+        }
       } else {
         setPdfUrl(null)
       }
