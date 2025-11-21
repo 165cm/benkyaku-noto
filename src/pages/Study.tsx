@@ -397,11 +397,13 @@ export default function Study() {
     return <div>読み込み中...</div>
   }
 
-  const hasPDF = !!pdfUrl
+  // PDF機能は一時的に無効化（内部実装は保持）
+  // const hasPDF = !!pdfUrl
+  const hasPDF = false
 
   return (
-    <div className={`mx-auto px-2 sm:px-4 ${hasPDF ? 'max-w-7xl' : 'max-w-2xl'}`}>
-      <div className={`${hasPDF ? 'grid lg:grid-cols-2 gap-4' : ''}`}>
+    <div className={`mx-auto px-2 sm:px-4 max-w-2xl`}>
+      <div>
         {/* 問題情報エリア */}
         <div>
       {/* ヘッダー */}
@@ -476,34 +478,40 @@ export default function Study() {
       </Card>
 
       {/* 解答ボタン */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-        <Button
-          variant="success"
-          size="lg"
-          onClick={() => handleRecord('correct')}
-          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
-        >
-          <Circle size={24} className="sm:w-8 sm:h-8" />
-          <span className="text-sm sm:text-base">正解</span>
-        </Button>
-        <Button
-          variant="warning"
-          size="lg"
-          onClick={() => handleRecord('partial')}
-          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
-        >
-          <Triangle size={24} className="sm:w-8 sm:h-8" />
-          <span className="text-sm sm:text-base">部分正解</span>
-        </Button>
-        <Button
-          variant="error"
-          size="lg"
-          onClick={() => handleRecord('incorrect')}
-          className="flex flex-col items-center gap-1 sm:gap-2 h-20 sm:h-24"
-        >
-          <X size={24} className="sm:w-8 sm:h-8" />
-          <span className="text-sm sm:text-base">不正解</span>
-        </Button>
+      <div className="space-y-2 mb-4">
+        {/* 正解・不正解ボタン（大きめ、横並び） */}
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <Button
+            variant="success"
+            size="lg"
+            onClick={() => handleRecord('correct')}
+            className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
+          >
+            <Circle size={28} className="sm:w-10 sm:h-10" />
+            <span className="text-base sm:text-lg font-bold">正解</span>
+          </Button>
+          <Button
+            variant="error"
+            size="lg"
+            onClick={() => handleRecord('incorrect')}
+            className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
+          >
+            <X size={28} className="sm:w-10 sm:h-10" />
+            <span className="text-base sm:text-lg font-bold">不正解</span>
+          </Button>
+        </div>
+        {/* 部分正解ボタン（小さめ、中央配置） */}
+        <div className="flex justify-center">
+          <Button
+            variant="warning"
+            size="lg"
+            onClick={() => handleRecord('partial')}
+            className="flex items-center gap-2 h-12 sm:h-14 px-6"
+          >
+            <Triangle size={18} className="sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">部分正解</span>
+          </Button>
+        </div>
       </div>
 
       {/* メモ入力（コンパクト） */}
