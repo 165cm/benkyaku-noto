@@ -5,6 +5,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
+import { getPDFUrl } from '@/lib/storage'
 import {
   getSession,
   addResult,
@@ -18,6 +19,7 @@ export default function Study() {
   const navigate = useNavigate()
   const [problem, setProblem] = useState<Problem | null>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
   const [startTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
@@ -116,6 +118,19 @@ export default function Study() {
 
       const workbookData = await getWorkbook(problemData.workbookId)
       setWorkbook(workbookData || null)
+
+      // PDF URLを動的に取得（期限切れ対策）
+      if (workbookData?.pdfFileName) {
+        try {
+          const url = await getPDFUrl(problemData.workbookId, workbookData.pdfFileName)
+          setPdfUrl(url)
+        } catch (error) {
+          console.error('PDF URL取得エラー:', error)
+          setPdfUrl(null)
+        }
+      } else {
+        setPdfUrl(null)
+      }
 
       const records = await getStudyRecords(id)
       setStudyRecords(records)
@@ -367,7 +382,7 @@ export default function Study() {
     return <div>読み込み中...</div>
   }
 
-  const hasPDF = !!workbook.pdfUrl
+  const hasPDF = !!pdfUrl
 
   return (
     <div className={`mx-auto px-2 sm:px-4 ${hasPDF ? 'max-w-7xl' : 'max-w-2xl'}`}>
@@ -617,10 +632,10 @@ export default function Study() {
         </div>
 
         {/* PDFビューアエリア */}
-        {hasPDF && workbook.pdfUrl && (
+        {hasPDF && pdfUrl && (
           <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
             <PDFViewer
-              pdfUrl={workbook.pdfUrl}
+              pdfUrl={pdfUrl}
               initialPage={problem.page || 1}
             />
           </div>

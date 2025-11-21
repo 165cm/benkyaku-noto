@@ -3,8 +3,8 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from './Button'
 
-// PDF.js workerの設定（unpkgを使用）
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// PDF.js workerの設定（ローカルファイルを使用してCORS問題を回避）
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface PDFViewerProps {
   pdfUrl: string
@@ -38,12 +38,21 @@ export default function PDFViewer({ pdfUrl, initialPage = 1, onPageChange }: PDF
   const onDocumentLoadError = (error: Error) => {
     console.error('PDF読み込みエラー:', error)
     console.error('PDF URL:', pdfUrl)
-    // CORSエラーの場合の詳細メッセージ
-    if (error.message?.includes('fetch') || error.message?.includes('CORS')) {
-      setError('PDFの読み込みに失敗しました（CORSエラーの可能性）')
-    } else {
-      setError(`PDFの読み込みに失敗しました: ${error.message || '不明なエラー'}`)
+
+    // エラータイプに応じた詳細メッセージ
+    let errorMessage = 'PDFの読み込みに失敗しました'
+
+    if (error.message?.includes('fetch') || error.message?.includes('CORS') || error.message?.includes('network')) {
+      errorMessage = 'ネットワークエラー: PDFを取得できませんでした。ページを再読み込みしてください。'
+    } else if (error.message?.includes('Invalid PDF') || error.message?.includes('password')) {
+      errorMessage = 'PDFファイルが無効または保護されています'
+    } else if (error.message?.includes('Missing PDF')) {
+      errorMessage = 'PDFファイルが見つかりません。再アップロードしてください。'
+    } else if (error.message) {
+      errorMessage = `PDFの読み込みに失敗しました: ${error.message}`
     }
+
+    setError(errorMessage)
     setLoading(false)
   }
 
