@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, ArrowLeft, Loader2, Trash2, FileText, X } from 'lucide-react'
+import { Upload, ArrowLeft, Loader2, Trash2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { hasOpenAIApiKey, uploadPDF } from '@/lib/storage'
+import { hasOpenAIApiKey } from '@/lib/storage'
+// import { uploadPDF } from '@/lib/storage' // PDF機能一時無効化
 import { imageToBase64, parseTableOfContents, type ParsedTableOfContents } from '@/lib/openai'
-import { addWorkbook, addProblem, db } from '@/lib/db'
+import { addWorkbook, addProblem } from '@/lib/db'
+// import { db } from '@/lib/db' // PDF機能一時無効化
 
 const MAX_IMAGES = 5
 
@@ -18,7 +20,7 @@ export default function ImportFromImage() {
   const [parsedData, setParsedData] = useState<ParsedTableOfContents | null>(null)
   const [problemCounts, setProblemCounts] = useState<{ [sectionId: string]: number }>({})
   const [categories, setCategories] = useState<{ [sectionId: string]: string }>({})
-  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  // const [pdfFile, setPdfFile] = useState<File | null>(null) // PDF機能一時無効化
   const [isImporting, setIsImporting] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,21 +116,20 @@ export default function ImportFromImage() {
         }
       }
 
-      // PDFがあればアップロード
-      if (pdfFile) {
-        try {
-          const downloadURL = await uploadPDF(pdfFile, workbookId)
-          await db.workbooks.update(workbookId, {
-            pdfUrl: downloadURL,
-            pdfFileName: pdfFile.name,
-            updatedAt: new Date(),
-          })
-        } catch (pdfError) {
-          console.error('PDF upload failed:', pdfError)
-          // PDFアップロードが失敗しても問題集は作成済みなので、エラーを表示して遷移
-          alert('問題集は作成されましたが、PDFのアップロードに失敗しました。\n\nエラー: ' + (pdfError instanceof Error ? pdfError.message : 'Unknown error') + '\n\n問題集詳細から再度アップロードしてください。')
-        }
-      }
+      // PDF機能一時無効化
+      // if (pdfFile) {
+      //   try {
+      //     const downloadURL = await uploadPDF(pdfFile, workbookId)
+      //     await db.workbooks.update(workbookId, {
+      //       pdfUrl: downloadURL,
+      //       pdfFileName: pdfFile.name,
+      //       updatedAt: new Date(),
+      //     })
+      //   } catch (pdfError) {
+      //     console.error('PDF upload failed:', pdfError)
+      //     alert('問題集は作成されましたが、PDFのアップロードに失敗しました。')
+      //   }
+      // }
 
       // 問題集詳細ページへ遷移
       navigate(`/workbooks/${workbookId}`)
@@ -183,24 +184,22 @@ export default function ImportFromImage() {
 
   const totalProblems = Object.values(problemCounts).reduce((sum, count) => sum + count, 0)
 
-  const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.type !== 'application/pdf') {
-      setError('PDFファイルのみアップロード可能です')
-      return
-    }
-
-    const maxSize = 50 * 1024 * 1024 // 50MB
-    if (file.size > maxSize) {
-      setError('ファイルサイズは50MB以下にしてください')
-      return
-    }
-
-    setError(null)
-    setPdfFile(file)
-  }
+  // PDF機能一時無効化
+  // const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0]
+  //   if (!file) return
+  //   if (file.type !== 'application/pdf') {
+  //     setError('PDFファイルのみアップロード可能です')
+  //     return
+  //   }
+  //   const maxSize = 50 * 1024 * 1024 // 50MB
+  //   if (file.size > maxSize) {
+  //     setError('ファイルサイズは50MB以下にしてください')
+  //     return
+  //   }
+  //   setError(null)
+  //   setPdfFile(file)
+  // }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -216,7 +215,7 @@ export default function ImportFromImage() {
 
       <h1 className="text-2xl font-bold mb-6">目次画像からインポート</h1>
 
-      {/* PDFアップロードセクション */}
+      {/* PDFアップロードセクション - 一時的に無効化
       {!parsedData && (
         <Card className="mb-6">
           <div className="space-y-4">
@@ -268,6 +267,7 @@ export default function ImportFromImage() {
           </div>
         </Card>
       )}
+      */}
 
       {/* 目次画像アップロードセクション */}
       {!parsedData && (
@@ -412,6 +412,7 @@ export default function ImportFromImage() {
                 </div>
               </div>
 
+              {/* PDF表示 - 一時的に無効化
               {pdfFile && (
                 <div>
                   <label className="block text-sm font-medium mb-2">PDF</label>
@@ -424,6 +425,7 @@ export default function ImportFromImage() {
                   </div>
                 </div>
               )}
+              */}
             </div>
           </Card>
 
@@ -524,7 +526,7 @@ export default function ImportFromImage() {
                 setParsedData(null)
                 setFiles([])
                 setPreviews([])
-                setPdfFile(null)
+                // setPdfFile(null) // PDF機能一時無効化
               }}
               disabled={isImporting}
             >
@@ -537,7 +539,7 @@ export default function ImportFromImage() {
                   インポート中...
                 </>
               ) : (
-                `インポート (${totalProblems}問${pdfFile ? ' + PDF' : ''})`
+                `インポート (${totalProblems}問)`
               )}
             </Button>
           </div>
