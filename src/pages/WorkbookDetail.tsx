@@ -1004,19 +1004,19 @@ export default function WorkbookDetail() {
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                               <span className="text-sm font-medium">
-                                                {problem.problemNumber.split('-').pop()}
+                                                {problem.problemNumber}
                                               </span>
+                                              {problem.sectionTitle && (
+                                                <span className="text-xs text-gray-600">
+                                                  {problem.sectionTitle}
+                                                </span>
+                                              )}
                                               {hasSubProblems && (
                                                 <span className="text-xs text-gray-500">
                                                   ({subProblems.length}小問)
                                                 </span>
                                               )}
                                             </div>
-                                            {problem.memo && (
-                                              <p className="text-xs text-gray-600 mt-1">
-                                                {problem.memo}
-                                              </p>
-                                            )}
                                           </div>
                                         </div>
 
@@ -1058,14 +1058,14 @@ export default function WorkbookDetail() {
                                               <div className="flex-1">
                                                 <div className="flex items-center gap-2">
                                                   <span className="text-sm font-medium text-blue-700">
-                                                    {subProblem.problemNumber.split('-').pop()}
+                                                    {subProblem.problemNumber}
                                                   </span>
+                                                  {subProblem.sectionTitle && (
+                                                    <span className="text-xs text-gray-600">
+                                                      {subProblem.sectionTitle}
+                                                    </span>
+                                                  )}
                                                 </div>
-                                                {subProblem.memo && (
-                                                  <p className="text-xs text-gray-600 mt-1">
-                                                    {subProblem.memo}
-                                                  </p>
-                                                )}
                                               </div>
 
                                               <div className="flex items-center gap-1">
