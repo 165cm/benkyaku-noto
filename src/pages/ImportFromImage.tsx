@@ -463,11 +463,13 @@ export default function ImportFromImage() {
                           onChange={(e) =>
                             updateSectionTitle(index, e.target.value)
                           }
+                          tabIndex={-1}
                           className="flex-1 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                         />
                         <button
                           onClick={() => removeSection(index)}
                           className="p-1 hover:bg-red-100 rounded"
+                          tabIndex={-1}
                         >
                           <Trash2 size={16} className="text-error" />
                         </button>
@@ -484,6 +486,7 @@ export default function ImportFromImage() {
                                 updateCategory(index, e.target.value)
                               }
                               placeholder="例: 言語"
+                              tabIndex={-1}
                               className="w-32 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                             />
                           </div>
@@ -500,6 +503,7 @@ export default function ImportFromImage() {
                                 )
                               }
                               placeholder="未設定"
+                              tabIndex={-1}
                               className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                             />
                           </div>
