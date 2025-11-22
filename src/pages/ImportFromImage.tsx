@@ -134,7 +134,8 @@ export default function ImportFromImage() {
         for (let j = 1; j <= count; j++) {
           await addProblem({
             workbookId,
-            problemNumber: `${section.title}-${j}`,
+            problemNumber: String(j), // 純粋な連番（後でrecalculateProblemNumbersで再計算）
+            sectionTitle: section.title, // セクション名を別フィールドに保存
             category,
             page: section.page,
             memo: `${section.title} の問題 ${j}`,

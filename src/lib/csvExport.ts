@@ -4,7 +4,7 @@ import { db } from './db'
 // 問題をCSV形式にエクスポート（学習統計情報付き）
 export async function exportProblemsToCSV(problems: Problem[]): Promise<string> {
   // CSVヘッダー
-  const headers = ['問題番号', 'カテゴリ', 'ページ', 'メモ', '学習回数', '正答率', '最新結果', '最新学習日']
+  const headers = ['問題番号', 'セクション', 'カテゴリ', 'ページ', 'メモ', '学習回数', '正答率', '最新結果', '最新学習日']
 
   // CSVデータ行（非同期処理）
   const rows = await Promise.all(problems.map(async (problem) => {
@@ -40,8 +40,14 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
       latestDate = new Date(latest.studiedAt).toLocaleDateString('ja-JP')
     }
 
+    // 表示用の問題番号（セクションがある場合は「セクション-番号」形式）
+    const displayNumber = problem.sectionTitle
+      ? `${problem.sectionTitle}-${problem.problemNumber}`
+      : problem.problemNumber
+
     return [
-      escapeCSVField(problem.problemNumber),
+      escapeCSVField(displayNumber),
+      escapeCSVField(problem.sectionTitle || ''),
       escapeCSVField(problem.category || ''),
       problem.page?.toString() || '',
       escapeCSVField(problem.memo || ''),
@@ -85,6 +91,7 @@ export function downloadCSV(csvContent: string, filename: string): void {
 // 注: 学習統計情報（学習回数、正答率、最新結果、最新学習日）はインポート時に無視されます
 export interface ParsedProblemData {
   problemNumber: string
+  sectionTitle?: string
   category?: string
   page?: number
   memo?: string
@@ -107,13 +114,14 @@ export function parseCSV(csvText: string): ParsedProblemData[] {
 
     if (fields.length < 1) continue
 
-    // 問題情報のみをインポート（フィールド0-3）
-    // フィールド4以降（学習統計情報）は無視
+    // 問題情報のみをインポート（フィールド0-4）
+    // フィールド5以降（学習統計情報）は無視
     const problem: ParsedProblemData = {
       problemNumber: fields[0] || '',
-      category: fields[1] || undefined,
-      page: fields[2] ? parseInt(fields[2]) : undefined,
-      memo: fields[3] || undefined,
+      sectionTitle: fields[1] || undefined,
+      category: fields[2] || undefined,
+      page: fields[3] ? parseInt(fields[3]) : undefined,
+      memo: fields[4] || undefined,
     }
 
     if (problem.problemNumber) {
