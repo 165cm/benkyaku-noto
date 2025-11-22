@@ -64,6 +64,13 @@ export class BenkyakuDB extends Dexie {
         }
       }
     })
+
+    // sectionTitleフィールドを追加（セクション名を問題番号と分離）
+    this.version(5).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+    })
   }
 }
 

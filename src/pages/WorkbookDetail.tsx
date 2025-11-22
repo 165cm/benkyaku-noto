@@ -364,9 +364,18 @@ export default function WorkbookDetail() {
     setGroupFormData({ groupName: '', category: '', page: '' })
   }
 
-  // 問題からカテゴリと目次タイトルを抽出
+  // 問題からカテゴリとセクションタイトルを抽出
   const parseGroupInfo = (problem: Problem) => {
-    // categoryフィールドが設定されている場合はそれを優先
+    // sectionTitleフィールドがある場合はそれを使用（新データ構造）
+    if (problem.sectionTitle) {
+      return {
+        category: problem.category || '未分類',
+        title: problem.sectionTitle,
+      }
+    }
+
+    // sectionTitleがない場合は後方互換性のため問題番号から抽出
+    // categoryフィールドが設定されている場合
     if (problem.category) {
       const parts = problem.problemNumber.split('-')
       return {
@@ -375,7 +384,7 @@ export default function WorkbookDetail() {
       }
     }
 
-    // categoryフィールドがない場合は問題番号から抽出（後方互換性）
+    // 旧データ形式：問題番号から抽出
     const problemNumber = problem.problemNumber
 
     // "[言語]熟語の成り立ち-109" → { category: "[言語]", title: "熟語の成り立ち" }
@@ -387,19 +396,10 @@ export default function WorkbookDetail() {
       }
     }
 
-    // "[言語]" だけの場合や、ハイフンがない場合
-    const parts = problemNumber.split('-')
-    if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
-      return {
-        category: parts[0],
-        title: parts.slice(1, -1).join('-') || '問題',
-      }
-    }
-
     // デフォルト
     return {
       category: '未分類',
-      title: parts.length > 1 ? parts[0] : '問題',
+      title: '問題',
     }
   }
 
@@ -716,6 +716,7 @@ export default function WorkbookDetail() {
             await addProblem({
               workbookId: id,
               problemNumber: problemData.problemNumber,
+              sectionTitle: problemData.sectionTitle,
               category: problemData.category,
               page: problemData.page,
               memo: problemData.memo,
