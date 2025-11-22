@@ -67,6 +67,11 @@ export default function WorkbookDetail() {
   const [problemAccuracy, setProblemAccuracy] = useState<number | null>(null)
   const [availableCategories, setAvailableCategories] = useState<string[]>([])
   const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false)
+  const [isEditingWorkbook, setIsEditingWorkbook] = useState(false)
+  const [workbookFormData, setWorkbookFormData] = useState({
+    title: '',
+    subject: '',
+  })
 
   useEffect(() => {
     if (id) {
@@ -659,6 +664,37 @@ export default function WorkbookDetail() {
     }
   }
 
+  const handleEditWorkbook = () => {
+    if (!workbook) return
+    setWorkbookFormData({
+      title: workbook.title,
+      subject: workbook.subject,
+    })
+    setIsEditingWorkbook(true)
+  }
+
+  const handleSaveWorkbook = async () => {
+    if (!id || !workbookFormData.title.trim()) return
+
+    try {
+      await db.workbooks.update(id, {
+        title: workbookFormData.title.trim(),
+        subject: workbookFormData.subject.trim(),
+        updatedAt: new Date(),
+      })
+      setIsEditingWorkbook(false)
+      loadData()
+    } catch (error) {
+      console.error('問題集の更新に失敗しました:', error)
+      alert('問題集の更新に失敗しました')
+    }
+  }
+
+  const handleCancelEditWorkbook = () => {
+    setIsEditingWorkbook(false)
+    setWorkbookFormData({ title: '', subject: '' })
+  }
+
   // PDF削除 - 一時的に無効化
   // const handleDeletePDF = async () => {
   //   if (!id || !workbook?.pdfFileName) return
@@ -777,9 +813,48 @@ export default function WorkbookDetail() {
         </Button>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">{workbook.title}</h1>
-            <p className="text-gray-600">{workbook.subject}</p>
+          <div className="flex-1">
+            {isEditingWorkbook ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={workbookFormData.title}
+                  onChange={(e) => setWorkbookFormData({ ...workbookFormData, title: e.target.value })}
+                  className="w-full px-3 py-2 text-xl font-bold border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="問題集のタイトル"
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  value={workbookFormData.subject}
+                  onChange={(e) => setWorkbookFormData({ ...workbookFormData, subject: e.target.value })}
+                  className="w-full px-3 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="科目・説明"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveWorkbook}>
+                    保存
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={handleCancelEditWorkbook}>
+                    キャンセル
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <div>
+                  <h1 className="text-2xl font-bold">{workbook.title}</h1>
+                  <p className="text-gray-600">{workbook.subject}</p>
+                </div>
+                <button
+                  onClick={handleEditWorkbook}
+                  className="p-1.5 hover:bg-gray-100 rounded transition-colors mt-1"
+                  title="問題集を編集"
+                >
+                  <Edit2 size={16} className="text-gray-500" />
+                </button>
+              </div>
+            )}
             {/* PDF機能は一時的に無効化
             {workbook.pdfFileName && (
               <p className="text-sm text-blue-600 flex items-center gap-1 mt-1">
