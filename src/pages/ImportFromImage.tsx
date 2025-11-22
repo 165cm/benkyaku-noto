@@ -173,12 +173,20 @@ export default function ImportFromImage() {
     const newSections = parsedData.sections.filter((_, i) => i !== index)
     setParsedData({ ...parsedData, sections: newSections })
 
-    const newCounts = { ...problemCounts }
-    delete newCounts[index]
-    setProblemCounts(newCounts)
+    // インデックスを再マッピング（削除したインデックス以降を詰める）
+    const newCounts: { [key: number]: number } = {}
+    const newCategories: { [key: number]: string } = {}
 
-    const newCategories = { ...categories }
-    delete newCategories[index]
+    let newIndex = 0
+    for (let i = 0; i < parsedData.sections.length; i++) {
+      if (i !== index) {
+        newCounts[newIndex] = problemCounts[i] || 0
+        newCategories[newIndex] = categories[i] || ''
+        newIndex++
+      }
+    }
+
+    setProblemCounts(newCounts)
     setCategories(newCategories)
   }
 
