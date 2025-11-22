@@ -374,8 +374,6 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
         problemNumber: `${parentProblem.problemNumber}-2`,
         sortOrder: baseSortOrder + 1,
         parentProblemId: parentProblemId,
-        category: parentProblem.category,
-        page: parentProblem.page,
       })
 
       // 3. 親問題のメモをクリア（箱としてのみ機能させる）
@@ -397,8 +395,6 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
         problemNumber: `${parentProblem.problemNumber}-${maxSubNumber + 1}`,
         sortOrder: maxSubSortOrder + 1,
         parentProblemId: parentProblemId,
-        category: parentProblem.category,
-        page: parentProblem.page,
       })
     }
   })
