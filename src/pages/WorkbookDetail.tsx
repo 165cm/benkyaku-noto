@@ -573,10 +573,23 @@ export default function WorkbookDetail() {
       return
     }
 
-    // ドラッグした問題を対象問題の小問にする
-    await makeSubProblem(draggedProblem.id, targetProblem.id)
-    setDraggedProblem(null)
-    loadData()
+    // 確認ポップアップ
+    const confirmMessage = `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？`
+    if (!confirm(confirmMessage)) {
+      setDraggedProblem(null)
+      return
+    }
+
+    try {
+      // ドラッグした問題を対象問題の小問にする
+      await makeSubProblem(draggedProblem.id, targetProblem.id)
+      setDraggedProblem(null)
+      loadData()
+    } catch (error) {
+      console.error('小問の設定に失敗しました:', error)
+      alert(error instanceof Error ? error.message : '小問の設定に失敗しました')
+      setDraggedProblem(null)
+    }
   }
 
   const handleDropToIndependent = async (e: React.DragEvent) => {
