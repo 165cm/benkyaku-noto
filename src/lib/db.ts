@@ -307,16 +307,22 @@ export async function recalculateProblemNumbers(workbookId: string) {
 // 問題を親問題の小問にする（親問題を箱として扱う）
 export async function makeSubProblem(problemId: string, parentProblemId: string) {
   // トランザクションで安全に実行
-  return await db.transaction('rw', db.problems, db.studyRecords, async () => {
-    const parentProblem = await db.problems.get(parentProblemId)
-    const draggedProblem = await db.problems.get(problemId)
+  const draggedProblem = await db.problems.get(problemId)
+  if (!draggedProblem) {
+    throw new Error('問題が見つかりません')
+  }
+  const workbookId = draggedProblem.workbookId
 
-    if (!parentProblem || !draggedProblem) {
+  await db.transaction('rw', db.problems, db.studyRecords, async () => {
+    const parentProblem = await db.problems.get(parentProblemId)
+    const currentDraggedProblem = await db.problems.get(problemId)
+
+    if (!parentProblem || !currentDraggedProblem) {
       throw new Error('問題が見つかりません')
     }
 
     // バリデーション
-    if (draggedProblem.workbookId !== parentProblem.workbookId) {
+    if (currentDraggedProblem.workbookId !== parentProblem.workbookId) {
       throw new Error('異なる問題集の問題は関連付けできません')
     }
 
@@ -324,7 +330,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
       throw new Error('問題を自分自身の小問にすることはできません')
     }
 
-    if (parentProblem.deletedAt || draggedProblem.deletedAt) {
+    if (parentProblem.deletedAt || currentDraggedProblem.deletedAt) {
       throw new Error('削除された問題を操作することはできません')
     }
 
@@ -398,9 +404,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
   })
 
   // 問題番号を再計算
-  await recalculateProblemNumbers(
-    (await db.problems.get(problemId))?.workbookId || ''
-  )
+  await recalculateProblemNumbers(workbookId)
 }
 
 // 小問を独立した問題にする
