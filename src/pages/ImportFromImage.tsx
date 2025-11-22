@@ -98,11 +98,34 @@ export default function ImportFromImage() {
       })
 
       // セクションごとに問題を登録
+      // 親カテゴリを継承するためのスタック
+      const categoryStack: string[] = []
+
       for (let i = 0; i < parsedData.sections.length; i++) {
         const section = parsedData.sections[i]
         const count = problemCounts[i] || 0
         const categoryValue = categories[i]
-        const category = categoryValue && categoryValue.trim() !== '' ? categoryValue.trim() : undefined
+
+        // カテゴリスタックを現在のレベルに合わせて調整
+        while (categoryStack.length > section.level) {
+          categoryStack.pop()
+        }
+
+        // カテゴリを決定（空の場合は親から継承）
+        let category: string | undefined
+        if (categoryValue && categoryValue.trim() !== '') {
+          category = categoryValue.trim()
+          // スタックを更新
+          categoryStack[section.level] = category
+        } else {
+          // 親カテゴリを継承（スタックから最も近い親を探す）
+          for (let level = section.level - 1; level >= 0; level--) {
+            if (categoryStack[level]) {
+              category = categoryStack[level]
+              break
+            }
+          }
+        }
 
         // 問題数が設定されていればその数だけ問題を作成
         for (let j = 1; j <= count; j++) {
