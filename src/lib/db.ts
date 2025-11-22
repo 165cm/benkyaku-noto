@@ -262,6 +262,73 @@ function decrementLastNumber(problemNumber: string): string {
   return parts.join('-')
 }
 
+// 問題番号を階層構造に基づいて再計算する
+export async function recalculateProblemNumbers(workbookId: string) {
+  return await db.transaction('rw', db.problems, async () => {
+    // 削除されていない問題を取得
+    const allProblems = await db.problems
+      .where('workbookId')
+      .equals(workbookId)
+      .toArray()
+
+    const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+    // 親問題（parentProblemIdがない問題）を取得してsortOrder順にソート
+    const parentProblems = activeProblems
+      .filter(p => !p.parentProblemId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+    // 小問をparentProblemIdでグループ化
+    const subProblemsMap = new Map<string, typeof activeProblems>()
+    for (const problem of activeProblems) {
+      if (problem.parentProblemId) {
+        if (!subProblemsMap.has(problem.parentProblemId)) {
+          subProblemsMap.set(problem.parentProblemId, [])
+        }
+        subProblemsMap.get(problem.parentProblemId)!.push(problem)
+      }
+    }
+
+    // 親問題に番号を割り当て
+    let parentNumber = 1
+    let baseSortOrder = 100
+
+    for (const parent of parentProblems) {
+      const subProblems = subProblemsMap.get(parent.id) || []
+
+      if (subProblems.length > 0) {
+        // 小問がある場合、親は箱として番号のみ
+        await db.problems.update(parent.id, {
+          problemNumber: String(parentNumber),
+          sortOrder: baseSortOrder,
+        })
+        baseSortOrder += 10
+
+        // 小問をsortOrder順にソートして番号を割り当て
+        subProblems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+        let subNumber = 1
+        for (const sub of subProblems) {
+          await db.problems.update(sub.id, {
+            problemNumber: `${parentNumber}-${subNumber}`,
+            sortOrder: baseSortOrder,
+          })
+          baseSortOrder += 10
+          subNumber++
+        }
+      } else {
+        // 小問がない通常の問題
+        await db.problems.update(parent.id, {
+          problemNumber: String(parentNumber),
+          sortOrder: baseSortOrder,
+        })
+        baseSortOrder += 100
+      }
+
+      parentNumber++
+    }
+  })
+}
+
 // 問題を親問題の小問にする（親問題を箱として扱う）
 export async function makeSubProblem(problemId: string, parentProblemId: string) {
   // トランザクションで安全に実行
@@ -353,51 +420,23 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
         page: parentProblem.page,
       })
     }
-
-    // ドロップした問題より後ろの問題を繰り上げる
-    // 例: 問題4に問題5をドロップした場合、問題6→問題5、問題7→問題6に繰り上げる
-    const draggedNumber = extractLastNumber(draggedProblem.problemNumber)
-    const draggedPrefix = getProblemPrefix(draggedProblem.problemNumber)
-
-    // 同じworkbookIdの問題を取得
-    const allProblems = await db.problems
-      .where('workbookId')
-      .equals(draggedProblem.workbookId)
-      .toArray()
-
-    // ドロップした問題より大きい番号を持つ問題を繰り上げる
-    for (const problem of allProblems) {
-      // スキップする条件：
-      // - ドロップした問題自身
-      // - 親問題
-      // - 小問（parentProblemIdが設定されている問題）
-      // - 削除された問題
-      if (
-        problem.id === draggedProblem.id ||
-        problem.id === parentProblemId ||
-        problem.parentProblemId ||
-        problem.deletedAt
-      ) {
-        continue
-      }
-
-      const problemNumber = extractLastNumber(problem.problemNumber)
-      const problemPrefix = getProblemPrefix(problem.problemNumber)
-
-      // 同じプレフィックスで、ドロップした問題より大きい番号を持つ問題を繰り上げる
-      if (problemPrefix === draggedPrefix && problemNumber > draggedNumber) {
-        const newProblemNumber = decrementLastNumber(problem.problemNumber)
-        await db.problems.update(problem.id, {
-          problemNumber: newProblemNumber,
-        })
-      }
-    }
   })
+
+  // 問題番号を再計算
+  await recalculateProblemNumbers(
+    (await db.problems.get(problemId))?.workbookId || ''
+  )
 }
 
 // 小問を独立した問題にする
 export async function makeIndependentProblem(problemId: string) {
+  const problem = await db.problems.get(problemId)
+  if (!problem) return
+
   await db.problems.update(problemId, { parentProblemId: undefined })
+
+  // 問題番号を再計算
+  await recalculateProblemNumbers(problem.workbookId)
 }
 
 // 親問題の小問を取得
