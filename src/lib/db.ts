@@ -237,31 +237,6 @@ export async function deleteStudyRecord(id: string) {
   await db.studyRecords.delete(id)
 }
 
-// 問題番号から最後の数値部分を抽出
-function extractLastNumber(problemNumber: string): number {
-  const parts = problemNumber.split('-')
-  const lastPart = parts[parts.length - 1]
-  const num = parseInt(lastPart)
-  return isNaN(num) ? 0 : num
-}
-
-// 問題番号のプレフィックスを取得（最後の数値部分を除く）
-function getProblemPrefix(problemNumber: string): string {
-  const parts = problemNumber.split('-')
-  if (parts.length <= 1) return ''
-  return parts.slice(0, -1).join('-')
-}
-
-// 問題番号の最後の数値部分を1つ減らす
-function decrementLastNumber(problemNumber: string): string {
-  const parts = problemNumber.split('-')
-  const lastPart = parts[parts.length - 1]
-  const num = parseInt(lastPart)
-  if (isNaN(num) || num <= 1) return problemNumber
-  parts[parts.length - 1] = (num - 1).toString()
-  return parts.join('-')
-}
-
 // 問題番号を階層構造に基づいて再計算する
 export async function recalculateProblemNumbers(workbookId: string) {
   return await db.transaction('rw', db.problems, async () => {
