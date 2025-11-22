@@ -271,17 +271,24 @@ export async function recalculateProblemNumbers(workbookId: string) {
       }
     }
 
-    // 親問題に番号を割り当て
-    let parentNumber = 1
+    // セクションごとに番号を管理
+    const sectionNumberMap = new Map<string, number>()
     let baseSortOrder = 100
 
     for (const parent of parentProblems) {
       const subProblems = subProblemsMap.get(parent.id) || []
 
+      // セクションキーを取得（sectionTitleがなければ'default'）
+      const sectionKey = parent.sectionTitle || 'default'
+
+      // セクション内の次の番号を取得
+      const sectionNumber = (sectionNumberMap.get(sectionKey) || 0) + 1
+      sectionNumberMap.set(sectionKey, sectionNumber)
+
       if (subProblems.length > 0) {
         // 小問がある場合、親は箱として番号のみ
         await db.problems.update(parent.id, {
-          problemNumber: String(parentNumber),
+          problemNumber: String(sectionNumber),
           sortOrder: baseSortOrder,
         })
         baseSortOrder += 10
@@ -291,7 +298,7 @@ export async function recalculateProblemNumbers(workbookId: string) {
         let subNumber = 1
         for (const sub of subProblems) {
           await db.problems.update(sub.id, {
-            problemNumber: `${parentNumber}-${subNumber}`,
+            problemNumber: `${sectionNumber}-${subNumber}`,
             sortOrder: baseSortOrder,
           })
           baseSortOrder += 10
@@ -300,13 +307,11 @@ export async function recalculateProblemNumbers(workbookId: string) {
       } else {
         // 小問がない通常の問題
         await db.problems.update(parent.id, {
-          problemNumber: String(parentNumber),
+          problemNumber: String(sectionNumber),
           sortOrder: baseSortOrder,
         })
         baseSortOrder += 100
       }
-
-      parentNumber++
     }
   })
 }
@@ -356,6 +361,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
         id: parentAsSubProblemId,
         workbookId: parentProblem.workbookId,
         problemNumber: `${parentProblem.problemNumber}-1`,
+        sectionTitle: parentProblem.sectionTitle,
         sortOrder: baseSortOrder,
         category: parentProblem.category,
         page: parentProblem.page,
@@ -379,6 +385,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
       // 2. ドラッグされた問題を「親-2」として設定
       await db.problems.update(problemId, {
         problemNumber: `${parentProblem.problemNumber}-2`,
+        sectionTitle: parentProblem.sectionTitle,
         sortOrder: baseSortOrder + 1,
         parentProblemId: parentProblemId,
       })
@@ -400,6 +407,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
 
       await db.problems.update(problemId, {
         problemNumber: `${parentProblem.problemNumber}-${maxSubNumber + 1}`,
+        sectionTitle: parentProblem.sectionTitle,
         sortOrder: maxSubSortOrder + 1,
         parentProblemId: parentProblemId,
       })

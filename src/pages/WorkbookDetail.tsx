@@ -632,6 +632,7 @@ export default function WorkbookDetail() {
     await addProblem({
       workbookId: id,
       problemNumber: newProblemNumber,
+      sectionTitle: parentProblem.sectionTitle,
       category: parentProblem.category,
       page: parentProblem.page,
       parentProblemId: parentProblem.id,
