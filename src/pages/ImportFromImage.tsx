@@ -98,34 +98,37 @@ export default function ImportFromImage() {
       })
 
       // セクションごとに問題を登録
-      // 親カテゴリを継承するためのスタック
-      const categoryStack: string[] = []
+      // 親セクションのタイトルをカテゴリとして使用するためのスタック
+      const titleStack: string[] = []
 
       for (let i = 0; i < parsedData.sections.length; i++) {
         const section = parsedData.sections[i]
         const count = problemCounts[i] || 0
         const categoryValue = categories[i]
 
-        // カテゴリスタックを現在のレベルに合わせて調整
-        while (categoryStack.length > section.level) {
-          categoryStack.pop()
+        // タイトルスタックを現在のレベルに合わせて調整
+        while (titleStack.length > section.level) {
+          titleStack.pop()
         }
 
-        // カテゴリを決定（空の場合は親から継承）
+        // 現在のセクションのタイトルをスタックに追加
+        titleStack[section.level] = section.title
+
+        // カテゴリを決定
         let category: string | undefined
         if (categoryValue && categoryValue.trim() !== '') {
+          // 明示的にカテゴリが設定されている場合はそれを使用
           category = categoryValue.trim()
-          // スタックを更新
-          categoryStack[section.level] = category
-        } else {
-          // 親カテゴリを継承（スタックから最も近い親を探す）
+        } else if (section.level > 0) {
+          // 子セクションの場合、親セクションのタイトルをカテゴリとして使用
           for (let level = section.level - 1; level >= 0; level--) {
-            if (categoryStack[level]) {
-              category = categoryStack[level]
+            if (titleStack[level]) {
+              category = titleStack[level]
               break
             }
           }
         }
+        // level 0（親セクション）でカテゴリが未設定の場合はundefined
 
         // 問題数が設定されていればその数だけ問題を作成
         for (let j = 1; j <= count; j++) {
