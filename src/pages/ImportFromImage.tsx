@@ -98,11 +98,37 @@ export default function ImportFromImage() {
       })
 
       // セクションごとに問題を登録
+      // 親セクションのタイトルをカテゴリとして使用するためのスタック
+      const titleStack: string[] = []
+
       for (let i = 0; i < parsedData.sections.length; i++) {
         const section = parsedData.sections[i]
         const count = problemCounts[i] || 0
         const categoryValue = categories[i]
-        const category = categoryValue && categoryValue.trim() !== '' ? categoryValue.trim() : undefined
+
+        // タイトルスタックを現在のレベルに合わせて調整
+        while (titleStack.length > section.level) {
+          titleStack.pop()
+        }
+
+        // 現在のセクションのタイトルをスタックに追加
+        titleStack[section.level] = section.title
+
+        // カテゴリを決定
+        let category: string | undefined
+        if (categoryValue && categoryValue.trim() !== '') {
+          // 明示的にカテゴリが設定されている場合はそれを使用
+          category = categoryValue.trim()
+        } else if (section.level > 0) {
+          // 子セクションの場合、親セクションのタイトルをカテゴリとして使用
+          for (let level = section.level - 1; level >= 0; level--) {
+            if (titleStack[level]) {
+              category = titleStack[level]
+              break
+            }
+          }
+        }
+        // level 0（親セクション）でカテゴリが未設定の場合はundefined
 
         // 問題数が設定されていればその数だけ問題を作成
         for (let j = 1; j <= count; j++) {
@@ -463,11 +489,13 @@ export default function ImportFromImage() {
                           onChange={(e) =>
                             updateSectionTitle(index, e.target.value)
                           }
+                          tabIndex={-1}
                           className="flex-1 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                         />
                         <button
                           onClick={() => removeSection(index)}
                           className="p-1 hover:bg-red-100 rounded"
+                          tabIndex={-1}
                         >
                           <Trash2 size={16} className="text-error" />
                         </button>
@@ -484,6 +512,7 @@ export default function ImportFromImage() {
                                 updateCategory(index, e.target.value)
                               }
                               placeholder="例: 言語"
+                              tabIndex={-1}
                               className="w-32 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                             />
                           </div>
@@ -500,6 +529,7 @@ export default function ImportFromImage() {
                                 )
                               }
                               placeholder="未設定"
+                              tabIndex={-1}
                               className="w-20 px-2 py-1 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                             />
                           </div>
