@@ -165,10 +165,14 @@ export default function StudyReport() {
         )
       : 0
 
+  // 学習したセクションタイトルを取得
+  const studiedSectionTitle = problems[0]?.sectionTitle || problems[0]?.category || '学習'
+
   return (
     <div>
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold mb-2">学習レポート</h1>
+        <p className="text-lg font-medium text-primary mb-1">{studiedSectionTitle}</p>
         <p className="text-gray-600">お疲れ様でした！</p>
       </div>
 
