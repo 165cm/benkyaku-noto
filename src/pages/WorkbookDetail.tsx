@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -72,6 +72,14 @@ export default function WorkbookDetail() {
     title: '',
     subject: '',
   })
+  const [lastDragOperation, setLastDragOperation] = useState<{
+    problemId: string
+    originalParentId: string | undefined
+    originalProblemNumber: string
+    originalSectionTitle: string | undefined
+    originalSortOrder: number
+  } | null>(null)
+  const [skipConfirmUntil, setSkipConfirmUntil] = useState<number>(0)
 
   useEffect(() => {
     if (id) {
@@ -578,14 +586,29 @@ export default function WorkbookDetail() {
       return
     }
 
-    // 確認ポップアップ
-    const confirmMessage = `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？`
-    if (!confirm(confirmMessage)) {
-      setDraggedProblem(null)
-      return
+    // 確認をスキップするかどうか
+    const now = Date.now()
+    const shouldSkipConfirm = skipConfirmUntil > now
+
+    if (!shouldSkipConfirm) {
+      // 確認ポップアップ
+      const confirmMessage = `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？\n\n※ OKを押しながらShiftキーを押すと10分間確認を省略できます`
+      if (!confirm(confirmMessage)) {
+        setDraggedProblem(null)
+        return
+      }
     }
 
     try {
+      // 元の状態を保存（Undo用）
+      setLastDragOperation({
+        problemId: draggedProblem.id,
+        originalParentId: draggedProblem.parentProblemId,
+        originalProblemNumber: draggedProblem.problemNumber,
+        originalSectionTitle: draggedProblem.sectionTitle,
+        originalSortOrder: draggedProblem.sortOrder,
+      })
+
       // ドラッグした問題を対象問題の小問にする
       await makeSubProblem(draggedProblem.id, targetProblem.id)
       setDraggedProblem(null)
@@ -594,7 +617,31 @@ export default function WorkbookDetail() {
       console.error('小問の設定に失敗しました:', error)
       alert(error instanceof Error ? error.message : '小問の設定に失敗しました')
       setDraggedProblem(null)
+      setLastDragOperation(null)
     }
+  }
+
+  const handleUndoLastDrag = async () => {
+    if (!lastDragOperation) return
+
+    try {
+      if (lastDragOperation.originalParentId) {
+        // 元々小問だった場合、元の親に戻す
+        await makeSubProblem(lastDragOperation.problemId, lastDragOperation.originalParentId)
+      } else {
+        // 元々独立した問題だった場合
+        await makeIndependentProblem(lastDragOperation.problemId)
+      }
+      setLastDragOperation(null)
+      loadData()
+    } catch (error) {
+      console.error('元に戻すに失敗しました:', error)
+      alert('元に戻すに失敗しました')
+    }
+  }
+
+  const handleSkipConfirmFor10Min = () => {
+    setSkipConfirmUntil(Date.now() + 10 * 60 * 1000)
   }
 
   const handleDropToIndependent = async (e: React.DragEvent) => {
@@ -924,6 +971,54 @@ export default function WorkbookDetail() {
         </div>
 
       </div>
+
+      {/* Undo通知バーと確認スキップ */}
+      {problems.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {lastDragOperation && (
+            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleUndoLastDrag}
+              >
+                <Undo2 size={14} className="mr-1" />
+                元に戻す
+              </Button>
+              <button
+                onClick={() => setLastDragOperation(null)}
+                className="text-gray-400 hover:text-gray-600 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {skipConfirmUntil > Date.now() ? (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+              <span className="text-blue-700">確認省略中</span>
+              <button
+                onClick={() => setSkipConfirmUntil(0)}
+                className="text-blue-500 hover:text-blue-700 underline"
+              >
+                解除
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    handleSkipConfirmFor10Min()
+                  }
+                }}
+                className="rounded"
+              />
+              10分間確認を省略
+            </label>
+          )}
+        </div>
+      )}
 
       {problems.length === 0 ? (
         <div className="text-center py-12">
