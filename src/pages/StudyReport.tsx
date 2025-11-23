@@ -40,6 +40,7 @@ export default function StudyReport() {
 
     const validProblems = problemDetails.filter((p) => p !== undefined) as Problem[]
     setProblems(validProblems)
+    setSession(currentSession)
 
     // 次のセクションを検索
     if (validProblems.length > 0) {
