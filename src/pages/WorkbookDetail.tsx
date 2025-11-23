@@ -824,7 +824,7 @@ export default function WorkbookDetail() {
           setImportProgress({ current: i + 1, total: parsedProblems.length, phase: 'importing' })
         }
 
-        // 親子関係を設定
+        // 親子関係を設定（makeSubProblemを使わず直接設定）
         const problemsWithParent = parsedProblems.filter(p => p.parentProblemNumber)
         if (problemsWithParent.length > 0) {
           setImportProgress({ current: 0, total: problemsWithParent.length, phase: 'relations' })
@@ -837,7 +837,10 @@ export default function WorkbookDetail() {
           const parentId = problemNumberToId.get(problemData.parentProblemNumber!)
           if (childId && parentId) {
             try {
-              await makeSubProblem(childId, parentId)
+              // 直接parentProblemIdを設定（makeSubProblemは使わない）
+              await db.problems.update(childId, {
+                parentProblemId: parentId,
+              })
               relationCount++
             } catch (error) {
               console.error('親子関係の設定に失敗:', error)
