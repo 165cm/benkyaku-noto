@@ -227,15 +227,22 @@ export default function Study() {
       // セッション結果に追加
       addResult(problem.id, result, studyTime)
 
+      // 更新後のセッションを再取得（currentIndexが更新されているため）
+      const updatedSession = getSession()
+      if (!updatedSession) {
+        navigate('/study-report')
+        return
+      }
+
       // セッションが完了したかチェック
-      if (isSessionComplete(session)) {
+      if (isSessionComplete(updatedSession)) {
         // レポートページへ
         navigate('/study-report')
         return
       }
 
       // 次の問題へ
-      const nextProblemId = getNextProblemId(session)
+      const nextProblemId = getNextProblemId(updatedSession)
       if (nextProblemId) {
         navigate(`/study/${nextProblemId}`)
         return

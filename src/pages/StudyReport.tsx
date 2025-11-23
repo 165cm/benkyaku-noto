@@ -40,6 +40,7 @@ export default function StudyReport() {
 
     const validProblems = problemDetails.filter((p) => p !== undefined) as Problem[]
     setProblems(validProblems)
+    setSession(currentSession)
 
     // 次のセクションを検索
     if (validProblems.length > 0) {
@@ -129,20 +130,8 @@ export default function StudyReport() {
   }
 
   // 問題番号の表示用フォーマット
+  // 正規化後はproblemNumberが既に "1", "2", "3-1", "3-2" 形式
   const getDisplayProblemNumber = (problemNumber: string) => {
-    const parts = problemNumber.split('-')
-
-    // 小問の場合（例: "代金精算-3-1" → "3-1"）
-    if (parts.length >= 3) {
-      return parts.slice(-2).join('-')
-    }
-
-    // 通常の問題（例: "代金精算-3" → "3"）
-    if (parts.length >= 2) {
-      return parts[parts.length - 1]
-    }
-
-    // ハイフンがない場合はそのまま
     return problemNumber
   }
 
