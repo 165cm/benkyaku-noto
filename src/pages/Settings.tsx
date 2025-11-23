@@ -86,13 +86,30 @@ export default function Settings() {
 
     const result: CategorySection[] = []
     categoryMap.forEach((sections, category) => {
+      // セクションを数値順にソート
+      const sortedSections = Array.from(sections).sort((a, b) => {
+        const titleA = a.replace(`${category}-`, '')
+        const titleB = b.replace(`${category}-`, '')
+
+        // 数値として解釈できる場合は数値比較
+        const numA = parseInt(titleA)
+        const numB = parseInt(titleB)
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB
+        }
+
+        // 数値でない場合は文字列比較
+        return titleA.localeCompare(titleB, 'ja')
+      })
+
       result.push({
         category,
-        sections: Array.from(sections).sort()
+        sections: sortedSections
       })
     })
 
-    setCategorySections(result.sort((a, b) => a.category.localeCompare(b.category)))
+    setCategorySections(result.sort((a, b) => a.category.localeCompare(b.category, 'ja')))
   }
 
   const toggleCategory = (category: string) => {
@@ -291,6 +308,8 @@ export default function Settings() {
                         {sections.map(sectionKey => {
                           const sectionTitle = sectionKey.replace(`${category}-`, '')
                           const isCategoryExcluded = excludedCategories.includes(category)
+                          // 「カテゴリ - セクション名」の形式で表示
+                          const displayName = `${category} - ${sectionTitle}`
                           return (
                             <label
                               key={sectionKey}
@@ -305,7 +324,7 @@ export default function Settings() {
                                 disabled={isCategoryExcluded}
                                 className="w-4 h-4 text-primary rounded"
                               />
-                              <span className="text-sm">{sectionTitle}</span>
+                              <span className="text-sm">{displayName}</span>
                               {excludedSections.includes(sectionKey) && !isCategoryExcluded && (
                                 <span className="text-xs text-error">(除外中)</span>
                               )}
