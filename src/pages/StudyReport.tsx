@@ -39,8 +39,14 @@ export default function StudyReport() {
   }
 
   const handleFinish = () => {
+    // 問題集のTOPに戻る
+    const workbookId = problems[0]?.workbookId
     clearSession()
-    navigate('/')
+    if (workbookId) {
+      navigate(`/workbooks/${workbookId}`)
+    } else {
+      navigate('/')
+    }
   }
 
   // 問題番号の表示用フォーマット
@@ -203,7 +209,7 @@ export default function StudyReport() {
 
       <div className="text-center">
         <Button onClick={handleFinish} size="lg">
-          ホームに戻る
+          問題集に戻る
         </Button>
       </div>
     </div>
