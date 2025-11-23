@@ -1,9 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Key, AlertCircle, CheckCircle, Trash2, Bug } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import { saveOpenAIApiKey, getOpenAIApiKey, removeOpenAIApiKey } from '@/lib/storage'
+import {
+  saveOpenAIApiKey,
+  getOpenAIApiKey,
+  removeOpenAIApiKey,
+  getExcludedCategories,
+  saveExcludedCategories,
+  getExcludedSections,
+  saveExcludedSections
+} from '@/lib/storage'
+import { db } from '@/lib/db'
+import type { Problem } from '@/types'
+
+interface CategorySection {
+  category: string
+  sections: string[]
+}
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -12,13 +27,103 @@ export default function Settings() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  // 除外設定
+  const [categorySections, setCategorySections] = useState<CategorySection[]>([])
+  const [excludedCategories, setExcludedCategories] = useState<string[]>([])
+  const [excludedSections, setExcludedSections] = useState<string[]>([])
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([])
+
   useEffect(() => {
     const existingKey = getOpenAIApiKey()
     if (existingKey) {
       setApiKey(existingKey)
       setIsApiKeySet(true)
     }
+
+    // 除外設定をロード
+    setExcludedCategories(getExcludedCategories())
+    setExcludedSections(getExcludedSections())
+
+    // カテゴリ・セクション一覧を取得
+    loadCategorySections()
   }, [])
+
+  const loadCategorySections = async () => {
+    const allProblems = await db.problems.toArray()
+    const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+    // カテゴリごとにセクションをグルーピング
+    const categoryMap = new Map<string, Set<string>>()
+
+    activeProblems.forEach((problem: Problem) => {
+      let category = problem.category || '未分類'
+      let title = '問題'
+
+      if (problem.category) {
+        const parts = problem.problemNumber.split('-')
+        title = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
+      } else {
+        const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
+        if (match) {
+          category = match[1]
+          title = match[2]
+        } else {
+          const parts = problem.problemNumber.split('-')
+          if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
+            category = parts[0]
+            title = parts.slice(1, -1).join('-') || '問題'
+          } else {
+            title = parts.length > 1 ? parts[0] : '問題'
+          }
+        }
+      }
+
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, new Set())
+      }
+      categoryMap.get(category)!.add(`${category}-${title}`)
+    })
+
+    const result: CategorySection[] = []
+    categoryMap.forEach((sections, category) => {
+      result.push({
+        category,
+        sections: Array.from(sections).sort()
+      })
+    })
+
+    setCategorySections(result.sort((a, b) => a.category.localeCompare(b.category)))
+  }
+
+  const toggleCategory = (category: string) => {
+    if (expandedCategories.includes(category)) {
+      setExpandedCategories(expandedCategories.filter(c => c !== category))
+    } else {
+      setExpandedCategories([...expandedCategories, category])
+    }
+  }
+
+  const toggleExcludeCategory = (category: string) => {
+    let newExcluded: string[]
+    if (excludedCategories.includes(category)) {
+      newExcluded = excludedCategories.filter(c => c !== category)
+    } else {
+      newExcluded = [...excludedCategories, category]
+    }
+    setExcludedCategories(newExcluded)
+    saveExcludedCategories(newExcluded)
+  }
+
+  const toggleExcludeSection = (sectionKey: string) => {
+    let newExcluded: string[]
+    if (excludedSections.includes(sectionKey)) {
+      newExcluded = excludedSections.filter(s => s !== sectionKey)
+    } else {
+      newExcluded = [...excludedSections, sectionKey]
+    }
+    setExcludedSections(newExcluded)
+    saveExcludedSections(newExcluded)
+  }
 
   const handleSave = () => {
     if (apiKey.trim()) {
@@ -139,6 +244,96 @@ export default function Settings() {
           <li>AIが自動的に章・節・タグを抽出</li>
           <li>内容を確認・編集して問題集を作成</li>
         </ol>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <Filter className="text-gray-600 mt-1" size={24} />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold mb-2">復習除外設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              カテゴリまたはセクション単位で復習候補から除外できます
+            </p>
+
+            {categorySections.length === 0 ? (
+              <p className="text-sm text-gray-500">問題が登録されていません</p>
+            ) : (
+              <div className="space-y-2">
+                {categorySections.map(({ category, sections }) => (
+                  <div key={category} className="border border-border rounded-lg">
+                    <div className="flex items-center gap-2 p-3 bg-gray-50">
+                      <button
+                        onClick={() => toggleCategory(category)}
+                        className="flex items-center gap-1 text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedCategories.includes(category) ? (
+                          <ChevronDown size={16} />
+                        ) : (
+                          <ChevronRight size={16} />
+                        )}
+                      </button>
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={excludedCategories.includes(category)}
+                          onChange={() => toggleExcludeCategory(category)}
+                          className="w-4 h-4 text-primary rounded"
+                        />
+                        <span className="font-medium text-sm">{category}</span>
+                        {excludedCategories.includes(category) && (
+                          <span className="text-xs text-error">(除外中)</span>
+                        )}
+                      </label>
+                    </div>
+
+                    {expandedCategories.includes(category) && (
+                      <div className="p-3 pt-0 space-y-1">
+                        {sections.map(sectionKey => {
+                          const sectionTitle = sectionKey.replace(`${category}-`, '')
+                          const isCategoryExcluded = excludedCategories.includes(category)
+                          return (
+                            <label
+                              key={sectionKey}
+                              className={`flex items-center gap-2 ml-6 cursor-pointer ${
+                                isCategoryExcluded ? 'opacity-50' : ''
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={excludedSections.includes(sectionKey)}
+                                onChange={() => toggleExcludeSection(sectionKey)}
+                                disabled={isCategoryExcluded}
+                                className="w-4 h-4 text-primary rounded"
+                              />
+                              <span className="text-sm">{sectionTitle}</span>
+                              {excludedSections.includes(sectionKey) && !isCategoryExcluded && (
+                                <span className="text-xs text-error">(除外中)</span>
+                              )}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(excludedCategories.length > 0 || excludedSections.length > 0) && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  {excludedCategories.length > 0 && (
+                    <span>除外カテゴリ: {excludedCategories.length}件</span>
+                  )}
+                  {excludedCategories.length > 0 && excludedSections.length > 0 && ' / '}
+                  {excludedSections.length > 0 && (
+                    <span>除外セクション: {excludedSections.length}件</span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </Card>
 
       <Card>

@@ -1,5 +1,53 @@
 import { db } from './db'
+import { getExcludedCategories, getExcludedSections } from './storage'
 import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
+
+// 問題のセクションキーを取得
+function getProblemSectionKey(problem: Problem): string {
+  let category = problem.category || '未分類'
+  let title = '問題'
+
+  if (problem.category) {
+    const parts = problem.problemNumber.split('-')
+    title = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
+  } else {
+    const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
+    if (match) {
+      category = match[1]
+      title = match[2]
+    } else {
+      const parts = problem.problemNumber.split('-')
+      if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
+        category = parts[0]
+        title = parts.slice(1, -1).join('-') || '問題'
+      } else {
+        title = parts.length > 1 ? parts[0] : '問題'
+      }
+    }
+  }
+
+  return `${category}-${title}`
+}
+
+// 問題が除外対象かどうかをチェック
+export function isProblemExcluded(problem: Problem): boolean {
+  const excludedCategories = getExcludedCategories()
+  const excludedSections = getExcludedSections()
+
+  // カテゴリで除外
+  const category = problem.category || '未分類'
+  if (excludedCategories.includes(category)) {
+    return true
+  }
+
+  // セクションで除外
+  const sectionKey = getProblemSectionKey(problem)
+  if (excludedSections.includes(sectionKey)) {
+    return true
+  }
+
+  return false
+}
 
 // 正答率の計算
 export function calculateAverageScore(records: StudyRecord[]): number {
@@ -33,8 +81,10 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   const allRecords = await db.studyRecords.toArray()
   const allProblems = await db.problems.toArray()
 
-  // 削除された問題を除外
-  const activeProblems = allProblems.filter(p => !p.deletedAt)
+  // 削除された問題と除外設定された問題を除外
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
 
   const allWorkbooks = await db.workbooks.toArray()
 
@@ -258,8 +308,10 @@ export interface SectionStats {
 export async function calculateSectionStats(): Promise<SectionStats[]> {
   const allProblems = await db.problems.toArray()
 
-  // 削除された問題を除外
-  const activeProblems = allProblems.filter(p => !p.deletedAt)
+  // 削除された問題と除外設定された問題を除外
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
 
   // 問題をセクション（カテゴリ×タイトル）でグルーピング
   const sectionMap = new Map<string, Problem[]>()

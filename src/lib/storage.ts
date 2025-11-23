@@ -4,7 +4,31 @@ import { storage } from './firebase'
 // ローカルストレージキー
 const STORAGE_KEYS = {
   OPENAI_API_KEY: 'benkyaku-openai-api-key',
+  EXCLUDED_CATEGORIES: 'benkyaku-excluded-categories',
+  EXCLUDED_SECTIONS: 'benkyaku-excluded-sections',
 } as const
+
+// 除外カテゴリの保存
+export function saveExcludedCategories(categories: string[]): void {
+  localStorage.setItem(STORAGE_KEYS.EXCLUDED_CATEGORIES, JSON.stringify(categories))
+}
+
+// 除外カテゴリの取得
+export function getExcludedCategories(): string[] {
+  const stored = localStorage.getItem(STORAGE_KEYS.EXCLUDED_CATEGORIES)
+  return stored ? JSON.parse(stored) : []
+}
+
+// 除外セクションの保存（カテゴリ-タイトル形式）
+export function saveExcludedSections(sections: string[]): void {
+  localStorage.setItem(STORAGE_KEYS.EXCLUDED_SECTIONS, JSON.stringify(sections))
+}
+
+// 除外セクションの取得
+export function getExcludedSections(): string[] {
+  const stored = localStorage.getItem(STORAGE_KEYS.EXCLUDED_SECTIONS)
+  return stored ? JSON.parse(stored) : []
+}
 
 // OpenAI APIキーの保存
 export function saveOpenAIApiKey(apiKey: string): void {

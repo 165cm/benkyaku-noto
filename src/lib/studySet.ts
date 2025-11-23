@@ -1,5 +1,5 @@
 import { db, isParentProblem } from './db'
-import { getTodayReviewList } from './review'
+import { getTodayReviewList, isProblemExcluded } from './review'
 import type { Problem } from '@/types'
 
 // 学習セットの生成
@@ -49,8 +49,10 @@ export async function generateStudySet(targetMinutes: number): Promise<Problem[]
   // 復習問題で時間が足りない場合は新規問題を追加
   const allProblems = await db.problems.toArray()
 
-  // 削除された問題を除外
-  const activeProblems = allProblems.filter(p => !p.deletedAt)
+  // 削除された問題と除外設定された問題を除外
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
 
   // 親問題（箱）を除外
   const learnableProblems: Problem[] = []
@@ -115,8 +117,10 @@ export async function generateFirstTimeStudySet(targetMinutes: number): Promise<
   // 未学習の問題をすべて取得
   const allProblems = await db.problems.toArray()
 
-  // 削除された問題を除外
-  const activeProblems = allProblems.filter(p => !p.deletedAt)
+  // 削除された問題と除外設定された問題を除外
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
 
   // 親問題（箱）を除外
   const learnableProblems: Problem[] = []
