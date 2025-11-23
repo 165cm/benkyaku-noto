@@ -80,6 +80,11 @@ export default function WorkbookDetail() {
     originalSortOrder: number
   } | null>(null)
   const [skipConfirmUntil, setSkipConfirmUntil] = useState<number>(0)
+  const [importProgress, setImportProgress] = useState<{
+    current: number
+    total: number
+    phase: 'importing' | 'relations'
+  } | null>(null)
 
   useEffect(() => {
     if (id) {
@@ -795,6 +800,8 @@ export default function WorkbookDetail() {
         const errors: string[] = []
         const problemNumberToId = new Map<string, string>()
 
+        setImportProgress({ current: 0, total: parsedProblems.length, phase: 'importing' })
+
         for (let i = 0; i < parsedProblems.length; i++) {
           try {
             const problemData = parsedProblems[i]
@@ -814,24 +821,32 @@ export default function WorkbookDetail() {
             const errorMsg = error instanceof Error ? error.message : '不明なエラー'
             errors.push(`${i + 1}行目: ${errorMsg}`)
           }
+          setImportProgress({ current: i + 1, total: parsedProblems.length, phase: 'importing' })
         }
 
         // 親子関係を設定
+        const problemsWithParent = parsedProblems.filter(p => p.parentProblemNumber)
+        if (problemsWithParent.length > 0) {
+          setImportProgress({ current: 0, total: problemsWithParent.length, phase: 'relations' })
+        }
+
         let relationCount = 0
-        for (const problemData of parsedProblems) {
-          if (problemData.parentProblemNumber) {
-            const childId = problemNumberToId.get(problemData.problemNumber)
-            const parentId = problemNumberToId.get(problemData.parentProblemNumber)
-            if (childId && parentId) {
-              try {
-                await makeSubProblem(childId, parentId)
-                relationCount++
-              } catch (error) {
-                console.error('親子関係の設定に失敗:', error)
-              }
+        for (let i = 0; i < problemsWithParent.length; i++) {
+          const problemData = problemsWithParent[i]
+          const childId = problemNumberToId.get(problemData.problemNumber)
+          const parentId = problemNumberToId.get(problemData.parentProblemNumber!)
+          if (childId && parentId) {
+            try {
+              await makeSubProblem(childId, parentId)
+              relationCount++
+            } catch (error) {
+              console.error('親子関係の設定に失敗:', error)
             }
           }
+          setImportProgress({ current: i + 1, total: problemsWithParent.length, phase: 'relations' })
         }
+
+        setImportProgress(null)
 
         // データを再読み込み
         await loadData()
@@ -869,6 +884,28 @@ export default function WorkbookDetail() {
 
   return (
     <div>
+      {/* インポート進捗オーバーレイ */}
+      {importProgress && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">
+              {importProgress.phase === 'importing' ? 'インポート中...' : '親子関係を設定中...'}
+            </h3>
+            <div className="mb-2">
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-primary h-3 rounded-full transition-all duration-150"
+                  style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 text-center">
+              {importProgress.current} / {importProgress.total}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6">
         <Button
           variant="secondary"
