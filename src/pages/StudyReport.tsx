@@ -217,10 +217,12 @@ export default function StudyReport() {
             <p className="text-sm text-gray-600 mb-1">正答率</p>
             <div className="flex items-center gap-4">
               <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
-                <div
-                  className="bg-primary rounded-full h-4"
-                  style={{ width: `${Math.min(100, Math.max(0, accuracyRate))}%` }}
-                />
+                {accuracyRate > 0 && (
+                  <div
+                    className="bg-primary h-4 rounded-full"
+                    style={{ width: `${accuracyRate}%` }}
+                  />
+                )}
               </div>
               <span className="text-2xl font-bold min-w-[60px] text-right">{accuracyRate}%</span>
             </div>
