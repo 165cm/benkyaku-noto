@@ -789,15 +789,16 @@ export default function WorkbookDetail() {
           return
         }
 
-        // 問題を追加
+        // 問題を追加（まず親問題なしで全て追加）
         let successCount = 0
         let errorCount = 0
         const errors: string[] = []
+        const problemNumberToId = new Map<string, string>()
 
         for (let i = 0; i < parsedProblems.length; i++) {
           try {
             const problemData = parsedProblems[i]
-            await addProblem({
+            const newProblemId = await addProblem({
               workbookId: id,
               problemNumber: problemData.problemNumber,
               sectionTitle: problemData.sectionTitle,
@@ -805,11 +806,30 @@ export default function WorkbookDetail() {
               page: problemData.page,
               memo: problemData.memo,
             })
+            // 問題番号とIDのマッピングを保存
+            problemNumberToId.set(problemData.problemNumber, newProblemId)
             successCount++
           } catch (error) {
             errorCount++
             const errorMsg = error instanceof Error ? error.message : '不明なエラー'
             errors.push(`${i + 1}行目: ${errorMsg}`)
+          }
+        }
+
+        // 親子関係を設定
+        let relationCount = 0
+        for (const problemData of parsedProblems) {
+          if (problemData.parentProblemNumber) {
+            const childId = problemNumberToId.get(problemData.problemNumber)
+            const parentId = problemNumberToId.get(problemData.parentProblemNumber)
+            if (childId && parentId) {
+              try {
+                await makeSubProblem(childId, parentId)
+                relationCount++
+              } catch (error) {
+                console.error('親子関係の設定に失敗:', error)
+              }
+            }
           }
         }
 

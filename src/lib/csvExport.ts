@@ -1,13 +1,24 @@
 import type { Problem } from '@/types'
-import { db } from './db'
+import { db, getSubProblems } from './db'
 
-// 問題をCSV形式にエクスポート（学習統計情報付き）
+// 問題をCSV形式にエクスポート（学習統計情報付き、親子関係を含む）
 export async function exportProblemsToCSV(problems: Problem[]): Promise<string> {
   // CSVヘッダー
-  const headers = ['問題番号', 'セクション', 'カテゴリ', 'ページ', 'メモ', '学習回数', '正答率', '最新結果', '最新学習日']
+  const headers = ['問題番号', 'セクション', 'カテゴリ', 'ページ', 'メモ', '親問題', '学習回数', '正答率', '最新結果', '最新学習日']
+
+  // 親問題を先に、小問を後に並べ替え
+  const sortedProblems: Problem[] = []
+  const parentProblems = problems.filter(p => !p.parentProblemId)
+
+  for (const parent of parentProblems) {
+    sortedProblems.push(parent)
+    // この親の小問を取得
+    const subProblems = await getSubProblems(parent.id)
+    sortedProblems.push(...subProblems)
+  }
 
   // CSVデータ行（非同期処理）
-  const rows = await Promise.all(problems.map(async (problem) => {
+  const rows = await Promise.all(sortedProblems.map(async (problem) => {
     // 学習記録を取得
     const records = await db.studyRecords
       .where('problemId')
@@ -45,12 +56,24 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
       ? `${problem.sectionTitle}-${problem.problemNumber}`
       : problem.problemNumber
 
+    // 親問題の番号を取得
+    let parentNumber = ''
+    if (problem.parentProblemId) {
+      const parent = problems.find(p => p.id === problem.parentProblemId)
+      if (parent) {
+        parentNumber = parent.sectionTitle
+          ? `${parent.sectionTitle}-${parent.problemNumber}`
+          : parent.problemNumber
+      }
+    }
+
     return [
       escapeCSVField(displayNumber),
       escapeCSVField(problem.sectionTitle || ''),
       escapeCSVField(problem.category || ''),
       problem.page?.toString() || '',
       escapeCSVField(problem.memo || ''),
+      escapeCSVField(parentNumber),
       studyCount.toString(),
       accuracy,
       latestResult,
@@ -95,6 +118,7 @@ export interface ParsedProblemData {
   category?: string
   page?: number
   memo?: string
+  parentProblemNumber?: string
 }
 
 export function parseCSV(csvText: string): ParsedProblemData[] {
@@ -114,14 +138,15 @@ export function parseCSV(csvText: string): ParsedProblemData[] {
 
     if (fields.length < 1) continue
 
-    // 問題情報のみをインポート（フィールド0-4）
-    // フィールド5以降（学習統計情報）は無視
+    // 問題情報のみをインポート（フィールド0-5）
+    // フィールド6以降（学習統計情報）は無視
     const problem: ParsedProblemData = {
       problemNumber: fields[0] || '',
       sectionTitle: fields[1] || undefined,
       category: fields[2] || undefined,
       page: fields[3] ? parseInt(fields[3]) : undefined,
       memo: fields[4] || undefined,
+      parentProblemNumber: fields[5] || undefined,
     }
 
     if (problem.problemNumber) {
