@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, XCircle, AlertCircle, Clock, TrendingUp } from 'lucide-react'
+import { CheckCircle, XCircle, AlertCircle, Clock, TrendingUp, Play } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getSession, clearSession } from '@/lib/studySession'
-import { db } from '@/lib/db'
+import { getSession, clearSession, createStudySession } from '@/lib/studySession'
+import { db, getSubProblems, isParentProblem } from '@/lib/db'
 import type { StudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
 
@@ -13,6 +13,10 @@ export default function StudyReport() {
   const [session, setSession] = useState<StudySession | null>(null)
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
+  const [nextSection, setNextSection] = useState<{
+    title: string
+    problems: Problem[]
+  } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -34,7 +38,53 @@ export default function StudyReport() {
       )
     )
 
-    setProblems(problemDetails.filter((p) => p !== undefined) as Problem[])
+    const validProblems = problemDetails.filter((p) => p !== undefined) as Problem[]
+    setProblems(validProblems)
+
+    // 次のセクションを検索
+    if (validProblems.length > 0) {
+      const workbookId = validProblems[0].workbookId
+      const currentSectionTitle = validProblems[0].sectionTitle
+
+      // 問題集の全問題を取得
+      const allProblems = await db.problems
+        .where('workbookId')
+        .equals(workbookId)
+        .toArray()
+
+      const activeProblems = allProblems.filter(p => !p.deletedAt && !p.parentProblemId)
+
+      // セクションごとにグループ化
+      const sections = new Map<string, Problem[]>()
+      for (const problem of activeProblems) {
+        const sectionKey = problem.sectionTitle || '未分類'
+        if (!sections.has(sectionKey)) {
+          sections.set(sectionKey, [])
+        }
+        sections.get(sectionKey)!.push(problem)
+      }
+
+      // セクションの順序を取得（sortOrder順）
+      const sectionOrder = Array.from(sections.keys()).sort((a, b) => {
+        const aProblems = sections.get(a)!
+        const bProblems = sections.get(b)!
+        const aMinSort = Math.min(...aProblems.map(p => p.sortOrder || 0))
+        const bMinSort = Math.min(...bProblems.map(p => p.sortOrder || 0))
+        return aMinSort - bMinSort
+      })
+
+      // 現在のセクションの次を取得
+      const currentIndex = sectionOrder.indexOf(currentSectionTitle || '未分類')
+      if (currentIndex >= 0 && currentIndex < sectionOrder.length - 1) {
+        const nextSectionTitle = sectionOrder[currentIndex + 1]
+        const nextProblems = sections.get(nextSectionTitle)!
+        setNextSection({
+          title: nextSectionTitle,
+          problems: nextProblems,
+        })
+      }
+    }
+
     setLoading(false)
   }
 
@@ -47,6 +97,35 @@ export default function StudyReport() {
     } else {
       navigate('/')
     }
+  }
+
+  const handleStudyNextSection = async () => {
+    if (!nextSection) return
+
+    // 学習可能な問題を抽出（親問題を除外し、小問を含める）
+    const learnableProblems: Problem[] = []
+    for (const problem of nextSection.problems) {
+      const hasSubProblems = await isParentProblem(problem.id)
+      if (!hasSubProblems) {
+        learnableProblems.push(problem)
+      }
+      // 小問を追加
+      const subProblems = await getSubProblems(problem.id)
+      learnableProblems.push(...subProblems)
+    }
+
+    if (learnableProblems.length === 0) {
+      alert('学習可能な問題がありません')
+      return
+    }
+
+    // ソート
+    learnableProblems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+    // セッションをクリアして新しいセッションを開始
+    clearSession()
+    createStudySession(999, learnableProblems)
+    navigate(`/study/${learnableProblems[0].id}`)
   }
 
   // 問題番号の表示用フォーマット
@@ -207,8 +286,14 @@ export default function StudyReport() {
         </div>
       </div>
 
-      <div className="text-center">
-        <Button onClick={handleFinish} size="lg">
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {nextSection && (
+          <Button onClick={handleStudyNextSection} size="lg">
+            <Play size={18} className="mr-2" />
+            次のセクション: {nextSection.title}
+          </Button>
+        )}
+        <Button onClick={handleFinish} size="lg" variant={nextSection ? 'secondary' : 'primary'}>
           問題集に戻る
         </Button>
       </div>
