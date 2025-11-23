@@ -4,7 +4,7 @@ import { db, getSubProblems } from './db'
 // 問題をCSV形式にエクスポート（学習統計情報付き、親子関係を含む）
 export async function exportProblemsToCSV(problems: Problem[]): Promise<string> {
   // CSVヘッダー
-  const headers = ['問題番号', 'セクション', 'カテゴリ', 'ページ', 'メモ', '親問題', '学習回数', '正答率', '最新結果', '最新学習日']
+  const headers = ['問題番号', 'セクション', 'カテゴリ', 'ページ', 'メモ', '親問題', '学習回数', '正答率', '最新結果', '最新学習日', '学習時間履歴']
 
   // 親問題を先に、小問を後に並べ替え
   const sortedProblems: Problem[] = []
@@ -30,13 +30,14 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
     let accuracy = ''
     let latestResult = ''
     let latestDate = ''
+    let timeHistory = ''
 
     if (records.length > 0) {
       // 正答率を計算
       const correctCount = records.filter(r => r.result === 'correct').length
       accuracy = `${Math.round((correctCount / records.length) * 100)}%`
 
-      // 最新の学習記録を取得
+      // 最新の学習記録を取得（新しい順にソート）
       const sortedRecords = records.sort((a, b) =>
         new Date(b.studiedAt).getTime() - new Date(a.studiedAt).getTime()
       )
@@ -49,6 +50,17 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
 
       // 日付をフォーマット
       latestDate = new Date(latest.studiedAt).toLocaleDateString('ja-JP')
+
+      // 学習時間履歴（直近5件、新しい順）
+      const recentRecords = sortedRecords.slice(0, 5)
+      timeHistory = recentRecords.map(r => {
+        const mins = Math.floor(r.studyTime / 60)
+        const secs = r.studyTime % 60
+        if (mins > 0) {
+          return `${mins}分${secs}秒`
+        }
+        return `${secs}秒`
+      }).join(' / ')
     }
 
     // 表示用の問題番号（セクションがある場合は「セクション-番号」形式）
@@ -78,6 +90,7 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
       accuracy,
       latestResult,
       latestDate,
+      escapeCSVField(timeHistory),
     ].join(',')
   }))
 

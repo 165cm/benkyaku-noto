@@ -21,7 +21,7 @@ export default function Study() {
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
-  const [startTime] = useState(Date.now())
+  const [startTime, setStartTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
   const [memo, setMemo] = useState('')
@@ -42,6 +42,14 @@ export default function Study() {
   useEffect(() => {
     if (id) {
       loadData()
+      // 問題が変わったらタイマーをリセット
+      setStartTime(Date.now())
+      setElapsedTime(0)
+      setPausedTime(0)
+      setPauseStartTime(null)
+      setIsPaused(false)
+      setMemo('')
+      setShowHistory(false)
     }
   }, [id])
 
