@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Home, Calendar, BarChart3, Settings } from 'lucide-react'
+import { BookOpen, Home, Calendar, BarChart3, Settings, PanelLeftClose, PanelLeft } from 'lucide-react'
 import clsx from 'clsx'
 
 interface LayoutProps {
@@ -9,6 +9,14 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed')
+    return saved === 'true'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', String(isSidebarCollapsed))
+  }, [isSidebarCollapsed])
 
   const navItems = [
     { path: '/', icon: Home, label: 'ホーム' },
@@ -23,37 +31,48 @@ export default function Layout({ children }: LayoutProps) {
       {/* Header */}
       <header className="bg-white border-b border-border sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold">弱点克服ノート</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden md:flex p-1.5 hover:bg-gray-100 rounded transition-colors"
+              title={isSidebarCollapsed ? 'サイドバーを表示' : 'サイドバーを非表示'}
+            >
+              {isSidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
+            </button>
+            <h1 className="text-xl font-bold">弱点克服ノート</h1>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-border hidden md:block">
-          <nav className="p-4 space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = location.pathname === item.path
+        {!isSidebarCollapsed && (
+          <aside className="w-64 bg-white border-r border-border hidden md:block">
+            <nav className="p-4 space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = location.pathname === item.path
 
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={clsx(
-                    'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
-                    isActive
-                      ? 'bg-secondary font-medium'
-                      : 'hover:bg-secondary/50'
-                  )}
-                >
-                  <Icon size={20} />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })}
-          </nav>
-        </aside>
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={clsx(
+                      'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
+                      isActive
+                        ? 'bg-secondary font-medium'
+                        : 'hover:bg-secondary/50'
+                    )}
+                  >
+                    <Icon size={20} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </nav>
+          </aside>
+        )}
 
         {/* Page Content */}
         <main className="flex-1 bg-gray-50 overflow-auto">
