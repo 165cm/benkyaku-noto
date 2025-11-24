@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getExplanations, deleteExplanation } from '@/lib/db'
 import { generateAndSaveExplanation, getNextSectionForExplanation } from '@/lib/aiExplanation'
 import { getOpenAIApiKey } from '@/lib/storage'
@@ -168,17 +169,7 @@ export default function Explanations() {
 
               {expandedId === explanation.id && (
                 <div className="mt-4 pt-4 border-t border-border">
-                  <div className="prose prose-sm max-w-none">
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: explanation.content
-                          .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>')
-                          .replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>')
-                          .replace(/\n\n/g, '</p><p class="mb-2">')
-                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      }}
-                    />
-                  </div>
+                  <MarkdownRenderer content={explanation.content} />
                 </div>
               )}
             </Card>
