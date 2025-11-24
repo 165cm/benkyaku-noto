@@ -4,7 +4,7 @@ import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown,
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getWeakModeSession, clearWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
-import { getProblem, db } from '@/lib/db'
+import { getProblem } from '@/lib/db'
 import type { Problem } from '@/types'
 
 interface ProblemDetail {
