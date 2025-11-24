@@ -127,6 +127,8 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
       reviewSchedules.push({
         problemId,
         problemNumber: problem.problemNumber,
+        sectionTitle: problem.sectionTitle,
+        category: problem.category,
         workbookTitle: workbook.title,
         nextReviewDate: today,
         reviewCount: records.length,

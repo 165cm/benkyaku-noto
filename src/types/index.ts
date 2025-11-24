@@ -42,6 +42,8 @@ export interface StudyRecord {
 export interface ReviewSchedule {
   problemId: string
   problemNumber: string
+  sectionTitle?: string
+  category?: string
   workbookTitle: string
   nextReviewDate: Date
   reviewCount: number

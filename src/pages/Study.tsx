@@ -497,13 +497,8 @@ export default function Study() {
       <Card className="mb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            {getSectionTitle(problem) && (
-              <p className="text-xs sm:text-sm text-gray-500 mb-1 truncate">
-                {getSectionTitle(problem)}
-              </p>
-            )}
             <h1 className="text-xl sm:text-2xl font-bold truncate">
-              問題 {getDisplayProblemNumber(problem)}
+              {getSectionTitle(problem)}
             </h1>
             {problem.memo && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
