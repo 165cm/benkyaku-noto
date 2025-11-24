@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
+import { getNextWeakProblem } from '@/lib/review'
 import {
   getSession,
   addResult,
@@ -17,6 +18,8 @@ import type { Problem, Workbook, StudyRecord, StudyResult } from '@/types'
 export default function Study() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isWeakMode = searchParams.get('mode') === 'weak'
   const [problem, setProblem] = useState<Problem | null>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
@@ -115,7 +118,7 @@ export default function Study() {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [problem, elapsedTime, memo])
+  }, [problem, elapsedTime, memo, isWeakMode])
 
   const loadData = async () => {
     if (!id) return
@@ -258,6 +261,19 @@ export default function Study() {
 
       // 問題がない場合はレポートへ
       navigate('/study-report')
+      return
+    }
+
+    // 苦手克服モードの場合は次の優先度の高い問題へ
+    if (isWeakMode) {
+      const nextProblem = await getNextWeakProblem(problem.id)
+      if (nextProblem) {
+        navigate(`/study/${nextProblem.id}?mode=weak`)
+        return
+      }
+      // 復習する問題がない場合はホームへ
+      alert('お疲れ様でした！復習する問題がなくなりました。')
+      navigate('/')
       return
     }
 

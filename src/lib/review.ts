@@ -389,40 +389,27 @@ export async function calculateSectionStats(): Promise<SectionStats[]> {
     })
 }
 
-// 苦手克服用の次の問題を取得
-export async function getWeakSectionProblem(): Promise<Problem | null> {
-  const sectionStats = await calculateSectionStats()
+// 苦手克服用の次の問題を取得（優先度スコア順）
+export async function getNextWeakProblem(excludeProblemId?: string): Promise<Problem | null> {
+  const reviewList = await getTodayReviewList()
 
-  // 学習済みセクションがない場合
-  if (sectionStats.length === 0) {
+  // 除外する問題をフィルタ（現在の問題を除外）
+  const filteredList = excludeProblemId
+    ? reviewList.filter(r => r.problemId !== excludeProblemId)
+    : reviewList
+
+  if (filteredList.length === 0) {
     return null
   }
 
-  // 最も正解率の低いセクションを取得
-  const weakestSection = sectionStats[0]
+  // 最も優先度の高い問題を取得
+  const highestPriority = filteredList[0]
+  const problem = await db.problems.get(highestPriority.problemId)
 
-  // そのセクション内で、最も正解率の低い問題を選択
-  const problemScores: { problem: Problem; score: number }[] = []
+  return problem || null
+}
 
-  for (const problem of weakestSection.problems) {
-    const records = await db.studyRecords
-      .where('problemId')
-      .equals(problem.id)
-      .reverse()
-      .sortBy('studiedAt')
-
-    if (records.length > 0) {
-      const latestRecord = records[0]
-      const score = latestRecord.result === 'correct' ? 100
-                  : latestRecord.result === 'partial' ? 50
-                  : 0
-      problemScores.push({ problem, score })
-    }
-  }
-
-  // スコアの低い順にソート
-  problemScores.sort((a, b) => a.score - b.score)
-
-  // 最もスコアの低い問題を返す
-  return problemScores.length > 0 ? problemScores[0].problem : weakestSection.problems[0]
+// 旧関数（後方互換性のため残す）
+export async function getWeakSectionProblem(): Promise<Problem | null> {
+  return getNextWeakProblem()
 }
