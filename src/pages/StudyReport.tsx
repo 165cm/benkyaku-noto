@@ -129,12 +129,6 @@ export default function StudyReport() {
     navigate(`/study/${learnableProblems[0].id}`)
   }
 
-  // 問題番号の表示用フォーマット
-  // 正規化後はproblemNumberが既に "1", "2", "3-1", "3-2" 形式
-  const getDisplayProblemNumber = (problemNumber: string) => {
-    return problemNumber
-  }
-
   if (loading || !session) {
     return <div>読み込み中...</div>
   }

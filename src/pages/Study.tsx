@@ -405,16 +405,6 @@ export default function Study() {
     }
   }
 
-  // 問題番号の表示用フォーマット
-  const getDisplayProblemNumber = (problem: Problem) => {
-    // sectionTitleがある場合は「セクション名-連番」形式
-    if (problem.sectionTitle) {
-      return `${problem.sectionTitle}-${problem.problemNumber}`
-    }
-    // sectionTitleがない場合はそのまま
-    return problem.problemNumber
-  }
-
   // セクションタイトルを取得
   const getSectionTitle = (problem: Problem) => {
     // sectionTitleフィールドがある場合はそれを使用（新データ構造）
