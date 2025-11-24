@@ -102,6 +102,7 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   // 復習スケジュールを計算
   const reviewSchedules: ReviewSchedule[] = []
   const today = new Date()
+  today.setHours(0, 0, 0, 0)  // 今日の0時0分0秒
 
   for (const [problemId, records] of problemRecordsMap) {
     const sortedRecords = records.sort(
@@ -109,8 +110,11 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     )
 
     const lastRecord = sortedRecords[0]
+    // 日付ベースで経過日数を計算（時刻を無視）
+    const lastStudyDate = new Date(lastRecord.studiedAt)
+    lastStudyDate.setHours(0, 0, 0, 0)
     const daysSince = Math.floor(
-      (today.getTime() - lastRecord.studiedAt.getTime()) / (1000 * 60 * 60 * 24)
+      (today.getTime() - lastStudyDate.getTime()) / (1000 * 60 * 60 * 24)
     )
 
     const averageScore = calculateAverageScore(records)
