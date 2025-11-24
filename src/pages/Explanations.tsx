@@ -5,7 +5,7 @@ import Card from '@/components/Card'
 import Button from '@/components/Button'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getExplanations, deleteExplanation } from '@/lib/db'
-import { generateAndSaveExplanation, getNextSectionForExplanation } from '@/lib/aiExplanation'
+import { generateAndSaveExplanation, hasUnexplainedSections } from '@/lib/aiExplanation'
 import { getOpenAIApiKey } from '@/lib/storage'
 import type { Explanation } from '@/types'
 
@@ -15,7 +15,7 @@ export default function Explanations() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [nextSection, setNextSection] = useState<{ category: string; title: string } | null>(null)
+  const [canGenerate, setCanGenerate] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
 
   useEffect(() => {
@@ -27,8 +27,8 @@ export default function Explanations() {
     const data = await getExplanations()
     setExplanations(data)
 
-    const next = await getNextSectionForExplanation()
-    setNextSection(next ? { category: next.category, title: next.title } : null)
+    const hasMore = await hasUnexplainedSections()
+    setCanGenerate(hasMore)
 
     setHasApiKey(!!getOpenAIApiKey())
     setLoading(false)
@@ -93,9 +93,9 @@ export default function Explanations() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold mb-1">新しい解説を生成</h2>
-            {nextSection ? (
+            {canGenerate ? (
               <p className="text-sm text-gray-600">
-                次の候補: <span className="font-medium">{nextSection.category} {nextSection.title}</span>
+                AIが学習データを分析し、最優先で理解すべきトピックを選定します
               </p>
             ) : (
               <p className="text-sm text-gray-600">
@@ -105,7 +105,7 @@ export default function Explanations() {
           </div>
           <Button
             onClick={handleGenerate}
-            disabled={generating || !nextSection}
+            disabled={generating || !canGenerate}
           >
             {generating ? (
               <>

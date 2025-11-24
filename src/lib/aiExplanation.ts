@@ -2,40 +2,67 @@ import { getOpenAIApiKey } from './storage'
 import { addExplanation, getExplanationSectionKeys } from './db'
 import { calculateSectionStats, type SectionStats } from './review'
 
-// OpenAI APIを使用して解説を生成
-export async function generateExplanation(section: SectionStats): Promise<string> {
+// GPTに全データを送って分析と解説を生成
+export async function generateExplanationWithAnalysis(
+  allSections: SectionStats[],
+  existingKeys: string[]
+): Promise<{ topic: string; category: string; content: string }> {
   const apiKey = getOpenAIApiKey()
   if (!apiKey) {
     throw new Error('OpenAI APIキーが設定されていません。設定画面でAPIキーを入力してください。')
   }
 
-  const prompt = `あなたは優秀な学習コーチです。以下の問題セクションについて、学習者が苦手を克服できるよう解説を生成してください。
+  // 全セクションのデータをJSON形式で準備
+  const sectionsData = allSections.map(section => ({
+    sectionKey: section.sectionKey,
+    category: section.category,
+    title: section.title,
+    accuracy: section.accuracy,
+    studiedCount: section.studiedCount,
+    totalProblems: section.problems.length,
+    alreadyExplained: existingKeys.includes(section.sectionKey)
+  }))
 
-## セクション情報
-- カテゴリ: ${section.category}
-- セクション名: ${section.title}
-- 現在の正答率: ${section.accuracy}%
-- 学習済み問題数: ${section.studiedCount}/${section.problems.length}問
+  const prompt = `あなたは優秀な学習コーチです。以下は学習者の全セクション別の正答率データです。
+このデータを分析し、学習者が最も優先的に理解すべきポイントを特定して解説を生成してください。
 
-## 生成する解説の内容
-以下の形式でマークダウンで解説を生成してください：
+## 全セクションの学習データ
+\`\`\`json
+${JSON.stringify(sectionsData, null, 2)}
+\`\`\`
 
-### 解き方のコツ
-このセクションの問題を解く際の基本的なアプローチと考え方を説明してください。
+## 指示
+1. alreadyExplained: true のセクションは解説済みなのでスキップしてください
+2. 単純に正答率が低いセクションを選ぶのではなく、以下を考慮してください：
+   - 基礎的な概念の理解不足が他の分野に影響していないか
+   - 複数のセクションに共通する弱点パターンはないか
+   - 学習量（studiedCount）と正答率のバランス
+   - 改善による波及効果が大きいトピックはどれか
 
-### 典型的な間違いパターン
+3. 分析結果に基づいて、以下の形式でマークダウンの解説を生成してください：
+
+---
+SELECTED_TOPIC: [選んだセクションのsectionKey]
+SELECTED_CATEGORY: [選んだセクションのcategory]
+---
+
+## 選定理由
+なぜこのトピックを最優先で学ぶべきか、データに基づいて説明してください。
+
+## 解き方のコツ
+このトピックの問題を解く際の基本的なアプローチと考え方を説明してください。
+
+## 典型的な間違いパターン
 学習者がよく犯す間違いとその原因を3つ程度挙げてください。
 
-### 暗記ポイント
+## 暗記ポイント
 覚えておくべき公式、パターン、キーワードをリストアップしてください。
 
-### 類似問題への応用
-このセクションで学んだ知識を他の問題にどう応用できるか説明してください。
+## 他セクションとの関連
+このトピックを理解することで改善が期待できる関連セクションがあれば説明してください。
 
-### 学習アドバイス
-正答率${section.accuracy}%の学習者に対する具体的なアドバイスを提供してください。
-
-解説は具体的で実践的な内容にしてください。`
+## 学習アドバイス
+この学習者のデータパターンに基づいた具体的なアドバイスを提供してください。`
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -48,14 +75,14 @@ export async function generateExplanation(section: SectionStats): Promise<string
       messages: [
         {
           role: 'system',
-          content: 'あなたは学習支援の専門家です。わかりやすく実践的な解説を提供してください。',
+          content: 'あなたは学習支援の専門家です。学習データを分析し、最も効果的な学習ポイントを特定して解説を提供してください。',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      max_tokens: 2000,
+      max_tokens: 3000,
       temperature: 0.7,
     }),
   })
@@ -66,52 +93,71 @@ export async function generateExplanation(section: SectionStats): Promise<string
   }
 
   const data = await response.json()
-  return data.choices[0].message.content
+  const content = data.choices[0].message.content
+
+  // レスポンスからトピック情報を抽出
+  const topicMatch = content.match(/SELECTED_TOPIC:\s*(.+)/)
+  const categoryMatch = content.match(/SELECTED_CATEGORY:\s*(.+)/)
+
+  const topic = topicMatch ? topicMatch[1].trim() : 'unknown'
+  const category = categoryMatch ? categoryMatch[1].trim() : 'unknown'
+
+  // メタデータ行を除去したコンテンツを返す
+  const cleanContent = content
+    .replace(/---\s*\n?SELECTED_TOPIC:[^\n]+\n?SELECTED_CATEGORY:[^\n]+\n?---/g, '')
+    .trim()
+
+  return { topic, category, content: cleanContent }
 }
 
-// 次に解説を生成すべきセクションを取得（生成済みをスキップ）
-export async function getNextSectionForExplanation(): Promise<SectionStats | null> {
+// 未解説セクションがあるか確認
+export async function hasUnexplainedSections(): Promise<boolean> {
   const sectionStats = await calculateSectionStats()
   const existingKeys = await getExplanationSectionKeys()
 
-  // 生成済みセクションをスキップ
-  const unexlainedSections = sectionStats.filter(
+  const unexplainedSections = sectionStats.filter(
     section => !existingKeys.includes(section.sectionKey)
   )
 
-  if (unexlainedSections.length === 0) {
-    return null
-  }
-
-  // 最も正答率の低いセクションを返す
-  return unexlainedSections[0]
+  return unexplainedSections.length > 0
 }
 
-// 解説を生成して保存
+// 解説を生成して保存（GPTが分析して最適なトピックを選択）
 export async function generateAndSaveExplanation(): Promise<{
   sectionKey: string
   category: string
   title: string
 } | null> {
-  const section = await getNextSectionForExplanation()
+  const sectionStats = await calculateSectionStats()
+  const existingKeys = await getExplanationSectionKeys()
 
-  if (!section) {
+  // 未解説セクションがない場合
+  const unexplainedSections = sectionStats.filter(
+    section => !existingKeys.includes(section.sectionKey)
+  )
+
+  if (unexplainedSections.length === 0) {
     return null
   }
 
-  const content = await generateExplanation(section)
+  // GPTに全データを送って分析・解説生成
+  const result = await generateExplanationWithAnalysis(sectionStats, existingKeys)
+
+  // GPTが選んだセクションの情報を取得
+  const selectedSection = sectionStats.find(s => s.sectionKey === result.topic)
+  const sectionTitle = selectedSection?.title || result.topic
 
   await addExplanation({
-    sectionKey: section.sectionKey,
-    category: section.category,
-    sectionTitle: section.title,
-    content,
-    accuracy: section.accuracy || 0,
+    sectionKey: result.topic,
+    category: result.category,
+    sectionTitle: sectionTitle,
+    content: result.content,
+    accuracy: selectedSection?.accuracy || 0,
   })
 
   return {
-    sectionKey: section.sectionKey,
-    category: section.category,
-    title: section.title,
+    sectionKey: result.topic,
+    category: result.category,
+    title: sectionTitle,
   }
 }
