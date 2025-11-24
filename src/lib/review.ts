@@ -326,29 +326,9 @@ export async function calculateSectionStats(): Promise<SectionStats[]> {
 
   activeProblems.forEach((problem) => {
     // categoryフィールドが設定されている場合はそれを優先
-    let category = problem.category || '未分類'
-    let title = '問題'
-
-    if (problem.category) {
-      // カテゴリが設定されている場合、問題番号からタイトルを抽出
-      const parts = problem.problemNumber.split('-')
-      title = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
-    } else {
-      // カテゴリがない場合は問題番号から抽出（後方互換性）
-      const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
-      if (match) {
-        category = match[1]
-        title = match[2]
-      } else {
-        const parts = problem.problemNumber.split('-')
-        if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
-          category = parts[0]
-          title = parts.slice(1, -1).join('-') || '問題'
-        } else {
-          title = parts.length > 1 ? parts[0] : '問題'
-        }
-      }
-    }
+    const category = problem.category || '未分類'
+    // sectionTitleフィールドを優先的に使用
+    const title = problem.sectionTitle || '問題'
 
     const sectionKey = `${category}-${title}`
     const existing = sectionMap.get(sectionKey) || []
