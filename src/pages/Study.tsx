@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp, StopCircle } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
 import { getNextWeakProblem } from '@/lib/review'
+import {
+  createWeakModeSession,
+  getWeakModeSession,
+  addWeakModeResult,
+} from '@/lib/weakModeSession'
 import {
   getSession,
   addResult,
@@ -53,8 +58,13 @@ export default function Study() {
       setIsPaused(false)
       setMemo('')
       setShowHistory(false)
+
+      // 苦手克服モードの場合、セッションがなければ作成
+      if (isWeakMode && !getWeakModeSession()) {
+        createWeakModeSession()
+      }
     }
-  }, [id])
+  }, [id, isWeakMode])
 
   // ウィンドウがフォーカスされた時にデータを再読み込み（問題番号の編集が反映されるように）
   useEffect(() => {
@@ -224,6 +234,17 @@ export default function Study() {
 
     const studyTime = elapsedTime
 
+    // 苦手克服モードの場合、前回の結果と回答数を取得
+    let previousResult: StudyResult | null = null
+    let previousAttempts = 0
+    if (isWeakMode) {
+      const records = await getStudyRecords(problem.id)
+      previousAttempts = records.length
+      if (records.length > 0) {
+        previousResult = records[0].result // 最新の記録
+      }
+    }
+
     await addStudyRecord({
       problemId: problem.id,
       workbookId: problem.workbookId,
@@ -234,14 +255,16 @@ export default function Study() {
 
     // 苦手克服モードの場合は次の優先度の高い問題へ（セッションより優先）
     if (isWeakMode) {
+      // セッションに結果を保存
+      addWeakModeResult(problem.id, result, previousResult, studyTime, previousAttempts)
+
       const nextProblem = await getNextWeakProblem(problem.id)
       if (nextProblem) {
         navigate(`/study/${nextProblem.id}?mode=weak`)
         return
       }
-      // 復習する問題がない場合はホームへ
-      alert('お疲れ様でした！復習する問題がなくなりました。')
-      navigate('/')
+      // 復習する問題がない場合はレポートへ
+      navigate('/weak-mode-report')
       return
     }
 
@@ -444,12 +467,23 @@ export default function Study() {
           <ArrowLeft size={16} />
         </Button>
         <p className="text-sm text-gray-600 truncate mx-2">{workbook.title}</p>
-        <button
-          onClick={togglePause}
-          className="p-2 rounded hover:bg-gray-100 transition-colors"
-        >
-          {isPaused ? <Play size={20} className="text-primary" /> : <Pause size={20} className="text-gray-600" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {isWeakMode && (
+            <button
+              onClick={() => navigate('/weak-mode-report')}
+              className="p-2 rounded hover:bg-red-100 transition-colors"
+              title="苦手克服を終了"
+            >
+              <StopCircle size={20} className="text-red-500" />
+            </button>
+          )}
+          <button
+            onClick={togglePause}
+            className="p-2 rounded hover:bg-gray-100 transition-colors"
+          >
+            {isPaused ? <Play size={20} className="text-primary" /> : <Pause size={20} className="text-gray-600" />}
+          </button>
+        </div>
       </div>
 
       {/* 時間終了メッセージ */}
