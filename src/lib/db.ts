@@ -1,12 +1,13 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-import type { Workbook, Problem, StudyRecord } from '@/types'
+import type { Workbook, Problem, StudyRecord, Explanation } from '@/types'
 import { validateProblem, validateWorkbook, validateStudyRecord } from './validation'
 
 export class BenkyakuDB extends Dexie {
   workbooks!: Table<Workbook>
   problems!: Table<Problem>
   studyRecords!: Table<StudyRecord>
+  explanations!: Table<Explanation>
 
   constructor() {
     super('BenkyakuNoto')
@@ -70,6 +71,14 @@ export class BenkyakuDB extends Dexie {
       workbooks: 'id, title, subject, createdAt',
       problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId',
       studyRecords: 'id, problemId, workbookId, studiedAt',
+    })
+
+    // AI生成解説テーブルを追加
+    this.version(6).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+      explanations: 'id, sectionKey, category, createdAt',
     })
   }
 }
@@ -489,4 +498,36 @@ export async function emptyTrash() {
   for (const problem of deletedProblems) {
     await permanentlyDeleteProblem(problem.id)
   }
+}
+
+// 解説関連の関数
+export async function addExplanation(explanation: Omit<Explanation, 'id' | 'createdAt'>) {
+  const id = crypto.randomUUID()
+  await db.explanations.add({
+    ...explanation,
+    id,
+    createdAt: new Date(),
+  })
+  return id
+}
+
+export async function getExplanations() {
+  return await db.explanations.orderBy('createdAt').reverse().toArray()
+}
+
+export async function getExplanation(id: string) {
+  return await db.explanations.get(id)
+}
+
+export async function getExplanationBySectionKey(sectionKey: string) {
+  return await db.explanations.where('sectionKey').equals(sectionKey).first()
+}
+
+export async function deleteExplanation(id: string) {
+  await db.explanations.delete(id)
+}
+
+export async function getExplanationSectionKeys(): Promise<string[]> {
+  const explanations = await db.explanations.toArray()
+  return explanations.map(e => e.sectionKey)
 }

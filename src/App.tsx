@@ -12,6 +12,7 @@ import Settings from '@/pages/Settings'
 import ImportFromImage from '@/pages/ImportFromImage'
 import Trash from '@/pages/Trash'
 import Debug from '@/pages/Debug'
+import Explanations from '@/pages/Explanations'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/review" element={<Review />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/explanations" element={<Explanations />} />
           <Route path="/trash" element={<Trash />} />
           <Route path="/debug" element={<Debug />} />
         </Routes>

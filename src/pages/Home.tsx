@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target } from 'lucide-react'
+import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
-import { getWorkbooks } from '@/lib/db'
+import { getWorkbooks, getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
 import type { StudyStats, ReviewSchedule, Workbook } from '@/types'
 
@@ -18,6 +18,7 @@ export default function Home() {
   const [unstudiedCount, setUnstudiedCount] = useState(0)
   const [weakSections, setWeakSections] = useState<SectionStats[]>([])
   const [startingReview, setStartingReview] = useState(false)
+  const [explanationCount, setExplanationCount] = useState(0)
 
   useEffect(() => {
     loadData()
@@ -25,12 +26,13 @@ export default function Home() {
 
   const loadData = async () => {
     setLoading(true)
-    const [statsData, reviewData, workbooksData, unstudiedCount, sectionStats] = await Promise.all([
+    const [statsData, reviewData, workbooksData, unstudiedCount, sectionStats, explanations] = await Promise.all([
       calculateStudyStats(),
       getTodayReviewList(),
       getWorkbooks(),
       getUnstudiedProblemsCount(),
       calculateSectionStats(),
+      getExplanations(),
     ])
 
     setStats(statsData)
@@ -38,6 +40,7 @@ export default function Home() {
     setWorkbooks(workbooksData.slice(0, 3)) // 最新3件
     setUnstudiedCount(unstudiedCount)
     setWeakSections(sectionStats.slice(0, 5)) // 苦手セクション上位5件
+    setExplanationCount(explanations.length)
     setLoading(false)
   }
 
@@ -201,7 +204,16 @@ export default function Home() {
             {/* 苦手セクション一覧 */}
             {weakSections.length > 0 && (
               <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-orange-900 mb-3">📊 苦手セクション（正解率の低い順）</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-orange-900">📊 苦手セクション（正解率の低い順）</h3>
+                  <button
+                    onClick={() => navigate('/explanations')}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    <Sparkles size={14} />
+                    AI解説 {explanationCount > 0 && `(${explanationCount})`}
+                  </button>
+                </div>
                 <div className="space-y-2">
                   {weakSections.map((section, index) => {
                     const colorClass = section.accuracy !== null && section.accuracy >= 80
