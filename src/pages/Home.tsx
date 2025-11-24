@@ -83,8 +83,8 @@ export default function Home() {
         return
       }
 
-      // 問題に直接ナビゲート
-      navigate(`/study/${problem.id}`)
+      // 問題に直接ナビゲート（苦手克服モードフラグ付き）
+      navigate(`/study/${problem.id}?mode=weak`)
     } catch (error) {
       console.error('Error starting weak section review:', error)
       alert('復習を開始できませんでした')
