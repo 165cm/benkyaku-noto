@@ -1,3 +1,5 @@
+import React from 'react'
+
 interface MarkdownRendererProps {
   content: string
 }
@@ -6,7 +8,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   // マークダウンをパースして要素に変換
   const parseMarkdown = (text: string) => {
     const lines = text.split('\n')
-    const elements: JSX.Element[] = []
+    const elements: React.ReactElement[] = []
     let currentList: string[] = []
     let listKey = 0
 
