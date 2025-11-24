@@ -232,6 +232,19 @@ export default function Study() {
       memo: memo || undefined,
     })
 
+    // 苦手克服モードの場合は次の優先度の高い問題へ（セッションより優先）
+    if (isWeakMode) {
+      const nextProblem = await getNextWeakProblem(problem.id)
+      if (nextProblem) {
+        navigate(`/study/${nextProblem.id}?mode=weak`)
+        return
+      }
+      // 復習する問題がない場合はホームへ
+      alert('お疲れ様でした！復習する問題がなくなりました。')
+      navigate('/')
+      return
+    }
+
     // セッション管理の確認
     const session = getSession()
     if (session) {
@@ -261,19 +274,6 @@ export default function Study() {
 
       // 問題がない場合はレポートへ
       navigate('/study-report')
-      return
-    }
-
-    // 苦手克服モードの場合は次の優先度の高い問題へ
-    if (isWeakMode) {
-      const nextProblem = await getNextWeakProblem(problem.id)
-      if (nextProblem) {
-        navigate(`/study/${nextProblem.id}?mode=weak`)
-        return
-      }
-      // 復習する問題がない場合はホームへ
-      alert('お疲れ様でした！復習する問題がなくなりました。')
-      navigate('/')
       return
     }
 
