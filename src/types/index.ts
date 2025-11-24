@@ -64,3 +64,14 @@ export interface StudyStats {
     accuracy?: number | null
   }[]
 }
+
+// AI生成解説
+export interface Explanation {
+  id: string
+  sectionKey: string // "カテゴリ-セクション名"
+  category: string
+  sectionTitle: string
+  content: string // マークダウン形式の解説
+  accuracy: number // 生成時の正答率
+  createdAt: Date
+}
