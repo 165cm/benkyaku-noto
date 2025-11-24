@@ -220,7 +220,7 @@ export default function WeakModeReport() {
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {index + 1}. {detail.problem.sectionTitle || ''} {detail.problem.problemNumber}
+                  {index + 1}. {detail.problem.sectionTitle || detail.problem.category || detail.problem.problemNumber}
                 </p>
                 <p className="text-xs text-gray-500">
                   過去{detail.previousAttempts}回 · {formatTime(detail.timeSpent)}

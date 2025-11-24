@@ -260,7 +260,7 @@ export default function StudyReport() {
                 <div className="flex items-center gap-3">
                   <ScoreIcon className={scoreColor} size={24} />
                   <div>
-                    <p className="font-medium">問題 {getDisplayProblemNumber(problem.problemNumber)}</p>
+                    <p className="font-medium">{problem.sectionTitle || problem.category || problem.problemNumber}</p>
                     {problem.page && (
                       <p className="text-xs text-gray-500">p.{problem.page}</p>
                     )}

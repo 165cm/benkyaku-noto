@@ -94,7 +94,7 @@ export default function Review() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium">
-                      問題 {getDisplayProblemNumber(review.problemNumber)}
+                      {review.sectionTitle || review.category || review.problemNumber}
                     </h3>
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded ${getPriorityColor(
