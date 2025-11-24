@@ -14,7 +14,7 @@ export default function Home() {
   const [reviewList, setReviewList] = useState<ReviewSchedule[]>([])
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'review' | 'firstTime'>('review')
+  const [activeTab, setActiveTab] = useState<'review' | 'firstTime' | 'explanation'>('review')
   const [unstudiedCount, setUnstudiedCount] = useState(0)
   const [weakSections, setWeakSections] = useState<SectionStats[]>([])
   const [startingReview, setStartingReview] = useState(false)
@@ -186,6 +186,22 @@ export default function Home() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('explanation')}
+            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
+              activeTab === 'explanation'
+                ? 'text-purple-600 border-b-2 border-purple-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Sparkles size={18} />
+            <span>AI解説</span>
+            {explanationCount > 0 && (
+              <span className="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                {explanationCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* 復習モードのコンテンツ */}
@@ -204,16 +220,7 @@ export default function Home() {
             {/* 苦手セクション一覧 */}
             {weakSections.length > 0 && (
               <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-orange-900">📊 苦手セクション（正解率の低い順）</h3>
-                  <button
-                    onClick={() => navigate('/explanations')}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    <Sparkles size={14} />
-                    AI解説 {explanationCount > 0 && `(${explanationCount})`}
-                  </button>
-                </div>
+                <h3 className="text-sm font-semibold text-orange-900 mb-3">📊 苦手セクション（正解率の低い順）</h3>
                 <div className="space-y-2">
                   {weakSections.map((section, index) => {
                     const colorClass = section.accuracy !== null && section.accuracy >= 80
@@ -317,6 +324,71 @@ export default function Home() {
                     初回学習を開始
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* AI解説モードのコンテンツ */}
+        {activeTab === 'explanation' && (
+          <div>
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={20} className="text-purple-600" />
+                <h2 className="text-xl font-semibold">AI解説ライブラリ</h2>
+              </div>
+              <p className="text-sm text-gray-600">
+                苦手セクションの解き方をAIが詳しく解説します
+              </p>
+            </div>
+
+            {/* 苦手セクション一覧 */}
+            {weakSections.length > 0 && (
+              <div className="mb-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-purple-900 mb-3">📚 解説候補セクション</h3>
+                <div className="space-y-2">
+                  {weakSections.slice(0, 3).map((section, index) => {
+                    const colorClass = section.accuracy !== null && section.accuracy >= 80
+                      ? 'text-green-700'
+                      : section.accuracy !== null && section.accuracy >= 50
+                      ? 'text-yellow-700'
+                      : 'text-red-700'
+                    return (
+                      <div key={section.sectionKey} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-purple-400 font-bold">{index + 1}.</span>
+                          <span className="font-medium text-gray-700">
+                            {section.category} {section.title}
+                          </span>
+                        </div>
+                        <span className={`font-semibold ${colorClass}`}>
+                          {section.accuracy}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
+              <div className="mb-4">
+                <p className="text-purple-900 font-medium mb-2">
+                  {explanationCount > 0
+                    ? `${explanationCount}件の解説がストックされています`
+                    : '苦手セクションの解説を生成しましょう'}
+                </p>
+                <p className="text-sm text-purple-700">
+                  解き方のコツ、典型的な間違い、暗記ポイントなどを確認できます
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate('/explanations')}
+                size="lg"
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Sparkles size={20} className="mr-2" />
+                解説ライブラリを開く
               </Button>
             </div>
           </div>
