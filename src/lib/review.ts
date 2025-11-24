@@ -61,13 +61,15 @@ export function calculateAverageScore(records: StudyRecord[]): number {
   return totalScore / records.length
 }
 
-// 経過日数係数の計算
+// 経過日数係数の計算（忘却曲線に基づく）
 export function getDaysCoefficient(daysSinceLastStudy: number): number {
-  if (daysSinceLastStudy <= 1) return 0.5
-  if (daysSinceLastStudy <= 3) return 1.0
-  if (daysSinceLastStudy <= 7) return 1.5
-  if (daysSinceLastStudy <= 14) return 2.0
-  return 2.5
+  if (daysSinceLastStudy < 1) return 0    // 今日学習済みは除外
+  if (daysSinceLastStudy <= 1) return 1.0  // 1日経過
+  if (daysSinceLastStudy <= 3) return 1.5  // 2-3日経過
+  if (daysSinceLastStudy <= 7) return 2.5  // 4-7日経過
+  if (daysSinceLastStudy <= 14) return 4.0 // 8-14日経過
+  if (daysSinceLastStudy <= 30) return 6.0 // 15-30日経過
+  return 8.0                               // 30日以上経過
 }
 
 // 復習優先度スコアの計算
@@ -131,8 +133,10 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     }
   }
 
-  // 優先度スコアの降順でソート
-  return reviewSchedules.sort((a, b) => b.priorityScore - a.priorityScore)
+  // 今日学習済み（priorityScore = 0）を除外し、優先度スコアの降順でソート
+  return reviewSchedules
+    .filter((schedule) => schedule.priorityScore > 0)
+    .sort((a, b) => b.priorityScore - a.priorityScore)
 }
 
 // 学習統計の計算
