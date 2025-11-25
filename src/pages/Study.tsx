@@ -17,6 +17,7 @@ import {
   addResult,
   isSessionComplete,
   getNextProblemId,
+  clearSession,
 } from '@/lib/studySession'
 import type { Problem, Workbook, StudyRecord, StudyResult } from '@/types'
 
@@ -50,6 +51,17 @@ export default function Study() {
 
   useEffect(() => {
     if (id) {
+      // 古いセッションをクリア（6時間以上前のセッション）
+      const session = getSession()
+      if (session) {
+        const sessionAge = Date.now() - new Date(session.startTime).getTime()
+        const sixHoursInMs = 6 * 60 * 60 * 1000
+        if (sessionAge > sixHoursInMs) {
+          console.log('古いセッションをクリアしました（6時間以上経過）')
+          clearSession()
+        }
+      }
+
       loadData()
       // 問題が変わったらタイマーをリセット
       setStartTime(Date.now())
