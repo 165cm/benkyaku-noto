@@ -15,9 +15,15 @@ import {
 import { db } from '@/lib/db'
 import type { Problem } from '@/types'
 
-interface CategorySection {
+interface SectionInfo {
   category: string
-  sections: string[]
+  sectionTitle: string
+  sectionKey: string
+}
+
+interface CategoryGroup {
+  category: string
+  sections: SectionInfo[]
 }
 
 export default function Settings() {
@@ -28,7 +34,7 @@ export default function Settings() {
   const [saved, setSaved] = useState(false)
 
   // 除外設定
-  const [categorySections, setCategorySections] = useState<CategorySection[]>([])
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([])
   const [excludedCategories, setExcludedCategories] = useState<string[]>([])
   const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
@@ -50,66 +56,59 @@ export default function Settings() {
 
   const loadCategorySections = async () => {
     const allProblems = await db.problems.toArray()
-    const activeProblems = allProblems.filter(p => !p.deletedAt)
+    const activeProblems = allProblems.filter(p => !p.deletedAt && !p.parentProblemId)
 
-    // カテゴリごとにセクションをグルーピング
-    const categoryMap = new Map<string, Set<string>>()
+    // カテゴリごとにセクションをグルーピング（WorkbookDetail.tsxと同じロジック）
+    const categoryMap = new Map<string, Map<string, Problem[]>>()
 
     activeProblems.forEach((problem: Problem) => {
-      let category = problem.category || '未分類'
-      let title = '問題'
-
-      if (problem.category) {
-        const parts = problem.problemNumber.split('-')
-        title = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
-      } else {
-        const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
-        if (match) {
-          category = match[1]
-          title = match[2]
-        } else {
-          const parts = problem.problemNumber.split('-')
-          if (parts[0].startsWith('[') && parts[0].endsWith(']')) {
-            category = parts[0]
-            title = parts.slice(1, -1).join('-') || '問題'
-          } else {
-            title = parts.length > 1 ? parts[0] : '問題'
-          }
-        }
-      }
+      const category = problem.category || '未分類'
+      const sectionTitle = problem.sectionTitle || '問題'
 
       if (!categoryMap.has(category)) {
-        categoryMap.set(category, new Set())
+        categoryMap.set(category, new Map())
       }
-      categoryMap.get(category)!.add(`${category}-${title}`)
+
+      const sections = categoryMap.get(category)!
+      if (!sections.has(sectionTitle)) {
+        sections.set(sectionTitle, [])
+      }
+      sections.get(sectionTitle)!.push(problem)
     })
 
-    const result: CategorySection[] = []
+    // カテゴリごとのセクション一覧を作成
+    const result: CategoryGroup[] = []
     categoryMap.forEach((sections, category) => {
-      // セクションを数値順にソート
-      const sortedSections = Array.from(sections).sort((a, b) => {
-        const titleA = a.replace(`${category}-`, '')
-        const titleB = b.replace(`${category}-`, '')
+      const sectionInfos: SectionInfo[] = []
 
-        // 数値として解釈できる場合は数値比較
-        const numA = parseInt(titleA)
-        const numB = parseInt(titleB)
+      sections.forEach((_problems, sectionTitle) => {
+        // セクションキーは category|||sectionTitle の形式
+        const sectionKey = `${category}|||${sectionTitle}`
 
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB
-        }
+        sectionInfos.push({
+          category,
+          sectionTitle,
+          sectionKey,
+        })
+      })
 
-        // 数値でない場合は文字列比較
-        return titleA.localeCompare(titleB, 'ja')
+      // セクションをsortOrder順にソート
+      sectionInfos.sort((a, b) => {
+        const problemsA = sections.get(a.sectionTitle) || []
+        const problemsB = sections.get(b.sectionTitle) || []
+        const minA = Math.min(...problemsA.map(p => p.sortOrder || 0))
+        const minB = Math.min(...problemsB.map(p => p.sortOrder || 0))
+        return minA - minB
       })
 
       result.push({
         category,
-        sections: sortedSections
+        sections: sectionInfos
       })
     })
 
-    setCategorySections(result.sort((a, b) => a.category.localeCompare(b.category, 'ja')))
+    // カテゴリを名前順にソート
+    setCategoryGroups(result.sort((a, b) => a.category.localeCompare(b.category, 'ja')))
   }
 
   const toggleCategory = (category: string) => {
@@ -272,11 +271,11 @@ export default function Settings() {
               カテゴリまたはセクション単位で復習候補から除外できます
             </p>
 
-            {categorySections.length === 0 ? (
+            {categoryGroups.length === 0 ? (
               <p className="text-sm text-gray-500">問題が登録されていません</p>
             ) : (
               <div className="space-y-2">
-                {categorySections.map(({ category, sections }) => (
+                {categoryGroups.map(({ category, sections }) => (
                   <div key={category} className="border border-border rounded-lg">
                     <div className="flex items-center gap-2 p-3 bg-gray-50">
                       <button
@@ -305,28 +304,27 @@ export default function Settings() {
 
                     {expandedCategories.includes(category) && (
                       <div className="p-3 pt-0 space-y-1">
-                        {sections.map(sectionKey => {
-                          const sectionTitle = sectionKey.replace(`${category}-`, '')
+                        {sections.map(section => {
                           const isCategoryExcluded = excludedCategories.includes(category)
                           return (
                             <label
-                              key={sectionKey}
+                              key={section.sectionKey}
                               className={`flex items-center gap-2 ml-6 cursor-pointer ${
                                 isCategoryExcluded ? 'opacity-50' : ''
                               }`}
                             >
                               <input
                                 type="checkbox"
-                                checked={excludedSections.includes(sectionKey)}
-                                onChange={() => toggleExcludeSection(sectionKey)}
+                                checked={excludedSections.includes(section.sectionKey)}
+                                onChange={() => toggleExcludeSection(section.sectionKey)}
                                 disabled={isCategoryExcluded}
                                 className="w-4 h-4 text-primary rounded flex-shrink-0"
                               />
                               <div className="flex-1 min-w-0">
-                                <span className="text-xs text-gray-500 block">{category}</span>
-                                <span className="text-sm block truncate">{sectionTitle}</span>
+                                <span className="text-xs text-gray-500 block">{section.category}</span>
+                                <span className="text-sm block truncate">{section.sectionTitle}</span>
                               </div>
-                              {excludedSections.includes(sectionKey) && !isCategoryExcluded && (
+                              {excludedSections.includes(section.sectionKey) && !isCategoryExcluded && (
                                 <span className="text-xs text-error flex-shrink-0">(除外中)</span>
                               )}
                             </label>
