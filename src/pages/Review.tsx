@@ -40,6 +40,15 @@ export default function Review() {
     return '通常'
   }
 
+  // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
+  const getReviewDisplayTitle = (review: ReviewSchedule) => {
+    if (review.sectionTitle) {
+      return `${review.sectionTitle}-${review.problemNumber}`
+    }
+    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
+    return review.problemNumber
+  }
+
   if (loading) {
     return <div>読み込み中...</div>
   }
@@ -74,9 +83,12 @@ export default function Review() {
                 className="flex items-center justify-between"
               >
                 <div className="flex-1">
+                  {review.category && (
+                    <p className="text-xs text-gray-500 mb-1">{review.category}</p>
+                  )}
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium">
-                      {review.sectionTitle || review.category || review.problemNumber}
+                      {getReviewDisplayTitle(review)}
                     </h3>
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded ${getPriorityColor(
