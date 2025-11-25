@@ -54,6 +54,15 @@ export default function Home() {
     return `${minutes}分`
   }
 
+  // 復習リストの表示用タイトルを取得（sectionTitle-problemNumber形式）
+  const getReviewDisplayTitle = (review: ReviewSchedule) => {
+    if (review.sectionTitle) {
+      return `${review.sectionTitle}-${review.problemNumber}`
+    }
+    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
+    return review.problemNumber
+  }
+
   const handleStartFirstTimeStudy = async () => {
     setLoading(true)
     try {
@@ -230,13 +239,20 @@ export default function Home() {
                       : 'text-red-700'
                     return (
                       <div key={section.sectionKey} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-orange-400 font-bold">{index + 1}.</span>
-                          <span className="font-medium text-gray-700">
-                            {section.category} {section.title}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-orange-400 font-bold">{index + 1}.</span>
+                            <div className="min-w-0">
+                              <span className="text-xs text-gray-500 block truncate">
+                                {section.category}
+                              </span>
+                              <span className="font-medium text-gray-700 block truncate">
+                                {section.title}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`font-semibold ${colorClass}`}>
                             {section.accuracy}%
                           </span>
@@ -254,11 +270,21 @@ export default function Home() {
             {/* 復習開始ボタン */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
               <div className="mb-4">
-                <p className="text-blue-900 font-medium mb-2">
-                  {weakSections.length > 0
-                    ? `次は「${weakSections[0].category} ${weakSections[0].title}」から出題されます`
-                    : '復習できる問題があります'}
-                </p>
+                {weakSections.length > 0 && (
+                  <>
+                    <p className="text-xs text-blue-600 mb-1">
+                      {weakSections[0].category}
+                    </p>
+                    <p className="text-blue-900 font-medium mb-2">
+                      次は「{weakSections[0].title}」から出題されます
+                    </p>
+                  </>
+                )}
+                {weakSections.length === 0 && (
+                  <p className="text-blue-900 font-medium mb-2">
+                    復習できる問題があります
+                  </p>
+                )}
                 <p className="text-sm text-blue-700">
                   苦手な分野を1問ずつ淡々と克服していきましょう
                 </p>
@@ -355,13 +381,20 @@ export default function Home() {
                       : 'text-red-700'
                     return (
                       <div key={section.sectionKey} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-purple-400 font-bold">{index + 1}.</span>
-                          <span className="font-medium text-gray-700">
-                            {section.category} {section.title}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-purple-400 font-bold">{index + 1}.</span>
+                            <div className="min-w-0">
+                              <span className="text-xs text-gray-500 block truncate">
+                                {section.category}
+                              </span>
+                              <span className="font-medium text-gray-700 block truncate">
+                                {section.title}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <span className={`font-semibold ${colorClass}`}>
+                        <span className={`font-semibold flex-shrink-0 ${colorClass}`}>
                           {section.accuracy}%
                         </span>
                       </div>
@@ -423,9 +456,12 @@ export default function Home() {
                 key={review.problemId}
                 className="flex items-center justify-between"
               >
-                <div>
-                  <h3 className="font-medium">問題 {review.problemNumber}</h3>
-                  <p className="text-sm text-gray-600">
+                <div className="flex-1 min-w-0">
+                  {review.category && (
+                    <p className="text-xs text-gray-500">{review.category}</p>
+                  )}
+                  <h3 className="font-medium truncate">{getReviewDisplayTitle(review)}</h3>
+                  <p className="text-sm text-gray-600 truncate">
                     {review.workbookTitle} · 正答率{' '}
                     {Math.round(review.averageScore)}%
                   </p>
@@ -433,6 +469,7 @@ export default function Home() {
                 <Button
                   size="sm"
                   onClick={() => navigate(`/study/${review.problemId}`)}
+                  className="flex-shrink-0"
                 >
                   <Play size={16} className="mr-1" />
                   学習

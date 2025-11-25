@@ -403,3 +403,27 @@ export async function getNextWeakProblem(excludeProblemId?: string): Promise<Pro
 export async function getWeakSectionProblem(): Promise<Problem | null> {
   return getNextWeakProblem()
 }
+
+// 今日の3時を基準とした学習時間を計算
+export async function getTodayStudyTime(): Promise<number> {
+  const now = new Date()
+  const todayAt3AM = new Date(now)
+
+  // 今日の3時を設定
+  todayAt3AM.setHours(3, 0, 0, 0)
+
+  // 現在時刻が3時より前の場合は、昨日の3時を基準にする
+  if (now.getHours() < 3) {
+    todayAt3AM.setDate(todayAt3AM.getDate() - 1)
+  }
+
+  // 3時以降の学習記録を取得
+  const allRecords = await db.studyRecords.toArray()
+  const todayRecords = allRecords.filter(record => {
+    const recordDate = new Date(record.studiedAt)
+    return recordDate >= todayAt3AM
+  })
+
+  // 合計学習時間を計算
+  return todayRecords.reduce((sum, record) => sum + record.studyTime, 0)
+}

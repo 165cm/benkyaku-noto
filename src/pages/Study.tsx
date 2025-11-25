@@ -6,7 +6,7 @@ import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
-import { getNextWeakProblem } from '@/lib/review'
+import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
   createWeakModeSession,
   getWeakModeSession,
@@ -32,6 +32,7 @@ export default function Study() {
   const [startTime, setStartTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
+  const [todayStudyTime, setTodayStudyTime] = useState(0) // 1日の学習時間（3時リセット）
   const [memo, setMemo] = useState('')
   const [timeExpired, setTimeExpired] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -59,6 +60,9 @@ export default function Study() {
       setMemo('')
       setShowHistory(false)
 
+      // 1日の学習時間を初回ロード
+      getTodayStudyTime().then(setTodayStudyTime)
+
       // 苦手克服モードの場合、セッションがなければ作成
       if (isWeakMode && !getWeakModeSession()) {
         createWeakModeSession()
@@ -81,7 +85,7 @@ export default function Study() {
   useEffect(() => {
     if (isPaused) return // 一時停止中は何もしない
 
-    const timer = setInterval(() => {
+    const timer = setInterval(async () => {
       // 一時停止中でない場合のみ時間を更新
       const rawElapsed = Math.floor((Date.now() - startTime) / 1000)
       const actualElapsed = rawElapsed - pausedTime
@@ -101,6 +105,10 @@ export default function Study() {
           }
         }
       }
+
+      // 1日の学習時間を更新（現在の問題の経過時間を含める）
+      const baseTodayTime = await getTodayStudyTime()
+      setTodayStudyTime(baseTodayTime + actualElapsed)
     }, 1000)
 
     return () => clearInterval(timer)
@@ -490,16 +498,22 @@ export default function Study() {
 
         {/* 時間表示 */}
         <div className="mt-4 pt-4 border-t border-border">
-          <div className="grid grid-cols-2 gap-3 text-center">
+          <div className={`grid gap-3 text-center ${getSession() ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="bg-blue-50 rounded-lg p-2">
+              <p className="text-xs text-blue-600">今日の学習</p>
+              <p className="text-lg font-bold font-mono text-blue-700">
+                {formatTime(todayStudyTime)}
+              </p>
+            </div>
             {getSession() && (
               <div className="bg-purple-50 rounded-lg p-2">
-                <p className="text-xs text-purple-600">セッション時間</p>
+                <p className="text-xs text-purple-600">セッション</p>
                 <p className="text-lg font-bold font-mono text-purple-700">
                   {formatTime(sessionElapsedTime)}
                 </p>
               </div>
             )}
-            <div className={`bg-gray-50 rounded-lg p-2 ${!getSession() ? 'col-span-2' : ''}`}>
+            <div className="bg-gray-50 rounded-lg p-2">
               <p className="text-xs text-gray-600">この問題</p>
               <p className={`text-lg font-bold font-mono ${isPaused ? 'text-orange-600' : 'text-gray-700'}`}>
                 {isPaused && '⏸ '}{formatTime(elapsedTime)}
