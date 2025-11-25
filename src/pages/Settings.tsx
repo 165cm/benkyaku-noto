@@ -308,8 +308,6 @@ export default function Settings() {
                         {sections.map(sectionKey => {
                           const sectionTitle = sectionKey.replace(`${category}-`, '')
                           const isCategoryExcluded = excludedCategories.includes(category)
-                          // 「カテゴリ - セクション名」の形式で表示
-                          const displayName = `${category} - ${sectionTitle}`
                           return (
                             <label
                               key={sectionKey}
@@ -322,11 +320,14 @@ export default function Settings() {
                                 checked={excludedSections.includes(sectionKey)}
                                 onChange={() => toggleExcludeSection(sectionKey)}
                                 disabled={isCategoryExcluded}
-                                className="w-4 h-4 text-primary rounded"
+                                className="w-4 h-4 text-primary rounded flex-shrink-0"
                               />
-                              <span className="text-sm">{displayName}</span>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs text-gray-500 block">{category}</span>
+                                <span className="text-sm block truncate">{sectionTitle}</span>
+                              </div>
                               {excludedSections.includes(sectionKey) && !isCategoryExcluded && (
-                                <span className="text-xs text-error">(除外中)</span>
+                                <span className="text-xs text-error flex-shrink-0">(除外中)</span>
                               )}
                             </label>
                           )
