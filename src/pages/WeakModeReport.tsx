@@ -54,6 +54,15 @@ export default function WeakModeReport() {
     setLoading(false)
   }
 
+  // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
+  const getProblemDisplayTitle = (problem: Problem) => {
+    if (problem.sectionTitle) {
+      return `${problem.sectionTitle}-${problem.problemNumber}`
+    }
+    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
+    return problem.problemNumber
+  }
+
   const handleGoHome = () => {
     clearWeakModeSession()
     navigate('/')
@@ -219,8 +228,11 @@ export default function WeakModeReport() {
               className="flex items-center justify-between p-3 bg-gray-50 rounded"
             >
               <div className="flex-1 min-w-0">
+                {detail.problem.category && (
+                  <p className="text-xs text-gray-500">{detail.problem.category}</p>
+                )}
                 <p className="text-sm font-medium truncate">
-                  {index + 1}. {detail.problem.sectionTitle || detail.problem.category || detail.problem.problemNumber}
+                  {index + 1}. {getProblemDisplayTitle(detail.problem)}
                 </p>
                 <p className="text-xs text-gray-500">
                   過去{detail.previousAttempts}回 · {formatTime(detail.timeSpent)}

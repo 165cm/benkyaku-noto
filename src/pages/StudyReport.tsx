@@ -100,6 +100,15 @@ export default function StudyReport() {
     }
   }
 
+  // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
+  const getProblemDisplayTitle = (problem: Problem) => {
+    if (problem.sectionTitle) {
+      return `${problem.sectionTitle}-${problem.problemNumber}`
+    }
+    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
+    return problem.problemNumber
+  }
+
   const handleStudyNextSection = async () => {
     if (!nextSection) return
 
@@ -254,7 +263,10 @@ export default function StudyReport() {
                 <div className="flex items-center gap-3">
                   <ScoreIcon className={scoreColor} size={24} />
                   <div>
-                    <p className="font-medium">{problem.sectionTitle || problem.category || problem.problemNumber}</p>
+                    {problem.category && (
+                      <p className="text-xs text-gray-500">{problem.category}</p>
+                    )}
+                    <p className="font-medium">{getProblemDisplayTitle(problem)}</p>
                     {problem.page && (
                       <p className="text-xs text-gray-500">p.{problem.page}</p>
                     )}

@@ -405,33 +405,13 @@ export default function Study() {
     }
   }
 
-  // セクションタイトルを取得
-  const getSectionTitle = (problem: Problem) => {
-    // sectionTitleフィールドがある場合はそれを使用（新データ構造）
+  // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
+  const getProblemDisplayTitle = (problem: Problem) => {
     if (problem.sectionTitle) {
-      return problem.sectionTitle
+      return `${problem.sectionTitle}-${problem.problemNumber}`
     }
-
-    // categoryフィールドがある場合はそれを使用
-    if (problem.category) {
-      return problem.category
-    }
-
-    // 後方互換性：問題番号から抽出
-    const parts = problem.problemNumber.split('-')
-
-    // 小問の場合（例: "代金精算-3-1" → "代金精算"）
-    if (parts.length >= 3) {
-      return parts.slice(0, -2).join('-')
-    }
-
-    // 通常の問題（例: "代金精算-3" → "代金精算"）
-    if (parts.length >= 2) {
-      return parts.slice(0, -1).join('-')
-    }
-
-    // ハイフンがない場合は空文字
-    return ''
+    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
+    return problem.problemNumber
   }
 
   if (!problem || !workbook) {
@@ -487,8 +467,13 @@ export default function Study() {
       <Card className="mb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            {problem.category && (
+              <p className="text-xs text-gray-500 mb-1 truncate">
+                {problem.category}
+              </p>
+            )}
             <h1 className="text-xl sm:text-2xl font-bold truncate">
-              {getSectionTitle(problem)}
+              {getProblemDisplayTitle(problem)}
             </h1>
             {problem.memo && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
