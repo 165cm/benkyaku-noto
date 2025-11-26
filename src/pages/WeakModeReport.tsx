@@ -18,7 +18,7 @@ interface ProblemDetail {
 export default function WeakModeReport() {
   const navigate = useNavigate()
   const [problemDetails, setProblemDetails] = useState<ProblemDetail[]>([])
-  const [stats, setStats] = useState<ReturnType<typeof calculateWeakModeStats> | null>(null)
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof calculateWeakModeStats>> | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function WeakModeReport() {
     }
 
     // 統計を計算
-    const sessionStats = calculateWeakModeStats(session)
+    const sessionStats = await calculateWeakModeStats(session)
     setStats(sessionStats)
 
     // 各問題の詳細を取得
@@ -238,7 +238,7 @@ export default function WeakModeReport() {
           ) : (
             <div className="space-y-3">
               <div className="text-center mb-3">
-                <p className="text-sm text-gray-600 mb-2">復習課題全体の正解率</p>
+                <p className="text-sm text-gray-600 mb-2">{stats.studyTimeEstimate.scopeLabel}の正解率</p>
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <div className="text-center">
                     <p className="text-xs text-gray-500 mb-1">学習前</p>

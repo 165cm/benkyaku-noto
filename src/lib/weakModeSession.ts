@@ -1,4 +1,5 @@
 import type { StudyResult } from '@/types'
+import { getProblem } from './db'
 
 export interface WeakModeResult {
   problemId: string
@@ -70,6 +71,7 @@ export function addWeakModeResult(
 
 // 80%正解率達成までの推定学習回数を計算
 export interface StudyTimeEstimate {
+  scopeLabel: string // スコープの説明（例：「数学カテゴリ」「第1章セクション」「復習対象問題」）
   previousAccuracy: number // 学習前の正解率（復習課題全体）
   currentAccuracy: number // 学習後の正解率（今回の学習結果）
   accuracyChange: number // 正解率の変化（+ or -）
@@ -81,7 +83,7 @@ export interface StudyTimeEstimate {
   message: string // ユーザー向けメッセージ
 }
 
-function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate {
+async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<StudyTimeEstimate> {
   const TARGET_ACCURACY = 80
   const MINUTES_PER_SESSION = 30 // 1回 = 30分
   const SECONDS_PER_SESSION = MINUTES_PER_SESSION * 60 // 1800秒
@@ -89,6 +91,37 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
 
   // 累計学習回数（このセッション自体をカウントするため常に1以上）
   const totalSessionCount = 1
+
+  // 学習した問題の詳細を取得してスコープを判定
+  const problemIds = results.map(r => r.problemId)
+  const problems = await Promise.all(problemIds.map(id => getProblem(id)))
+  const validProblems = problems.filter(p => p !== undefined)
+
+  // カテゴリとセクションを抽出
+  const categories = new Set(validProblems.map(p => p.category || '未分類'))
+  const sections = new Set(validProblems.map(p => p.sectionTitle || ''))
+
+  // スコープラベルを決定
+  let scopeLabel = '復習対象問題'
+  if (categories.size === 1 && sections.size === 1) {
+    const category = Array.from(categories)[0]
+    const section = Array.from(sections)[0]
+    if (section) {
+      scopeLabel = `${section}`
+    } else if (category !== '未分類') {
+      scopeLabel = `${category}カテゴリ`
+    }
+  } else if (categories.size === 1) {
+    const category = Array.from(categories)[0]
+    if (category !== '未分類') {
+      scopeLabel = `${category}カテゴリ`
+    }
+  } else if (sections.size === 1) {
+    const section = Array.from(sections)[0]
+    if (section) {
+      scopeLabel = `${section}`
+    }
+  }
 
   // 学習前の正解率を計算（previousResultから）
   const problemsWithPrevious = results.filter(r => r.previousResult !== null)
@@ -123,6 +156,7 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
   // 既に目標達成している場合
   if (currentAccuracy >= TARGET_ACCURACY) {
     return {
+      scopeLabel,
       previousAccuracy,
       currentAccuracy,
       accuracyChange,
@@ -201,6 +235,7 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
   }
 
   return {
+    scopeLabel,
     previousAccuracy,
     currentAccuracy,
     accuracyChange,
@@ -214,7 +249,7 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
 }
 
 // セッションの統計を計算
-export function calculateWeakModeStats(session: WeakModeSession) {
+export async function calculateWeakModeStats(session: WeakModeSession) {
   const results = session.results
   if (results.length === 0) {
     return {
@@ -229,6 +264,7 @@ export function calculateWeakModeStats(session: WeakModeSession) {
       maxStreak: 0,
       masteredCount: 0,
       studyTimeEstimate: {
+        scopeLabel: '復習対象問題',
         previousAccuracy: 0,
         currentAccuracy: 0,
         accuracyChange: 0,
@@ -281,7 +317,7 @@ export function calculateWeakModeStats(session: WeakModeSession) {
   ).length
 
   // 学習時間推定を計算
-  const studyTimeEstimate = calculateStudyTimeEstimate(session)
+  const studyTimeEstimate = await calculateStudyTimeEstimate(session)
 
   return {
     totalProblems,
