@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import DataMigrationPrompt from '@/components/DataMigrationPrompt'
 import Home from '@/pages/Home'
 import Workbooks from '@/pages/Workbooks'
 import WorkbookDetail from '@/pages/WorkbookDetail'
@@ -32,23 +33,26 @@ export default function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/workbooks" element={<Workbooks />} />
-                  <Route path="/workbooks/:id" element={<WorkbookDetail />} />
-                  <Route path="/workbooks/import" element={<ImportFromImage />} />
-                  <Route path="/study/:id" element={<Study />} />
-                  <Route path="/study-report" element={<StudyReport />} />
-                  <Route path="/weak-mode-report" element={<WeakModeReport />} />
-                  <Route path="/review" element={<Review />} />
-                  <Route path="/stats" element={<Stats />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/explanations" element={<Explanations />} />
-                  <Route path="/trash" element={<Trash />} />
-                  <Route path="/debug" element={<Debug />} />
-                </Routes>
-              </Layout>
+              <>
+                <DataMigrationPrompt />
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/workbooks" element={<Workbooks />} />
+                    <Route path="/workbooks/:id" element={<WorkbookDetail />} />
+                    <Route path="/workbooks/import" element={<ImportFromImage />} />
+                    <Route path="/study/:id" element={<Study />} />
+                    <Route path="/study-report" element={<StudyReport />} />
+                    <Route path="/weak-mode-report" element={<WeakModeReport />} />
+                    <Route path="/review" element={<Review />} />
+                    <Route path="/stats" element={<Stats />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/explanations" element={<Explanations />} />
+                    <Route path="/trash" element={<Trash />} />
+                    <Route path="/debug" element={<Debug />} />
+                  </Routes>
+                </Layout>
+              </>
             </ProtectedRoute>
           }
         />
