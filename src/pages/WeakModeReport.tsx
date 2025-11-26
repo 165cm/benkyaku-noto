@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown, Minus, Timer } from 'lucide-react'
+import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getWeakModeSession, clearWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
@@ -218,12 +218,12 @@ export default function WeakModeReport() {
         </div>
       </Card>
 
-      {/* 正解率80%達成までの推定学習時間 */}
+      {/* あなたの成長記録 */}
       {stats.studyTimeEstimate && (
         <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <Timer className="text-indigo-600" size={20} />
-            正解率80%達成までの推定学習時間
+            <TrendingUp className="text-indigo-600" size={20} />
+            あなたの成長記録
           </h2>
 
           {stats.studyTimeEstimate.currentAccuracy >= stats.studyTimeEstimate.targetAccuracy ? (
@@ -232,60 +232,54 @@ export default function WeakModeReport() {
                 🎉 {stats.studyTimeEstimate.message}
               </p>
               <p className="text-sm text-gray-600">
-                現在の正解率: {stats.studyTimeEstimate.currentAccuracy}%
-              </p>
-            </div>
-          ) : stats.studyTimeEstimate.canEstimate ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                <span>現在の正解率</span>
-                <span className="font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                <span>目標正解率</span>
-                <span className="font-bold text-indigo-600">{stats.studyTimeEstimate.targetAccuracy}%</span>
-              </div>
-
-              {stats.studyTimeEstimate.linearEstimate !== null && (
-                <div className="p-3 bg-white rounded border border-indigo-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">線形推定（順調なら）</p>
-                      <p className="text-sm text-gray-600">
-                        あと<span className="text-lg font-bold text-blue-600 mx-1">
-                          {formatTime(stats.studyTimeEstimate.linearEstimate)}
-                        </span>の学習
-                      </p>
-                    </div>
-                    <TrendingUp className="text-blue-500" size={20} />
-                  </div>
-                </div>
-              )}
-
-              {stats.studyTimeEstimate.exponentialEstimate !== null &&
-               stats.studyTimeEstimate.exponentialEstimate > 0 && (
-                <div className="p-3 bg-white rounded border border-purple-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">指数関数推定（より現実的）</p>
-                      <p className="text-sm text-gray-600">
-                        あと<span className="text-lg font-bold text-purple-600 mx-1">
-                          {formatTime(stats.studyTimeEstimate.exponentialEstimate)}
-                        </span>の学習
-                      </p>
-                    </div>
-                    <Star className="text-purple-500" size={20} />
-                  </div>
-                </div>
-              )}
-
-              <p className="text-xs text-gray-500 mt-3 text-center">
-                💡 推定は過去の学習ペースに基づいています
+                今回の正解率: {stats.studyTimeEstimate.currentAccuracy}%
               </p>
             </div>
           ) : (
-            <div className="text-center py-2">
-              <p className="text-sm text-gray-600">{stats.studyTimeEstimate.message}</p>
+            <div className="space-y-3">
+              <div className="text-center mb-3">
+                <p className="text-sm text-gray-600 mb-1">今回の正解率</p>
+                <p className="text-3xl font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  目標 {stats.studyTimeEstimate.targetAccuracy}% まであと {stats.studyTimeEstimate.targetAccuracy - stats.studyTimeEstimate.currentAccuracy}ポイント
+                </p>
+              </div>
+
+              {stats.studyTimeEstimate.canEstimate && (
+                <>
+                  <div className="p-3 bg-white rounded border border-indigo-200 text-center">
+                    <p className="text-sm text-gray-700 mb-1">💡 このペースなら、</p>
+                    <p className="text-lg font-bold text-indigo-600">
+                      {stats.studyTimeEstimate.estimatedSessionsMin !== null &&
+                       stats.studyTimeEstimate.estimatedSessionsMax !== null &&
+                       stats.studyTimeEstimate.estimatedSessionsMin !== stats.studyTimeEstimate.estimatedSessionsMax
+                        ? `あと${stats.studyTimeEstimate.estimatedSessionsMin}〜${stats.studyTimeEstimate.estimatedSessionsMax}回の苦手克服で達成！`
+                        : stats.studyTimeEstimate.estimatedSessionsMin !== null
+                          ? `あと${stats.studyTimeEstimate.estimatedSessionsMin}回の苦手克服で達成！`
+                          : stats.studyTimeEstimate.estimatedSessionsMax !== null
+                            ? `あと${stats.studyTimeEstimate.estimatedSessionsMax}回の苦手克服で達成！`
+                            : 'もう少しで達成！'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">※1回 = 約30分の学習</p>
+                  </div>
+
+                  {stats.studyTimeEstimate.totalSessionCount < 6 && (
+                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="text-sm text-gray-700 text-center">
+                        📝 まだ{stats.studyTimeEstimate.totalSessionCount}回分のデータです。
+                        <br />
+                        6回くらい続けると予測がより正確になります！
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!stats.studyTimeEstimate.canEstimate && (
+                <div className="text-center py-2">
+                  <p className="text-sm text-gray-600">{stats.studyTimeEstimate.message}</p>
+                </div>
+              )}
             </div>
           )}
         </Card>
