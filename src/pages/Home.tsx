@@ -150,8 +150,8 @@ export default function Home() {
               <TrendingUp className="text-purple-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-600">正答率</p>
-              <p className="text-2xl font-bold">
+              <p className="text-sm text-gray-600" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">正答率</p>
+              <p className="text-2xl font-bold" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">
                 {stats ? stats.correctRate : 0}%
               </p>
             </div>

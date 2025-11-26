@@ -1144,7 +1144,10 @@ export default function WorkbookDetail() {
                           ? 'bg-yellow-100 text-yellow-700'
                           : 'bg-red-100 text-red-700'
                         return (
-                          <span className={`text-sm px-2 py-1 rounded font-medium ${colorClass}`}>
+                          <span
+                            className={`text-sm px-2 py-1 rounded font-medium ${colorClass}`}
+                            title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
+                          >
                             正解率 {categoryAccuracy}%
                           </span>
                         )
@@ -1208,7 +1211,10 @@ export default function WorkbookDetail() {
                                       ? 'bg-yellow-100 text-yellow-700'
                                       : 'bg-red-100 text-red-700'
                                     return (
-                                      <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${colorClass}`}>
+                                      <span
+                                        className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${colorClass}`}
+                                        title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
+                                      >
                                         正解率 {accuracy}%
                                       </span>
                                     )
