@@ -287,7 +287,9 @@ export async function calculateWeakModeStats(session: WeakModeSession) {
   const correctCount = results.filter(r => r.result === 'correct').length
   const partialCount = results.filter(r => r.result === 'partial').length
   const incorrectCount = results.filter(r => r.result === 'incorrect').length
-  const accuracy = Math.round((correctCount / totalProblems) * 100)
+  // 正解率の計算（部分正解を0.5点として統一）
+  const totalScore = correctCount + (partialCount * 0.5)
+  const accuracy = Math.round((totalScore / totalProblems) * 100)
 
   // 改善した問題数（前回より良くなった）
   const improvedCount = results.filter(r => {

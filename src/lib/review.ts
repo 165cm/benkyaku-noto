@@ -162,8 +162,11 @@ export async function calculateStudyStats() {
   const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
   const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
 
+  // 正解率の計算（部分正解を0.5点として統一）
   const correctCount = allRecords.filter((r) => r.result === 'correct').length
-  const correctRate = allRecords.length > 0 ? (correctCount / allRecords.length) * 100 : 0
+  const partialCount = allRecords.filter((r) => r.result === 'partial').length
+  const totalScore = correctCount + (partialCount * 0.5)
+  const correctRate = allRecords.length > 0 ? Math.round((totalScore / allRecords.length) * 100) : 0
 
   // 週間データ
   const weeklyData = []
@@ -217,8 +220,11 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
   const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
 
+  // 正解率の計算（部分正解を0.5点として統一）
   const correctCount = allRecords.filter((r) => r.result === 'correct').length
-  const correctRate = allRecords.length > 0 ? (correctCount / allRecords.length) * 100 : 0
+  const partialCount = allRecords.filter((r) => r.result === 'partial').length
+  const totalScore = correctCount + (partialCount * 0.5)
+  const correctRate = allRecords.length > 0 ? Math.round((totalScore / allRecords.length) * 100) : 0
 
   // 週間データ（学習時間、問題数、正答率）
   const weeklyData = []
@@ -233,8 +239,11 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
       return recordDate.getTime() === date.getTime()
     })
 
+    // 日別正解率の計算（部分正解を0.5点として統一）
     const dayCorrectCount = dayRecords.filter((r) => r.result === 'correct').length
-    const dayAccuracy = dayRecords.length > 0 ? Math.round((dayCorrectCount / dayRecords.length) * 100) : null
+    const dayPartialCount = dayRecords.filter((r) => r.result === 'partial').length
+    const dayTotalScore = dayCorrectCount + (dayPartialCount * 0.5)
+    const dayAccuracy = dayRecords.length > 0 ? Math.round((dayTotalScore / dayRecords.length) * 100) : null
 
     weeklyData.push({
       date: dateStr,
