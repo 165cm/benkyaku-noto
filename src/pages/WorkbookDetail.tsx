@@ -60,6 +60,7 @@ export default function WorkbookDetail() {
     categoryName: '',
   })
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
+  const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [subProblemsMap, setSubProblemsMap] = useState<Map<string, Problem[]>>(new Map())
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
@@ -92,13 +93,19 @@ export default function WorkbookDetail() {
     }
   }, [id])
 
-  // 各セクションの直近回答の正解率を計算
+  // 各セクションおよびカテゴリの直近回答の正解率を計算
   useEffect(() => {
     const calculateAccuracyRates = async () => {
       const hierarchy = groupProblemsByHierarchy()
-      const accuracyMap = new Map<string, number | null>()
+      const sectionAccuracyMap = new Map<string, number | null>()
+      const categoryAccuracyMap = new Map<string, number | null>()
+
+      // セクション別の正解率とカテゴリ別の問題リストを計算
+      const categoryProblemsMap = new Map<string, Problem[]>()
 
       for (const [category, titles] of Object.entries(hierarchy)) {
+        const categoryLearnableProblems: Problem[] = []
+
         for (const [title, titleProblems] of Object.entries(titles)) {
           const sectionKey = `${category}-${title}`
 
@@ -118,18 +125,33 @@ export default function WorkbookDetail() {
             learnableProblems.push(...subProblems)
           }
 
+          // セクション正解率を計算
           const accuracy = await calculateRecentAccuracyForProblems(learnableProblems)
-          accuracyMap.set(sectionKey, accuracy)
+          sectionAccuracyMap.set(sectionKey, accuracy)
+
+          // カテゴリ全体の問題リストに追加
+          categoryLearnableProblems.push(...learnableProblems)
         }
+
+        // カテゴリ別の問題リストを保存
+        categoryProblemsMap.set(category, categoryLearnableProblems)
       }
 
-      setSectionAccuracyRates(accuracyMap)
+      // カテゴリ別の正解率を計算
+      for (const [category, categoryProblems] of categoryProblemsMap.entries()) {
+        const categoryAccuracy = await calculateRecentAccuracyForProblems(categoryProblems)
+        categoryAccuracyMap.set(category, categoryAccuracy)
+      }
+
+      setSectionAccuracyRates(sectionAccuracyMap)
+      setCategoryAccuracyRates(categoryAccuracyMap)
     }
 
     if (problems.length > 0) {
       calculateAccuracyRates()
     } else {
       setSectionAccuracyRates(new Map())
+      setCategoryAccuracyRates(new Map())
     }
   }, [problems, subProblemsMap])
 
@@ -1113,6 +1135,22 @@ export default function WorkbookDetail() {
                     <span className="text-sm text-gray-500">
                       {Object.keys(titles).length}セクション · {totalProblems}問
                     </span>
+                    {(() => {
+                      const categoryAccuracy = categoryAccuracyRates.get(category)
+                      if (categoryAccuracy !== null && categoryAccuracy !== undefined) {
+                        const colorClass = categoryAccuracy >= 80
+                          ? 'bg-green-100 text-green-700'
+                          : categoryAccuracy >= 50
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-red-100 text-red-700'
+                        return (
+                          <span className={`text-sm px-2 py-1 rounded font-medium ${colorClass}`}>
+                            正解率 {categoryAccuracy}%
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
                   <button
                     onClick={(e) => {
