@@ -1,7 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Home, Calendar, BarChart3, Settings, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { BookOpen, Home, Calendar, BarChart3, Settings, PanelLeftClose, PanelLeft, LogOut, User as UserIcon } from 'lucide-react'
 import clsx from 'clsx'
+import { useAuthStore } from '@/store/authStore'
 
 interface LayoutProps {
   children: ReactNode
@@ -9,10 +10,12 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const { user, signOut } = useAuthStore()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed')
     return saved === 'true'
   })
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(isSidebarCollapsed))
@@ -25,6 +28,14 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/stats', icon: BarChart3, label: '統計' },
     { path: '/settings', icon: Settings, label: '設定' },
   ]
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,6 +51,43 @@ export default function Layout({ children }: LayoutProps) {
               {isSidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
             </button>
             <h1 className="text-xl font-bold">弱点克服ノート</h1>
+          </div>
+
+          {/* User Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <UserIcon size={18} />
+              <span className="text-sm hidden sm:inline">
+                {user?.displayName || user?.email?.split('@')[0] || 'ユーザー'}
+              </span>
+            </button>
+
+            {showUserMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowUserMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-20">
+                  <div className="px-4 py-2 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.displayName || 'ユーザー'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <LogOut size={16} />
+                    ログアウト
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>

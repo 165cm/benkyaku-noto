@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight, Cloud, CloudUpload, CloudDownload } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import {
@@ -13,6 +13,8 @@ import {
   saveExcludedSections
 } from '@/lib/storage'
 import { db } from '@/lib/db'
+import { backupToCloud, restoreFromCloud, calculateBackupSize, type SyncProgress } from '@/lib/sync'
+import { useAuthStore } from '@/store/authStore'
 import type { Problem } from '@/types'
 
 interface SectionInfo {
@@ -28,6 +30,7 @@ interface CategoryGroup {
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [apiKey, setApiKey] = useState('')
   const [isApiKeySet, setIsApiKeySet] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -38,6 +41,11 @@ export default function Settings() {
   const [excludedCategories, setExcludedCategories] = useState<string[]>([])
   const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
+
+  // バックアップ・復元
+  const [backupSize, setBackupSize] = useState<{ totalItems: number; estimatedSizeKB: number } | null>(null)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     const existingKey = getOpenAIApiKey()
@@ -52,6 +60,9 @@ export default function Settings() {
 
     // カテゴリ・セクション一覧を取得
     loadCategorySections()
+
+    // バックアップサイズを計算
+    calculateBackupSize().then(setBackupSize)
   }, [])
 
   const loadCategorySections = async () => {
@@ -155,6 +166,55 @@ export default function Settings() {
       removeOpenAIApiKey()
       setApiKey('')
       setIsApiKeySet(false)
+    }
+  }
+
+  const handleBackup = async () => {
+    if (!user) {
+      alert('ログインが必要です')
+      return
+    }
+
+    if (!confirm('ローカルデータをクラウドにバックアップしますか？\n既存のクラウドデータは上書きされます。')) {
+      return
+    }
+
+    try {
+      setSyncMessage(null)
+      await backupToCloud(user.uid, setSyncProgress)
+      setSyncMessage({ type: 'success', text: 'バックアップが完了しました' })
+      setTimeout(() => setSyncMessage(null), 5000)
+    } catch (error) {
+      console.error('Backup error:', error)
+      setSyncMessage({ type: 'error', text: 'バックアップに失敗しました' })
+    } finally {
+      setSyncProgress(null)
+    }
+  }
+
+  const handleRestore = async () => {
+    if (!user) {
+      alert('ログインが必要です')
+      return
+    }
+
+    if (!confirm('クラウドからデータを復元しますか？\nローカルデータとマージされます。')) {
+      return
+    }
+
+    try {
+      setSyncMessage(null)
+      await restoreFromCloud(user.uid, setSyncProgress)
+      setSyncMessage({ type: 'success', text: '復元が完了しました' })
+      setTimeout(() => {
+        setSyncMessage(null)
+        window.location.reload() // ページをリロードして最新データを表示
+      }, 2000)
+    } catch (error) {
+      console.error('Restore error:', error)
+      setSyncMessage({ type: 'error', text: '復元に失敗しました' })
+    } finally {
+      setSyncProgress(null)
     }
   }
 
@@ -349,6 +409,82 @@ export default function Settings() {
                   )}
                 </p>
               </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <Cloud className="text-primary mt-1" size={24} />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold mb-2">データの同期</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              学習データをクラウドにバックアップして、複数のデバイスで同期できます
+            </p>
+
+            {backupSize && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>ローカルデータ:</strong> {backupSize.totalItems}件 (約{backupSize.estimatedSizeKB}KB)
+                </p>
+              </div>
+            )}
+
+            {syncProgress && (
+              <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <p className="text-sm font-medium">{syncProgress.message}</p>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(syncProgress.current / syncProgress.total) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {syncMessage && (
+              <div className={`border rounded-lg p-4 mb-4 ${
+                syncMessage.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {syncMessage.type === 'success' ? (
+                    <CheckCircle size={20} />
+                  ) : (
+                    <AlertCircle size={20} />
+                  )}
+                  <p className="text-sm font-medium">{syncMessage.text}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleBackup}
+                disabled={!user || !!syncProgress}
+              >
+                <CloudUpload size={16} className="mr-2" />
+                バックアップ
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleRestore}
+                disabled={!user || !!syncProgress}
+              >
+                <CloudDownload size={16} className="mr-2" />
+                復元
+              </Button>
+            </div>
+
+            {!user && (
+              <p className="text-sm text-gray-500 mt-4">
+                データ同期を使用するには、<strong>ログイン</strong>が必要です
+              </p>
             )}
           </div>
         </div>
