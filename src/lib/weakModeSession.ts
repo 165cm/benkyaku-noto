@@ -70,7 +70,9 @@ export function addWeakModeResult(
 
 // 80%正解率達成までの推定学習回数を計算
 export interface StudyTimeEstimate {
-  currentAccuracy: number // 現在の正解率
+  previousAccuracy: number // 学習前の正解率（復習課題全体）
+  currentAccuracy: number // 学習後の正解率（今回の学習結果）
+  accuracyChange: number // 正解率の変化（+ or -）
   targetAccuracy: number // 目標正解率（80%）
   canEstimate: boolean // 推定可能かどうか
   estimatedSessionsMin: number | null // 推定回数（下限）
@@ -88,20 +90,42 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
   // 累計学習回数（このセッション自体をカウントするため常に1以上）
   const totalSessionCount = 1
 
-  // 基本的な正解率を計算
+  // 学習前の正解率を計算（previousResultから）
+  const problemsWithPrevious = results.filter(r => r.previousResult !== null)
+  let previousAccuracy = 0
+
+  if (problemsWithPrevious.length > 0) {
+    const previousCorrectCount = problemsWithPrevious.filter(
+      r => r.previousResult === 'correct'
+    ).length
+    const previousPartialCount = problemsWithPrevious.filter(
+      r => r.previousResult === 'partial'
+    ).length
+    // 部分正解を0.5点として計算（統一）
+    previousAccuracy = Math.round(
+      ((previousCorrectCount + previousPartialCount * 0.5) / problemsWithPrevious.length) * 100
+    )
+  }
+
+  // 今回の学習後の正解率を計算
   const correctCount = results.filter(r => r.result === 'correct').length
   const partialCount = results.filter(r => r.result === 'partial').length
   const totalProblems = results.length
 
-  // 正解を1点、部分正解を0.5点として計算
+  // 正解を1点、部分正解を0.5点として計算（統一）
   const currentAccuracy = totalProblems > 0
     ? Math.round(((correctCount + partialCount * 0.5) / totalProblems) * 100)
     : 0
 
+  // 正解率の変化
+  const accuracyChange = currentAccuracy - previousAccuracy
+
   // 既に目標達成している場合
   if (currentAccuracy >= TARGET_ACCURACY) {
     return {
+      previousAccuracy,
       currentAccuracy,
+      accuracyChange,
       targetAccuracy: TARGET_ACCURACY,
       canEstimate: false,
       estimatedSessionsMin: null,
@@ -113,30 +137,14 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
 
   const totalTime = results.reduce((sum, r) => sum + r.timeSpent, 0)
 
-  // 1. 線形モデル（シンプル・直感的）
-  // 前回の結果がある問題から、初期正解率を推定
-  const problemsWithPrevious = results.filter(r => r.previousResult !== null)
-  let initialAccuracy = 0
-
-  if (problemsWithPrevious.length > 0) {
-    const previousCorrectCount = problemsWithPrevious.filter(
-      r => r.previousResult === 'correct'
-    ).length
-    const previousPartialCount = problemsWithPrevious.filter(
-      r => r.previousResult === 'partial'
-    ).length
-    initialAccuracy = Math.round(
-      ((previousCorrectCount + previousPartialCount * 0.5) / problemsWithPrevious.length) * 100
-    )
-  }
-
   // 正解率の向上量
-  const accuracyImprovement = currentAccuracy - initialAccuracy
+  const accuracyImprovement = accuracyChange
   const remainingAccuracy = TARGET_ACCURACY - currentAccuracy
 
   let linearEstimateSeconds: number | null = null
   let exponentialEstimateSeconds: number | null = null
 
+  // 1. 線形モデル（シンプル・直感的）
   if (accuracyImprovement > 0 && totalTime > 0) {
     // 1%の正解率向上にかかる時間
     const timePerPercent = totalTime / accuracyImprovement
@@ -144,10 +152,10 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
   }
 
   // 2. 指数関数モデル（より科学的）
-  if (accuracyImprovement > 0 && totalTime > 0 && initialAccuracy < TARGET_ACCURACY) {
+  if (accuracyImprovement > 0 && totalTime > 0 && previousAccuracy < TARGET_ACCURACY) {
     const maxAccuracy = 100 // 理論上の最大正解率
     const accuracyDiff = maxAccuracy - currentAccuracy
-    const initialDiff = maxAccuracy - initialAccuracy
+    const initialDiff = maxAccuracy - previousAccuracy
 
     if (initialDiff > 0 && accuracyDiff > 0 && accuracyDiff < initialDiff) {
       const k = -Math.log(accuracyDiff / initialDiff) / totalTime
@@ -193,7 +201,9 @@ function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate
   }
 
   return {
+    previousAccuracy,
     currentAccuracy,
+    accuracyChange,
     targetAccuracy: TARGET_ACCURACY,
     canEstimate,
     estimatedSessionsMin,
@@ -219,7 +229,9 @@ export function calculateWeakModeStats(session: WeakModeSession) {
       maxStreak: 0,
       masteredCount: 0,
       studyTimeEstimate: {
+        previousAccuracy: 0,
         currentAccuracy: 0,
+        accuracyChange: 0,
         targetAccuracy: 80,
         canEstimate: false,
         estimatedSessionsMin: null,
