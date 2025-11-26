@@ -162,11 +162,11 @@ export async function calculateStudyStats() {
   const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
   const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
 
-  // 正解率の計算（部分正解を0.5点として統一）
-  const correctCount = allRecords.filter((r) => r.result === 'correct').length
-  const partialCount = allRecords.filter((r) => r.result === 'partial').length
-  const totalScore = correctCount + (partialCount * 0.5)
-  const correctRate = allRecords.length > 0 ? Math.round((totalScore / allRecords.length) * 100) : 0
+  // 正解率の計算（最新3回の重み付け平均）
+  // 学習記録から問題IDを抽出し、各問題の最新3回で計算
+  const problemIds = new Set(allRecords.map(r => r.problemId))
+  const problems = await db.problems.where('id').anyOf([...problemIds]).toArray()
+  const correctRate = await calculateRecentAccuracyForProblems(problems) || 0
 
   // 週間データ
   const weeklyData = []
@@ -220,11 +220,11 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
   const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
 
-  // 正解率の計算（部分正解を0.5点として統一）
-  const correctCount = allRecords.filter((r) => r.result === 'correct').length
-  const partialCount = allRecords.filter((r) => r.result === 'partial').length
-  const totalScore = correctCount + (partialCount * 0.5)
-  const correctRate = allRecords.length > 0 ? Math.round((totalScore / allRecords.length) * 100) : 0
+  // 正解率の計算（最新3回の重み付け平均）
+  // 学習記録から問題IDを抽出し、各問題の最新3回で計算
+  const problemIds = new Set(allRecords.map(r => r.problemId))
+  const problems = await db.problems.where('id').anyOf([...problemIds]).toArray()
+  const correctRate = await calculateRecentAccuracyForProblems(problems) || 0
 
   // 週間データ（学習時間、問題数、正答率）
   const weeklyData = []

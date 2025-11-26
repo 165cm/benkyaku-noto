@@ -158,9 +158,9 @@ export default function WeakModeReport() {
         <Card className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <TrendingUp className="text-green-600" size={20} />
-            <span className="text-sm text-gray-600">正解率</span>
+            <span className="text-sm text-gray-600" title="この学習セッション内の正解率">正解率</span>
           </div>
-          <p className="text-3xl font-bold text-green-600">{stats.accuracy}%</p>
+          <p className="text-3xl font-bold text-green-600" title="この学習セッション内の正解率">{stats.accuracy}%</p>
         </Card>
 
         <Card className="text-center">
