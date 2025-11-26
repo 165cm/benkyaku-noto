@@ -68,6 +68,135 @@ export function addWeakModeResult(
   saveWeakModeSession(session)
 }
 
+// 80%正解率達成までの推定学習時間を計算
+export interface StudyTimeEstimate {
+  linearEstimate: number | null // 線形モデルでの推定時間（秒）
+  exponentialEstimate: number | null // 指数関数モデルでの推定時間（秒）
+  canEstimate: boolean // 推定可能かどうか
+  currentAccuracy: number // 現在の正解率
+  targetAccuracy: number // 目標正解率（80%）
+  message: string // ユーザー向けメッセージ
+}
+
+function calculateStudyTimeEstimate(session: WeakModeSession): StudyTimeEstimate {
+  const TARGET_ACCURACY = 80
+  const results = session.results
+
+  // 基本的な正解率を計算
+  const correctCount = results.filter(r => r.result === 'correct').length
+  const partialCount = results.filter(r => r.result === 'partial').length
+  const totalProblems = results.length
+
+  // 正解を1点、部分正解を0.5点として計算
+  const currentAccuracy = totalProblems > 0
+    ? Math.round(((correctCount + partialCount * 0.5) / totalProblems) * 100)
+    : 0
+
+  // 既に目標達成している場合
+  if (currentAccuracy >= TARGET_ACCURACY) {
+    return {
+      linearEstimate: null,
+      exponentialEstimate: null,
+      canEstimate: false,
+      currentAccuracy,
+      targetAccuracy: TARGET_ACCURACY,
+      message: '目標達成！正解率80%を超えています！',
+    }
+  }
+
+  // データが不足している場合（最低5問は必要）
+  if (totalProblems < 5) {
+    return {
+      linearEstimate: null,
+      exponentialEstimate: null,
+      canEstimate: false,
+      currentAccuracy,
+      targetAccuracy: TARGET_ACCURACY,
+      message: 'もう少し問題を解くと推定できます（最低5問）',
+    }
+  }
+
+  const totalTime = results.reduce((sum, r) => sum + r.timeSpent, 0)
+
+  // 1. 線形モデル（シンプル・直感的）
+  // 前回の結果がある問題から、初期正解率を推定
+  const problemsWithPrevious = results.filter(r => r.previousResult !== null)
+  let initialAccuracy = 0
+
+  if (problemsWithPrevious.length > 0) {
+    const previousCorrectCount = problemsWithPrevious.filter(
+      r => r.previousResult === 'correct'
+    ).length
+    const previousPartialCount = problemsWithPrevious.filter(
+      r => r.previousResult === 'partial'
+    ).length
+    initialAccuracy = Math.round(
+      ((previousCorrectCount + previousPartialCount * 0.5) / problemsWithPrevious.length) * 100
+    )
+  }
+
+  // 正解率の向上量
+  const accuracyImprovement = currentAccuracy - initialAccuracy
+  const remainingAccuracy = TARGET_ACCURACY - currentAccuracy
+
+  let linearEstimate: number | null = null
+
+  if (accuracyImprovement > 0 && totalTime > 0) {
+    // 1%の正解率向上にかかる時間
+    const timePerPercent = totalTime / accuracyImprovement
+    linearEstimate = Math.round(timePerPercent * remainingAccuracy)
+  }
+
+  // 2. 指数関数モデル（より科学的）
+  // 学習曲線: accuracy(t) = max - (max - initial) * exp(-k * t)
+  // k（学習速度定数）を推定
+  let exponentialEstimate: number | null = null
+
+  if (accuracyImprovement > 0 && totalTime > 0 && initialAccuracy < TARGET_ACCURACY) {
+    // 学習速度定数 k を推定
+    // currentAccuracy = TARGET_ACCURACY - (TARGET_ACCURACY - initialAccuracy) * exp(-k * totalTime)
+    // exp(-k * totalTime) = (TARGET_ACCURACY - currentAccuracy) / (TARGET_ACCURACY - initialAccuracy)
+
+    const maxAccuracy = 100 // 理論上の最大正解率
+    const accuracyDiff = maxAccuracy - currentAccuracy
+    const initialDiff = maxAccuracy - initialAccuracy
+
+    if (initialDiff > 0 && accuracyDiff > 0 && accuracyDiff < initialDiff) {
+      const k = -Math.log(accuracyDiff / initialDiff) / totalTime
+
+      // 80%達成までの時間を計算
+      // TARGET_ACCURACY = maxAccuracy - (maxAccuracy - initialAccuracy) * exp(-k * t)
+      // exp(-k * t) = (maxAccuracy - TARGET_ACCURACY) / (maxAccuracy - initialAccuracy)
+      const targetDiff = maxAccuracy - TARGET_ACCURACY
+      const ratio = targetDiff / initialDiff
+
+      if (ratio > 0 && ratio < 1) {
+        const estimatedTime = -Math.log(ratio) / k
+        exponentialEstimate = Math.round(estimatedTime - totalTime) // 残り時間
+      }
+    }
+  }
+
+  // メッセージ生成
+  let message = ''
+  if (linearEstimate !== null || exponentialEstimate !== null) {
+    message = '推定学習時間を計算しました'
+  } else if (accuracyImprovement <= 0) {
+    message = '正解率が向上していないため推定できません'
+  } else {
+    message = 'データが不足しているため推定が困難です'
+  }
+
+  return {
+    linearEstimate,
+    exponentialEstimate,
+    canEstimate: linearEstimate !== null || exponentialEstimate !== null,
+    currentAccuracy,
+    targetAccuracy: TARGET_ACCURACY,
+    message,
+  }
+}
+
 // セッションの統計を計算
 export function calculateWeakModeStats(session: WeakModeSession) {
   const results = session.results
@@ -83,6 +212,14 @@ export function calculateWeakModeStats(session: WeakModeSession) {
       improvedCount: 0,
       maxStreak: 0,
       masteredCount: 0,
+      studyTimeEstimate: {
+        linearEstimate: null,
+        exponentialEstimate: null,
+        canEstimate: false,
+        currentAccuracy: 0,
+        targetAccuracy: 80,
+        message: 'データがありません',
+      } as StudyTimeEstimate,
     }
   }
 
@@ -124,6 +261,9 @@ export function calculateWeakModeStats(session: WeakModeSession) {
     r.result === 'correct' && r.previousAttempts >= 2
   ).length
 
+  // 学習時間推定を計算
+  const studyTimeEstimate = calculateStudyTimeEstimate(session)
+
   return {
     totalProblems,
     totalTime,
@@ -135,5 +275,6 @@ export function calculateWeakModeStats(session: WeakModeSession) {
     improvedCount,
     maxStreak,
     masteredCount,
+    studyTimeEstimate,
   }
 }
