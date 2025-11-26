@@ -33,9 +33,11 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
     let timeHistory = ''
 
     if (records.length > 0) {
-      // 正答率を計算
+      // 正解率を計算（部分正解を0.5点として統一）
       const correctCount = records.filter(r => r.result === 'correct').length
-      accuracy = `${Math.round((correctCount / records.length) * 100)}%`
+      const partialCount = records.filter(r => r.result === 'partial').length
+      const totalScore = correctCount + (partialCount * 0.5)
+      accuracy = `${Math.round((totalScore / records.length) * 100)}%`
 
       // 最新の学習記録を取得（新しい順にソート）
       const sortedRecords = records.sort((a, b) =>
