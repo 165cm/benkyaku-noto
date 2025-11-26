@@ -238,9 +238,32 @@ export default function WeakModeReport() {
           ) : (
             <div className="space-y-3">
               <div className="text-center mb-3">
-                <p className="text-sm text-gray-600 mb-1">今回の正解率</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-600 mb-2">復習課題全体の正解率</p>
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 mb-1">学習前</p>
+                    <p className="text-2xl font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</p>
+                  </div>
+                  <div className="text-2xl text-gray-400">→</div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 mb-1">学習後</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</p>
+                  </div>
+                  {stats.studyTimeEstimate.accuracyChange !== 0 && (
+                    <div className="text-center">
+                      <p className={`text-lg font-bold ${
+                        stats.studyTimeEstimate.accuracyChange > 0
+                          ? 'text-green-600'
+                          : stats.studyTimeEstimate.accuracyChange < 0
+                            ? 'text-red-600'
+                            : 'text-gray-600'
+                      }`}>
+                        {stats.studyTimeEstimate.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.accuracyChange}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
                   目標 {stats.studyTimeEstimate.targetAccuracy}% まであと {stats.studyTimeEstimate.targetAccuracy - stats.studyTimeEstimate.currentAccuracy}ポイント
                 </p>
               </div>
