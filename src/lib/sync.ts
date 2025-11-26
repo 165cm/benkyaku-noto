@@ -196,3 +196,22 @@ export async function calculateBackupSize(): Promise<{
     estimatedSizeKB: Math.round(estimatedSizeKB)
   }
 }
+
+/**
+ * ローカル（IndexedDB）にデータが存在するかチェック
+ */
+export async function hasLocalData(): Promise<boolean> {
+  try {
+    const counts = await Promise.all([
+      db.workbooks.count(),
+      db.problems.count(),
+      db.studyRecords.count(),
+      db.explanations.count()
+    ])
+
+    return counts.some(count => count > 0)
+  } catch (error) {
+    console.error('Error checking local data:', error)
+    return false
+  }
+}

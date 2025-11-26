@@ -282,3 +282,30 @@ export async function restoreAllDataFromFirestore(userId: string) {
     explanations
   }
 }
+
+// ================== Data Existence Check ==================
+
+/**
+ * Firestoreにユーザーのデータが存在するかチェック
+ */
+export async function hasCloudData(userId: string): Promise<boolean> {
+  try {
+    // いずれかのコレクションにデータが存在するかチェック
+    const [workbooks, problems, studyRecords, explanations] = await Promise.all([
+      getWorkbooksFromFirestore(userId),
+      getProblemsFromFirestore(userId),
+      getStudyRecordsFromFirestore(userId),
+      getExplanationsFromFirestore(userId)
+    ])
+
+    return (
+      workbooks.length > 0 ||
+      problems.length > 0 ||
+      studyRecords.length > 0 ||
+      explanations.length > 0
+    )
+  } catch (error) {
+    console.error('Error checking cloud data:', error)
+    return false
+  }
+}
