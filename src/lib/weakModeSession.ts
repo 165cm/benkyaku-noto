@@ -1,5 +1,5 @@
 import type { StudyResult } from '@/types'
-import { getProblem } from './db'
+import { getProblem, getStudyRecords } from './db'
 import { isSameStudyDay } from './dateUtils'
 
 export interface WeakModeResult {
@@ -78,11 +78,33 @@ export function addWeakModeResult(
   saveWeakModeSession(session)
 }
 
+// 直近N回の重み付け平均を計算
+// 最新50%、1つ前30%、2つ前20%の重みで計算
+function calculateWeightedAverage(results: StudyResult[]): number {
+  if (results.length === 0) return 0
+
+  const weights = [0.5, 0.3, 0.2] // 最新から順に
+  const scores = results.map(r =>
+    r === 'correct' ? 1 : r === 'partial' ? 0.5 : 0
+  )
+
+  let weightedSum = 0
+  let totalWeight = 0
+
+  for (let i = 0; i < Math.min(scores.length, 3); i++) {
+    const weight = weights[i]
+    weightedSum += scores[i] * weight
+    totalWeight += weight
+  }
+
+  return totalWeight > 0 ? (weightedSum / totalWeight) * 100 : 0
+}
+
 // 80%正解率達成までの推定学習回数を計算
 export interface StudyTimeEstimate {
   scopeLabel: string // スコープの説明（例：「数学カテゴリ」「第1章セクション」「復習対象問題」）
-  previousAccuracy: number // 学習前の正解率（復習課題全体）
-  currentAccuracy: number // 学習後の正解率（今回の学習結果）
+  previousAccuracy: number // 学習前の正解率（直近3回の重み付け平均、今回を除く）
+  currentAccuracy: number // 学習後の正解率（直近3回の重み付け平均、今回を含む）
   accuracyChange: number // 正解率の変化（+ or -）
   targetAccuracy: number // 目標正解率（80%）
   canEstimate: boolean // 推定可能かどうか
@@ -132,31 +154,35 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
     }
   }
 
-  // 学習前の正解率を計算（previousResultから）
-  const problemsWithPrevious = results.filter(r => r.previousResult !== null)
-  let previousAccuracy = 0
+  // 各問題の履歴を取得して、学習前後の正解率を計算
+  const problemHistories = await Promise.all(
+    problemIds.map(async (problemId) => {
+      const records = await getStudyRecords(problemId)
+      return {
+        problemId,
+        records: records.map(r => r.result),
+      }
+    })
+  )
 
-  if (problemsWithPrevious.length > 0) {
-    const previousCorrectCount = problemsWithPrevious.filter(
-      r => r.previousResult === 'correct'
-    ).length
-    const previousPartialCount = problemsWithPrevious.filter(
-      r => r.previousResult === 'partial'
-    ).length
-    // 部分正解を0.5点として計算（統一）
-    previousAccuracy = Math.round(
-      ((previousCorrectCount + previousPartialCount * 0.5) / problemsWithPrevious.length) * 100
-    )
-  }
+  // 学習前の正解率（直近3回の重み付け平均、今回を除く）
+  const previousAccuracies = problemHistories.map(({ records }) => {
+    // 今回の学習を除いた履歴（最新1件を除く）
+    const previousRecords = records.slice(1, 4)
+    return calculateWeightedAverage(previousRecords)
+  })
+  const previousAccuracy = previousAccuracies.length > 0
+    ? Math.round(previousAccuracies.reduce((sum, acc) => sum + acc, 0) / previousAccuracies.length)
+    : 0
 
-  // 今回の学習後の正解率を計算
-  const correctCount = results.filter(r => r.result === 'correct').length
-  const partialCount = results.filter(r => r.result === 'partial').length
-  const totalProblems = results.length
-
-  // 正解を1点、部分正解を0.5点として計算（統一）
-  const currentAccuracy = totalProblems > 0
-    ? Math.round(((correctCount + partialCount * 0.5) / totalProblems) * 100)
+  // 学習後の正解率（直近3回の重み付け平均、今回を含む）
+  const currentAccuracies = problemHistories.map(({ records }) => {
+    // 直近3回の履歴（今回を含む）
+    const recentRecords = records.slice(0, 3)
+    return calculateWeightedAverage(recentRecords)
+  })
+  const currentAccuracy = currentAccuracies.length > 0
+    ? Math.round(currentAccuracies.reduce((sum, acc) => sum + acc, 0) / currentAccuracies.length)
     : 0
 
   // 正解率の変化
