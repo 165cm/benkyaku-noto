@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown, Minus, Info } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getWeakModeSession, clearWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
@@ -238,16 +238,23 @@ export default function WeakModeReport() {
           ) : (
             <div className="space-y-3">
               <div className="text-center mb-3">
-                <p className="text-sm text-gray-600 mb-2" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">{stats.studyTimeEstimate.scopeLabel}の正解率</p>
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <p className="text-sm text-gray-600">{stats.studyTimeEstimate.scopeLabel}の正解率</p>
+                  <Info
+                    size={14}
+                    className="text-gray-400 cursor-help"
+                    title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
+                  />
+                </div>
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-1" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">学習前</p>
-                    <p className="text-2xl font-bold text-gray-600" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">{stats.studyTimeEstimate.previousAccuracy}%</p>
+                    <p className="text-xs text-gray-500 mb-1">学習前</p>
+                    <p className="text-2xl font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</p>
                   </div>
                   <div className="text-2xl text-gray-400">→</div>
                   <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-1" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">学習後</p>
-                    <p className="text-2xl font-bold text-blue-600" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">{stats.studyTimeEstimate.currentAccuracy}%</p>
+                    <p className="text-xs text-gray-500 mb-1">学習後</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</p>
                   </div>
                   {stats.studyTimeEstimate.accuracyChange !== 0 && (
                     <div className="text-center">

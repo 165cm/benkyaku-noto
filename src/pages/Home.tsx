@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles } from 'lucide-react'
+import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles, Info } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
@@ -124,8 +124,15 @@ export default function Home() {
               <Calendar className="text-blue-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-600" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">今日の学習時間</p>
-              <p className="text-2xl font-bold" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-gray-600">今日の学習時間</p>
+                <Info
+                  size={14}
+                  className="text-gray-400 cursor-help"
+                  title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）"
+                />
+              </div>
+              <p className="text-2xl font-bold">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
               </p>
             </div>
@@ -150,8 +157,15 @@ export default function Home() {
               <TrendingUp className="text-purple-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-600" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">正答率</p>
-              <p className="text-2xl font-bold" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-gray-600">正答率</p>
+                <Info
+                  size={14}
+                  className="text-gray-400 cursor-help"
+                  title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
+                />
+              </div>
+              <p className="text-2xl font-bold">
                 {stats ? stats.correctRate : 0}%
               </p>
             </div>
