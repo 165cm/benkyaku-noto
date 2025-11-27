@@ -126,11 +126,9 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-1">
                 <p className="text-sm text-gray-600">今日の学習時間</p>
-                <Info
-                  size={14}
-                  className="text-gray-400 cursor-help"
-                  title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）"
-                />
+                <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
+                  <Info size={14} className="text-gray-400" />
+                </span>
               </div>
               <p className="text-2xl font-bold">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
@@ -159,11 +157,9 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-1">
                 <p className="text-sm text-gray-600">正答率</p>
-                <Info
-                  size={14}
-                  className="text-gray-400 cursor-help"
-                  title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                />
+                <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
+                  <Info size={14} className="text-gray-400" />
+                </span>
               </div>
               <p className="text-2xl font-bold">
                 {stats ? stats.correctRate : 0}%

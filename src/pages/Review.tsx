@@ -109,19 +109,15 @@ export default function Review() {
                     </span>
                     <span className="flex items-center gap-1">
                       平均正答率: {Math.round(review.averageScore)}%
-                      <Info
-                        size={12}
-                        className="text-gray-400 cursor-help"
-                        title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                      />
+                      <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
+                        <Info size={12} className="text-gray-400" />
+                      </span>
                     </span>
                     <span className="flex items-center gap-1">
                       最終学習: {daysSince}日前
-                      <Info
-                        size={12}
-                        className="text-gray-400 cursor-help"
-                        title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）"
-                      />
+                      <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
+                        <Info size={12} className="text-gray-400" />
+                      </span>
                     </span>
                   </div>
                 </div>

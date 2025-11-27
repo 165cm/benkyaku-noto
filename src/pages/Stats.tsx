@@ -78,11 +78,9 @@ export default function Stats() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-sm text-gray-600">今日の学習時間</p>
-                <Info
-                  size={14}
-                  className="text-gray-400 cursor-help"
-                  title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）"
-                />
+                <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
+                  <Info size={14} className="text-gray-400" />
+                </span>
               </div>
               <p className="text-2xl font-bold">
                 {formatTime(stats.todayStudyTime)}
@@ -99,11 +97,9 @@ export default function Stats() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-sm text-gray-600">今週の学習時間</p>
-                <Info
-                  size={14}
-                  className="text-gray-400 cursor-help"
-                  title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）"
-                />
+                <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
+                  <Info size={14} className="text-gray-400" />
+                </span>
               </div>
               <p className="text-2xl font-bold">
                 {formatTime(stats.weekStudyTime)}
@@ -134,11 +130,9 @@ export default function Stats() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-sm text-gray-600">正答率</p>
-                <Info
-                  size={14}
-                  className="text-gray-400 cursor-help"
-                  title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                />
+                <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
+                  <Info size={14} className="text-gray-400" />
+                </span>
               </div>
               <p className="text-2xl font-bold">{stats.correctRate}%</p>
             </div>
@@ -187,11 +181,9 @@ export default function Stats() {
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-lg font-semibold">週間正答率</h2>
-            <Info
-              size={16}
-              className="text-gray-400 cursor-help"
-              title="日別の正答率（日付は夜中の3時で更新）"
-            />
+            <span title="日別の正答率（日付は夜中の3時で更新）" className="inline-flex cursor-help">
+              <Info size={16} className="text-gray-400" />
+            </span>
           </div>
           <div className="space-y-3">
             {stats.weeklyData.map((day) => {

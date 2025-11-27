@@ -240,11 +240,9 @@ export default function WeakModeReport() {
               <div className="text-center mb-3">
                 <div className="flex items-center justify-center gap-1 mb-2">
                   <p className="text-sm text-gray-600">{stats.studyTimeEstimate.scopeLabel}の正解率</p>
-                  <Info
-                    size={14}
-                    className="text-gray-400 cursor-help"
-                    title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                  />
+                  <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
+                    <Info size={14} className="text-gray-400" />
+                  </span>
                 </div>
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <div className="text-center">
