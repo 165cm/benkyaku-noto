@@ -49,6 +49,9 @@ export default function Study() {
   const [editTime, setEditTime] = useState('')
   const [editMemo, setEditMemo] = useState('')
 
+  // 回答処理中フラグ（二重クリック防止）
+  const [isProcessing, setIsProcessing] = useState(false)
+
   useEffect(() => {
     if (id) {
       // 古いセッションをクリア（6時間以上前のセッション）
@@ -250,9 +253,11 @@ export default function Study() {
   }
 
   const handleRecord = async (result: StudyResult) => {
-    if (!problem) return
+    if (!problem || isProcessing) return
 
-    const studyTime = elapsedTime
+    setIsProcessing(true)
+    try {
+      const studyTime = elapsedTime
 
     // 苦手克服モードの場合、前回の結果と回答数を取得
     let previousResult: StudyResult | null = null
@@ -394,6 +399,9 @@ export default function Study() {
 
     // 未学習問題がない場合は問題集詳細ページに戻る
     navigate(`/workbooks/${problem.workbookId}`)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -543,6 +551,7 @@ export default function Study() {
             variant="success"
             size="lg"
             onClick={() => handleRecord('correct')}
+            disabled={isProcessing}
             className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
           >
             <Circle size={28} className="sm:w-10 sm:h-10" />
@@ -552,6 +561,7 @@ export default function Study() {
             variant="error"
             size="lg"
             onClick={() => handleRecord('incorrect')}
+            disabled={isProcessing}
             className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
           >
             <X size={28} className="sm:w-10 sm:h-10" />
@@ -564,6 +574,7 @@ export default function Study() {
             variant="warning"
             size="lg"
             onClick={() => handleRecord('partial')}
+            disabled={isProcessing}
             className="flex items-center gap-2 h-12 sm:h-14 px-6"
           >
             <Triangle size={18} className="sm:w-5 sm:h-5" />
