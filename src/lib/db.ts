@@ -243,25 +243,6 @@ export async function getStudyRecords(problemId: string) {
     .sortBy('studiedAt')
 }
 
-// 問題の正答率を計算
-export async function calculateAccuracyForProblem(problemId: string): Promise<number | null> {
-  const records = await db.studyRecords
-    .where('problemId')
-    .equals(problemId)
-    .toArray()
-
-  if (records.length === 0) return null
-
-  const correctCount = records.filter(r => r.result === 'correct').length
-  const partialCount = records.filter(r => r.result === 'partial').length
-
-  // 正解を1点、部分正解を0.5点として計算
-  const totalScore = correctCount + (partialCount * 0.5)
-  const accuracy = (totalScore / records.length) * 100
-
-  return Math.round(accuracy)
-}
-
 export async function deleteWorkbook(id: string) {
   // 問題集に紐づく問題と学習記録も削除
   const problems = await db.problems.where('workbookId').equals(id).toArray()

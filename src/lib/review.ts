@@ -1,6 +1,7 @@
 import { db } from './db'
 import { getExcludedCategories, getExcludedSections } from './storage'
 import { getTodayStartTime, getStudyDate, getStudyDaysDiff } from './dateUtils'
+import { calculateWeightedAverage } from './weakModeSession'
 import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
 
 // 問題のセクションキーを取得
@@ -50,16 +51,21 @@ export function isProblemExcluded(problem: Problem): boolean {
   return false
 }
 
-// 正答率の計算
+// 正答率の計算（直近3回の重み付け平均）
 export function calculateAverageScore(records: StudyRecord[]): number {
   if (records.length === 0) return 0
 
-  const totalScore = records.reduce((sum, record) => {
-    const score = record.result === 'correct' ? 100 : record.result === 'partial' ? 50 : 0
-    return sum + score
-  }, 0)
+  // 最新順にソート
+  const sortedRecords = [...records].sort((a, b) =>
+    b.studiedAt.getTime() - a.studiedAt.getTime()
+  )
 
-  return totalScore / records.length
+  // 直近3回の結果を取得
+  const recent3 = sortedRecords.slice(0, 3)
+  const results = recent3.map(r => r.result)
+
+  // calculateWeightedAverageを使用（0-100の範囲で返される）
+  return calculateWeightedAverage(results)
 }
 
 // 経過日数係数の計算（忘却曲線に基づく）
@@ -270,29 +276,10 @@ export async function calculateRecentAccuracyForProblems(problems: Problem[]): P
       .sortBy('studiedAt')
 
     if (records.length > 0) {
-      // 最新3回の記録を取得
+      // 最新3回の記録を取得してcalculateWeightedAverageを使用
       const recent3 = records.slice(0, 3)
-
-      // スコア化
-      const scores = recent3.map(record =>
-        record.result === 'correct' ? 100
-        : record.result === 'partial' ? 50
-        : 0
-      )
-
-      // 重み付け平均を計算
-      // 最新: 50%, 1つ前: 30%, 2つ前: 20%
-      let weightedScore: number
-      if (scores.length === 1) {
-        weightedScore = scores[0]
-      } else if (scores.length === 2) {
-        // 2回の場合: 最新62.5%, 1つ前37.5%（比率を維持）
-        weightedScore = scores[0] * 0.625 + scores[1] * 0.375
-      } else {
-        // 3回以上: 最新50%, 1つ前30%, 2つ前20%
-        weightedScore = scores[0] * 0.5 + scores[1] * 0.3 + scores[2] * 0.2
-      }
-
+      const results = recent3.map(r => r.result)
+      const weightedScore = calculateWeightedAverage(results)
       recentScores.push(weightedScore)
     }
   }

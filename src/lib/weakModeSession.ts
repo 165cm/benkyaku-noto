@@ -81,7 +81,7 @@ export function addWeakModeResult(
 
 // 直近N回の重み付け平均を計算
 // 最新50%、1つ前30%、2つ前20%の重みで計算
-function calculateWeightedAverage(results: StudyResult[]): number {
+export function calculateWeightedAverage(results: StudyResult[]): number {
   if (results.length === 0) return 0
 
   const weights = [0.5, 0.3, 0.2] // 最新から順に
