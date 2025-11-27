@@ -1,5 +1,6 @@
 import type { StudyResult } from '@/types'
 import { getProblem } from './db'
+import { isSameStudyDay } from './dateUtils'
 
 export interface WeakModeResult {
   problemId: string
@@ -40,6 +41,14 @@ export function getWeakModeSession(): WeakModeSession | null {
 
   const session = JSON.parse(data)
   session.startTime = new Date(session.startTime)
+
+  // 日付境界（3時基準）を超えていたらセッションをクリア
+  const now = new Date()
+  if (!isSameStudyDay(session.startTime, now)) {
+    clearWeakModeSession()
+    return null
+  }
+
   return session
 }
 
