@@ -87,7 +87,7 @@ export async function syncProblemToFirestore(userId: string, problem: Problem) {
   const firestoreProblem: FirestoreProblem = {
     ...problem,
     createdAt: dateToTimestamp(problem.createdAt),
-    deletedAt: problem.deletedAt ? dateToTimestamp(problem.deletedAt) : undefined
+    ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
   }
 
   await setDoc(problemRef, firestoreProblem, { merge: true })
@@ -216,7 +216,7 @@ export async function backupAllDataToFirestore(
     const firestoreProblem: FirestoreProblem = {
       ...problem,
       createdAt: dateToTimestamp(problem.createdAt),
-      deletedAt: problem.deletedAt ? dateToTimestamp(problem.deletedAt) : undefined
+      ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
     }
     batch.set(ref, firestoreProblem)
   })
