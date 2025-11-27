@@ -15,12 +15,21 @@ interface ProblemDetail {
   timeSpent: number
 }
 
+interface SectionGroup {
+  sectionKey: string
+  sectionTitle: string
+  category: string
+  problems: ProblemDetail[]
+  correctCount: number
+  totalCount: number
+}
+
 export default function WeakModeReport() {
   const navigate = useNavigate()
   const [problemDetails, setProblemDetails] = useState<ProblemDetail[]>([])
   const [stats, setStats] = useState<Awaited<ReturnType<typeof calculateWeakModeStats>> | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showDetails, setShowDetails] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadReportData()
@@ -121,6 +130,46 @@ export default function WeakModeReport() {
     }
   }
 
+  // 問題をセクションごとにグループ化
+  const groupBySection = (details: ProblemDetail[]): SectionGroup[] => {
+    const groups = new Map<string, SectionGroup>()
+
+    for (const detail of details) {
+      const sectionKey = detail.problem.sectionTitle || 'その他'
+      const category = detail.problem.category || ''
+
+      if (!groups.has(sectionKey)) {
+        groups.set(sectionKey, {
+          sectionKey,
+          sectionTitle: sectionKey,
+          category,
+          problems: [],
+          correctCount: 0,
+          totalCount: 0,
+        })
+      }
+
+      const group = groups.get(sectionKey)!
+      group.problems.push(detail)
+      group.totalCount++
+      if (detail.currentResult === 'correct') {
+        group.correctCount++
+      }
+    }
+
+    return Array.from(groups.values())
+  }
+
+  const toggleSection = (sectionKey: string) => {
+    const newExpanded = new Set(expandedSections)
+    if (newExpanded.has(sectionKey)) {
+      newExpanded.delete(sectionKey)
+    } else {
+      newExpanded.add(sectionKey)
+    }
+    setExpandedSections(newExpanded)
+  }
+
   if (loading) {
     return <div>読み込み中...</div>
   }
@@ -173,7 +222,7 @@ export default function WeakModeReport() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={18} className="text-green-600" />
-                  <span className="text-sm font-medium">ホーム画面の正解率</span>
+                  <span className="text-sm font-medium">復習対象全体の正解率</span>
                   <span title="直近3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="cursor-help">
                     <Info size={12} className="text-gray-400" />
                   </span>
@@ -226,23 +275,17 @@ export default function WeakModeReport() {
         </div>
       )}
 
-      {/* 問題別詳細（アコーディオン） */}
-      <Card className="mb-4">
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
-        >
-          <div className="flex items-center gap-2">
+      {/* 問題別詳細 */}
+      {problemDetails.length <= 10 ? (
+        // 10問以下：全て表示（アコーディオンなし）
+        <Card className="mb-4">
+          <div className="p-2 mb-2">
             <span className="font-medium text-sm">問題別の結果</span>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 ml-2">
               {stats.totalProblems}問中{stats.correctCount}問正解（正解率{stats.accuracy}%）
             </span>
           </div>
-          {showDetails ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </button>
-
-        {showDetails && (
-          <div className="border-t mt-2 pt-2 space-y-1">
+          <div className="border-t pt-2 space-y-1">
             {problemDetails.map((detail, index) => (
               <div
                 key={detail.problem.id}
@@ -261,8 +304,59 @@ export default function WeakModeReport() {
               </div>
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        // 10問超え：セクション別にアコーディオン表示
+        <div className="space-y-2 mb-4">
+          <div className="px-2 mb-2">
+            <span className="font-medium text-sm">問題別の結果</span>
+            <span className="text-xs text-gray-500 ml-2">
+              {stats.totalProblems}問中{stats.correctCount}問正解（正解率{stats.accuracy}%）
+            </span>
+          </div>
+          {groupBySection(problemDetails).map((section) => {
+            const accuracy = Math.round((section.correctCount / section.totalCount) * 100)
+            return (
+              <Card key={section.sectionKey}>
+                <button
+                  onClick={() => toggleSection(section.sectionKey)}
+                  className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="font-medium text-sm truncate">{section.sectionTitle}</span>
+                    <span className="text-xs text-gray-500">
+                      {section.totalCount}問中{section.correctCount}問正解 · {accuracy}%
+                    </span>
+                  </div>
+                  {expandedSections.has(section.sectionKey) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </button>
+
+                {expandedSections.has(section.sectionKey) && (
+                  <div className="border-t mt-2 pt-2 space-y-1">
+                    {section.problems.map((detail) => (
+                      <div
+                        key={detail.problem.id}
+                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{getProblemDisplayTitle(detail.problem)}</span>
+                          <span className="text-xs text-gray-500 ml-2">{formatTime(detail.timeSpent)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {detail.previousResult ? getResultIcon(detail.previousResult) : <span className="text-gray-400 text-xs">初</span>}
+                          <span className="text-gray-400 text-xs">→</span>
+                          {getResultIcon(detail.currentResult)}
+                          {getChangeIcon(detail.previousResult, detail.currentResult)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       {/* ホームに戻るボタン */}
       <div className="text-center">

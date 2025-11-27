@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles, Info } from 'lucide-react'
+import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles, Info, FileText } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
 import { getWorkbooks, getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
+import { getWeakModeSession } from '@/lib/weakModeSession'
 import type { StudyStats, ReviewSchedule, Workbook } from '@/types'
 
 export default function Home() {
@@ -19,6 +20,7 @@ export default function Home() {
   const [weakSections, setWeakSections] = useState<SectionStats[]>([])
   const [startingReview, setStartingReview] = useState(false)
   const [explanationCount, setExplanationCount] = useState(0)
+  const [hasTodayReport, setHasTodayReport] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -34,6 +36,10 @@ export default function Home() {
       calculateSectionStats(),
       getExplanations(),
     ])
+
+    // 今日のレポートがあるかチェック
+    const session = getWeakModeSession()
+    setHasTodayReport(session !== null && session.results.length > 0)
 
     setStats(statsData)
     setReviewList(reviewData.slice(0, 5)) // 上位5件
@@ -168,6 +174,30 @@ export default function Home() {
           </div>
         </Card>
       </div>
+
+      {/* 今日のレポート */}
+      {hasTodayReport && (
+        <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white rounded-lg shadow-sm">
+                <FileText className="text-blue-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">本日の苦手克服レポート</h3>
+                <p className="text-sm text-gray-600">今日の学習成果を確認しましょう</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate('/weak-mode-report')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <FileText size={18} className="mr-2" />
+              レポートを見る
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* 学習モード選択（タブ式） */}
       <Card className="mb-8">
