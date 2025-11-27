@@ -1,6 +1,7 @@
 import type { StudyResult } from '@/types'
 import { getProblem, getStudyRecords } from './db'
 import { isSameStudyDay } from './dateUtils'
+import { getTodayReviewList } from './review'
 
 export interface WeakModeResult {
   problemId: string
@@ -112,6 +113,13 @@ export interface StudyTimeEstimate {
   estimatedSessionsMax: number | null // 推定回数（上限）
   totalSessionCount: number // これまでの累計学習回数（常に1以上）
   message: string // ユーザー向けメッセージ
+  // 復習対象全体の統計
+  overallStats?: {
+    previousAccuracy: number // 復習対象全体の学習前の正解率
+    currentAccuracy: number // 復習対象全体の学習後の正解率
+    accuracyChange: number // 復習対象全体の正解率の変化
+    totalProblemsCount: number // 復習対象全体の問題数
+  }
 }
 
 async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<StudyTimeEstimate> {
@@ -257,6 +265,62 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
     }
   }
 
+  // 復習対象全体の正解率変化を計算
+  let overallStats: StudyTimeEstimate['overallStats'] = undefined
+  try {
+    const reviewList = await getTodayReviewList()
+    if (reviewList.length > 0) {
+      // 復習対象全体の問題を取得
+      const overallProblems = await Promise.all(
+        reviewList.map(r => getProblem(r.problemId))
+      )
+      const validOverallProblems = overallProblems.filter(p => p !== undefined)
+
+      if (validOverallProblems.length > 0) {
+        // 今回のセッションで解いた問題とそれ以外で分けて計算
+        const sessionProblemIds = new Set(problemIds)
+        const overallPreviousAccuracies: number[] = []
+        const overallCurrentAccuracies: number[] = []
+
+        for (const problem of validOverallProblems) {
+          const records = await getStudyRecords(problem.id)
+          const resultsList = records.map(r => r.result)
+
+          if (sessionProblemIds.has(problem.id)) {
+            // 今回のセッションで解いた問題：学習前は最新を除く
+            const previousRecords = resultsList.slice(1, 4)
+            const currentRecords = resultsList.slice(0, 3)
+            overallPreviousAccuracies.push(calculateWeightedAverage(previousRecords))
+            overallCurrentAccuracies.push(calculateWeightedAverage(currentRecords))
+          } else {
+            // 今回のセッションで解いていない問題：学習前後で同じ
+            const recentRecords = resultsList.slice(0, 3)
+            const accuracy = calculateWeightedAverage(recentRecords)
+            overallPreviousAccuracies.push(accuracy)
+            overallCurrentAccuracies.push(accuracy)
+          }
+        }
+
+        const overallPreviousAccuracyValue = overallPreviousAccuracies.length > 0
+          ? Math.round(overallPreviousAccuracies.reduce((sum, acc) => sum + acc, 0) / overallPreviousAccuracies.length)
+          : 0
+        const overallCurrentAccuracyValue = overallCurrentAccuracies.length > 0
+          ? Math.round(overallCurrentAccuracies.reduce((sum, acc) => sum + acc, 0) / overallCurrentAccuracies.length)
+          : 0
+
+        overallStats = {
+          previousAccuracy: overallPreviousAccuracyValue,
+          currentAccuracy: overallCurrentAccuracyValue,
+          accuracyChange: overallCurrentAccuracyValue - overallPreviousAccuracyValue,
+          totalProblemsCount: validOverallProblems.length,
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to calculate overall stats:', error)
+    // エラーが発生しても続行（overallStatsはundefinedのまま）
+  }
+
   // メッセージ生成
   let message = ''
   const canEstimate = estimatedSessionsMin !== null || estimatedSessionsMax !== null
@@ -280,6 +344,7 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
     estimatedSessionsMax,
     totalSessionCount,
     message,
+    overallStats,
   }
 }
 
