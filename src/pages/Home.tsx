@@ -124,8 +124,8 @@ export default function Home() {
               <Calendar className="text-blue-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-600">今日の学習時間</p>
-              <p className="text-2xl font-bold">
+              <p className="text-sm text-gray-600" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">今日の学習時間</p>
+              <p className="text-2xl font-bold" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
               </p>
             </div>
