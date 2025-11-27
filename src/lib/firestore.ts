@@ -62,11 +62,11 @@ function removeUndefined<T extends Record<string, any>>(obj: T): T {
 export async function syncWorkbookToFirestore(userId: string, workbook: Workbook) {
   const workbookRef = doc(firestore, `${getUserPath(userId)}/workbooks/${workbook.id}`)
 
-  const firestoreWorkbook: FirestoreWorkbook = {
+  const firestoreWorkbook = removeUndefined({
     ...workbook,
     createdAt: dateToTimestamp(workbook.createdAt),
     updatedAt: dateToTimestamp(workbook.updatedAt)
-  }
+  }) as FirestoreWorkbook
 
   await setDoc(workbookRef, firestoreWorkbook, { merge: true })
 }
@@ -134,10 +134,10 @@ export async function deleteProblemFromFirestore(userId: string, problemId: stri
 export async function syncStudyRecordToFirestore(userId: string, record: StudyRecord) {
   const recordRef = doc(firestore, `${getUserPath(userId)}/studyRecords/${record.id}`)
 
-  const firestoreRecord: FirestoreStudyRecord = {
+  const firestoreRecord = removeUndefined({
     ...record,
     studiedAt: dateToTimestamp(record.studiedAt)
-  }
+  }) as FirestoreStudyRecord
 
   await setDoc(recordRef, firestoreRecord, { merge: true })
 }
@@ -171,10 +171,10 @@ export async function deleteStudyRecordFromFirestore(userId: string, recordId: s
 export async function syncExplanationToFirestore(userId: string, explanation: Explanation) {
   const explanationRef = doc(firestore, `${getUserPath(userId)}/explanations/${explanation.id}`)
 
-  const firestoreExplanation: FirestoreExplanation = {
+  const firestoreExplanation = removeUndefined({
     ...explanation,
     createdAt: dateToTimestamp(explanation.createdAt)
-  }
+  }) as FirestoreExplanation
 
   await setDoc(explanationRef, firestoreExplanation, { merge: true })
 }
@@ -213,11 +213,11 @@ export async function backupAllDataToFirestore(
   // Workbooks
   data.workbooks.forEach((workbook) => {
     const ref = doc(firestore, `${getUserPath(userId)}/workbooks/${workbook.id}`)
-    const firestoreWorkbook: FirestoreWorkbook = {
+    const firestoreWorkbook = removeUndefined({
       ...workbook,
       createdAt: dateToTimestamp(workbook.createdAt),
       updatedAt: dateToTimestamp(workbook.updatedAt)
-    }
+    }) as FirestoreWorkbook
     batch.set(ref, firestoreWorkbook)
   })
 
@@ -242,10 +242,10 @@ export async function backupAllDataToFirestore(
   if (recordBatches.length > 0) {
     recordBatches[0].forEach((record) => {
       const ref = doc(firestore, `${getUserPath(userId)}/studyRecords/${record.id}`)
-      const firestoreRecord: FirestoreStudyRecord = {
+      const firestoreRecord = removeUndefined({
         ...record,
         studiedAt: dateToTimestamp(record.studiedAt)
-      }
+      }) as FirestoreStudyRecord
       batch.set(ref, firestoreRecord)
     })
   }
@@ -253,10 +253,10 @@ export async function backupAllDataToFirestore(
   // Explanations
   data.explanations.forEach((explanation) => {
     const ref = doc(firestore, `${getUserPath(userId)}/explanations/${explanation.id}`)
-    const firestoreExplanation: FirestoreExplanation = {
+    const firestoreExplanation = removeUndefined({
       ...explanation,
       createdAt: dateToTimestamp(explanation.createdAt)
-    }
+    }) as FirestoreExplanation
     batch.set(ref, firestoreExplanation)
   })
 
@@ -268,10 +268,10 @@ export async function backupAllDataToFirestore(
     const additionalBatch = writeBatch(firestore)
     recordBatches[i].forEach((record) => {
       const ref = doc(firestore, `${getUserPath(userId)}/studyRecords/${record.id}`)
-      const firestoreRecord: FirestoreStudyRecord = {
+      const firestoreRecord = removeUndefined({
         ...record,
         studiedAt: dateToTimestamp(record.studiedAt)
-      }
+      }) as FirestoreStudyRecord
       additionalBatch.set(ref, firestoreRecord)
     })
     await additionalBatch.commit()
