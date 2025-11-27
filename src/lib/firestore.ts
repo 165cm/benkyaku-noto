@@ -46,6 +46,17 @@ function timestampToDate(timestamp: Timestamp): Date {
   return timestamp.toDate()
 }
 
+// undefined値を削除するヘルパー（Firestoreはundefinedを許可しない）
+function removeUndefined<T extends Record<string, any>>(obj: T): T {
+  const result = { ...obj }
+  Object.keys(result).forEach(key => {
+    if (result[key] === undefined) {
+      delete result[key]
+    }
+  })
+  return result
+}
+
 // ================== Workbooks ==================
 
 export async function syncWorkbookToFirestore(userId: string, workbook: Workbook) {
@@ -84,11 +95,11 @@ export async function deleteWorkbookFromFirestore(userId: string, workbookId: st
 export async function syncProblemToFirestore(userId: string, problem: Problem) {
   const problemRef = doc(firestore, `${getUserPath(userId)}/problems/${problem.id}`)
 
-  const firestoreProblem = {
+  const firestoreProblem = removeUndefined({
     ...problem,
     createdAt: dateToTimestamp(problem.createdAt),
     ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
-  } as FirestoreProblem
+  }) as FirestoreProblem
 
   await setDoc(problemRef, firestoreProblem, { merge: true })
 }
@@ -213,11 +224,11 @@ export async function backupAllDataToFirestore(
   // Problems
   data.problems.forEach((problem) => {
     const ref = doc(firestore, `${getUserPath(userId)}/problems/${problem.id}`)
-    const firestoreProblem = {
+    const firestoreProblem = removeUndefined({
       ...problem,
       createdAt: dateToTimestamp(problem.createdAt),
       ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
-    } as FirestoreProblem
+    }) as FirestoreProblem
     batch.set(ref, firestoreProblem)
   })
 
