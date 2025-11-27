@@ -1,7 +1,6 @@
 import type { StudyResult } from '@/types'
-import { getProblem, getStudyRecords } from './db'
+import { getProblem, getStudyRecords, db } from './db'
 import { isSameStudyDay } from './dateUtils'
-import { getTodayReviewList } from './review'
 
 export interface WeakModeResult {
   problemId: string
@@ -265,55 +264,51 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
     }
   }
 
-  // 復習対象全体の正解率変化を計算
+  // 復習対象全体の正解率変化を計算（ホーム画面と同じ対象）
   let overallStats: StudyTimeEstimate['overallStats'] = undefined
   try {
-    const reviewList = await getTodayReviewList()
-    if (reviewList.length > 0) {
-      // 復習対象全体の問題を取得
-      const overallProblems = await Promise.all(
-        reviewList.map(r => getProblem(r.problemId))
-      )
-      const validOverallProblems = overallProblems.filter(p => p !== undefined)
+    // 学習記録があるすべての問題を取得（ホーム画面と同じ）
+    const allRecords = await db.studyRecords.toArray()
+    const allProblemIds = new Set(allRecords.map(r => r.problemId))
+    const overallProblems = await db.problems.where('id').anyOf([...allProblemIds]).toArray()
 
-      if (validOverallProblems.length > 0) {
-        // 今回のセッションで解いた問題とそれ以外で分けて計算
-        const sessionProblemIds = new Set(problemIds)
-        const overallPreviousAccuracies: number[] = []
-        const overallCurrentAccuracies: number[] = []
+    if (overallProblems.length > 0) {
+      // 今回のセッションで解いた問題とそれ以外で分けて計算
+      const sessionProblemIds = new Set(problemIds)
+      const overallPreviousAccuracies: number[] = []
+      const overallCurrentAccuracies: number[] = []
 
-        for (const problem of validOverallProblems) {
-          const records = await getStudyRecords(problem.id)
-          const resultsList = records.map(r => r.result)
+      for (const problem of overallProblems) {
+        const records = await getStudyRecords(problem.id)
+        const resultsList = records.map(r => r.result)
 
-          if (sessionProblemIds.has(problem.id)) {
-            // 今回のセッションで解いた問題：学習前は最新を除く
-            const previousRecords = resultsList.slice(1, 4)
-            const currentRecords = resultsList.slice(0, 3)
-            overallPreviousAccuracies.push(calculateWeightedAverage(previousRecords))
-            overallCurrentAccuracies.push(calculateWeightedAverage(currentRecords))
-          } else {
-            // 今回のセッションで解いていない問題：学習前後で同じ
-            const recentRecords = resultsList.slice(0, 3)
-            const accuracy = calculateWeightedAverage(recentRecords)
-            overallPreviousAccuracies.push(accuracy)
-            overallCurrentAccuracies.push(accuracy)
-          }
+        if (sessionProblemIds.has(problem.id)) {
+          // 今回のセッションで解いた問題：学習前は最新を除く
+          const previousRecords = resultsList.slice(1, 4)
+          const currentRecords = resultsList.slice(0, 3)
+          overallPreviousAccuracies.push(calculateWeightedAverage(previousRecords))
+          overallCurrentAccuracies.push(calculateWeightedAverage(currentRecords))
+        } else {
+          // 今回のセッションで解いていない問題：学習前後で同じ
+          const recentRecords = resultsList.slice(0, 3)
+          const accuracy = calculateWeightedAverage(recentRecords)
+          overallPreviousAccuracies.push(accuracy)
+          overallCurrentAccuracies.push(accuracy)
         }
+      }
 
-        const overallPreviousAccuracyValue = overallPreviousAccuracies.length > 0
-          ? Math.round(overallPreviousAccuracies.reduce((sum, acc) => sum + acc, 0) / overallPreviousAccuracies.length)
-          : 0
-        const overallCurrentAccuracyValue = overallCurrentAccuracies.length > 0
-          ? Math.round(overallCurrentAccuracies.reduce((sum, acc) => sum + acc, 0) / overallCurrentAccuracies.length)
-          : 0
+      const overallPreviousAccuracyValue = overallPreviousAccuracies.length > 0
+        ? Math.round(overallPreviousAccuracies.reduce((sum, acc) => sum + acc, 0) / overallPreviousAccuracies.length)
+        : 0
+      const overallCurrentAccuracyValue = overallCurrentAccuracies.length > 0
+        ? Math.round(overallCurrentAccuracies.reduce((sum, acc) => sum + acc, 0) / overallCurrentAccuracies.length)
+        : 0
 
-        overallStats = {
-          previousAccuracy: overallPreviousAccuracyValue,
-          currentAccuracy: overallCurrentAccuracyValue,
-          accuracyChange: overallCurrentAccuracyValue - overallPreviousAccuracyValue,
-          totalProblemsCount: validOverallProblems.length,
-        }
+      overallStats = {
+        previousAccuracy: overallPreviousAccuracyValue,
+        currentAccuracy: overallCurrentAccuracyValue,
+        accuracyChange: overallCurrentAccuracyValue - overallPreviousAccuracyValue,
+        totalProblemsCount: overallProblems.length,
       }
     }
   } catch (error) {
