@@ -1,5 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { storage } from './firebase'
+import { storage, auth } from './firebase'
+import { syncUserSettingsToFirestore } from './firestore'
 
 // ローカルストレージキー
 const STORAGE_KEYS = {
@@ -9,8 +10,23 @@ const STORAGE_KEYS = {
 } as const
 
 // 除外カテゴリの保存
-export function saveExcludedCategories(categories: string[]): void {
+export async function saveExcludedCategories(categories: string[]): Promise<void> {
   localStorage.setItem(STORAGE_KEYS.EXCLUDED_CATEGORIES, JSON.stringify(categories))
+
+  // Firestoreに自動同期（ログイン中の場合）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      const excludedSections = getExcludedSections()
+      await syncUserSettingsToFirestore(user.uid, {
+        excludedCategories: categories,
+        excludedSections
+      })
+      console.log('除外カテゴリをクラウドに同期しました')
+    } catch (error) {
+      console.error('除外カテゴリの同期に失敗しました', error)
+    }
+  }
 }
 
 // 除外カテゴリの取得
@@ -20,8 +36,23 @@ export function getExcludedCategories(): string[] {
 }
 
 // 除外セクションの保存（カテゴリ-タイトル形式）
-export function saveExcludedSections(sections: string[]): void {
+export async function saveExcludedSections(sections: string[]): Promise<void> {
   localStorage.setItem(STORAGE_KEYS.EXCLUDED_SECTIONS, JSON.stringify(sections))
+
+  // Firestoreに自動同期（ログイン中の場合）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      const excludedCategories = getExcludedCategories()
+      await syncUserSettingsToFirestore(user.uid, {
+        excludedCategories,
+        excludedSections: sections
+      })
+      console.log('除外セクションをクラウドに同期しました')
+    } catch (error) {
+      console.error('除外セクションの同期に失敗しました', error)
+    }
+  }
 }
 
 // 除外セクションの取得

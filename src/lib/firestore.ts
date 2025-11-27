@@ -197,6 +197,38 @@ export async function deleteExplanationFromFirestore(userId: string, explanation
   await deleteDoc(explanationRef)
 }
 
+// ================== User Settings ==================
+
+export interface UserSettings {
+  excludedCategories: string[]
+  excludedSections: string[]
+}
+
+export async function syncUserSettingsToFirestore(userId: string, settings: UserSettings) {
+  const settingsRef = doc(firestore, `${getUserPath(userId)}/settings/preferences`)
+  await setDoc(settingsRef, settings, { merge: true })
+}
+
+export async function getUserSettingsFromFirestore(userId: string): Promise<UserSettings | null> {
+  const settingsRef = doc(firestore, `${getUserPath(userId)}/settings/preferences`)
+  const snapshot = await getDocs(query(collection(firestore, `${getUserPath(userId)}/settings`)))
+
+  if (snapshot.empty) {
+    return null
+  }
+
+  const settingsDoc = snapshot.docs.find(doc => doc.id === 'preferences')
+  if (!settingsDoc) {
+    return null
+  }
+
+  const data = settingsDoc.data() as UserSettings
+  return {
+    excludedCategories: data.excludedCategories || [],
+    excludedSections: data.excludedSections || []
+  }
+}
+
 // ================== Batch Operations ==================
 
 export async function backupAllDataToFirestore(
