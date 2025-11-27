@@ -1,5 +1,6 @@
 import { db } from './db'
 import { getExcludedCategories, getExcludedSections } from './storage'
+import { getTodayStartTime, getStudyDate, getStudyDaysDiff } from './dateUtils'
 import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
 
 // 問題のセクションキーを取得
@@ -101,8 +102,7 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
 
   // 復習スケジュールを計算
   const reviewSchedules: ReviewSchedule[] = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)  // 今日の0時0分0秒
+  const today = getStudyDate(new Date())  // 3時基準の今日の日付
 
   for (const [problemId, records] of problemRecordsMap) {
     const sortedRecords = records.sort(
@@ -110,12 +110,8 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     )
 
     const lastRecord = sortedRecords[0]
-    // 日付ベースで経過日数を計算（時刻を無視）
-    const lastStudyDate = new Date(lastRecord.studiedAt)
-    lastStudyDate.setHours(0, 0, 0, 0)
-    const daysSince = Math.floor(
-      (today.getTime() - lastStudyDate.getTime()) / (1000 * 60 * 60 * 24)
-    )
+    // 3時基準で経過日数を計算
+    const daysSince = getStudyDaysDiff(lastRecord.studiedAt, new Date())
 
     const averageScore = calculateAverageScore(records)
     const priorityScore = calculatePriorityScore(averageScore, daysSince)
@@ -147,15 +143,14 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
 
 // 学習統計の計算
 export async function calculateStudyStats() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayStart = getTodayStartTime()  // 今日の3時
 
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - 6)
+  const weekStart = new Date(todayStart)
+  weekStart.setDate(todayStart.getDate() - 6)
 
   const allRecords = await db.studyRecords.toArray()
 
-  const todayRecords = allRecords.filter((r) => r.studiedAt >= today)
+  const todayRecords = allRecords.filter((r) => r.studiedAt >= todayStart)
   const weekRecords = allRecords.filter((r) => r.studiedAt >= weekStart)
 
   const totalStudyTime = allRecords.reduce((sum, r) => sum + r.studyTime, 0)
@@ -168,17 +163,16 @@ export async function calculateStudyStats() {
   const problems = await db.problems.where('id').anyOf([...problemIds]).toArray()
   const correctRate = await calculateRecentAccuracyForProblems(problems) || 0
 
-  // 週間データ
+  // 週間データ（3時基準）
   const weeklyData = []
   for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
+    const date = new Date(todayStart)
+    date.setDate(todayStart.getDate() - i)
     const dateStr = date.toISOString().split('T')[0]
 
     const dayRecords = allRecords.filter((r) => {
-      const recordDate = new Date(r.studiedAt)
-      recordDate.setHours(0, 0, 0, 0)
-      return recordDate.getTime() === date.getTime()
+      const recordStudyDate = getStudyDate(r.studiedAt)
+      return recordStudyDate.getTime() === date.getTime()
     })
 
     weeklyData.push({
@@ -200,11 +194,10 @@ export async function calculateStudyStats() {
 
 // 問題集別の学習統計の計算（日別正答率を含む）
 export async function calculateStudyStatsByWorkbook(workbookId?: string) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayStart = getTodayStartTime()  // 今日の3時
 
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - 6)
+  const weekStart = new Date(todayStart)
+  weekStart.setDate(todayStart.getDate() - 6)
 
   let allRecords = await db.studyRecords.toArray()
 
@@ -213,7 +206,7 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
     allRecords = allRecords.filter((r) => r.workbookId === workbookId)
   }
 
-  const todayRecords = allRecords.filter((r) => r.studiedAt >= today)
+  const todayRecords = allRecords.filter((r) => r.studiedAt >= todayStart)
   const weekRecords = allRecords.filter((r) => r.studiedAt >= weekStart)
 
   const totalStudyTime = allRecords.reduce((sum, r) => sum + r.studyTime, 0)
@@ -226,17 +219,16 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   const problems = await db.problems.where('id').anyOf([...problemIds]).toArray()
   const correctRate = await calculateRecentAccuracyForProblems(problems) || 0
 
-  // 週間データ（学習時間、問題数、正答率）
+  // 週間データ（学習時間、問題数、正答率）- 3時基準
   const weeklyData = []
   for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
+    const date = new Date(todayStart)
+    date.setDate(todayStart.getDate() - i)
     const dateStr = date.toISOString().split('T')[0]
 
     const dayRecords = allRecords.filter((r) => {
-      const recordDate = new Date(r.studiedAt)
-      recordDate.setHours(0, 0, 0, 0)
-      return recordDate.getTime() === date.getTime()
+      const recordStudyDate = getStudyDate(r.studiedAt)
+      return recordStudyDate.getTime() === date.getTime()
     })
 
     // 日別正解率の計算（部分正解を0.5点として統一）
@@ -415,22 +407,12 @@ export async function getWeakSectionProblem(): Promise<Problem | null> {
 
 // 今日の3時を基準とした学習時間を計算
 export async function getTodayStudyTime(): Promise<number> {
-  const now = new Date()
-  const todayAt3AM = new Date(now)
-
-  // 今日の3時を設定
-  todayAt3AM.setHours(3, 0, 0, 0)
-
-  // 現在時刻が3時より前の場合は、昨日の3時を基準にする
-  if (now.getHours() < 3) {
-    todayAt3AM.setDate(todayAt3AM.getDate() - 1)
-  }
+  const todayStart = getTodayStartTime()
 
   // 3時以降の学習記録を取得
   const allRecords = await db.studyRecords.toArray()
   const todayRecords = allRecords.filter(record => {
-    const recordDate = new Date(record.studiedAt)
-    return recordDate >= todayAt3AM
+    return record.studiedAt >= todayStart
   })
 
   // 合計学習時間を計算
