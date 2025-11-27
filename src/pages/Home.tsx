@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles, Info } from 'lucide-react'
+import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, Sparkles } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import InfoTooltip from '@/components/InfoTooltip'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
 import { getWorkbooks, getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
@@ -126,9 +127,7 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-1">
                 <p className="text-sm text-gray-600">今日の学習時間</p>
-                <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
-                  <Info size={14} className="text-gray-400" />
-                </span>
+                <InfoTooltip content="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" />
               </div>
               <p className="text-2xl font-bold">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
@@ -157,9 +156,7 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-1">
                 <p className="text-sm text-gray-600">正答率</p>
-                <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
-                  <Info size={14} className="text-gray-400" />
-                </span>
+                <InfoTooltip content="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" />
               </div>
               <p className="text-2xl font-bold">
                 {stats ? stats.correctRate : 0}%

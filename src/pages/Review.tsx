@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Play, TrendingUp, Info } from 'lucide-react'
+import { Calendar, Play, TrendingUp } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import InfoTooltip from '@/components/InfoTooltip'
 import { getTodayReviewList } from '@/lib/review'
 import type { ReviewSchedule } from '@/types'
 
@@ -109,15 +110,11 @@ export default function Review() {
                     </span>
                     <span className="flex items-center gap-1">
                       平均正答率: {Math.round(review.averageScore)}%
-                      <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
-                        <Info size={12} className="text-gray-400" />
-                      </span>
+                      <InfoTooltip content="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" size={12} />
                     </span>
                     <span className="flex items-center gap-1">
                       最終学習: {daysSince}日前
-                      <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
-                        <Info size={12} className="text-gray-400" />
-                      </span>
+                      <InfoTooltip content="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" size={12} />
                     </span>
                   </div>
                 </div>
