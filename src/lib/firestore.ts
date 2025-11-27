@@ -84,11 +84,11 @@ export async function deleteWorkbookFromFirestore(userId: string, workbookId: st
 export async function syncProblemToFirestore(userId: string, problem: Problem) {
   const problemRef = doc(firestore, `${getUserPath(userId)}/problems/${problem.id}`)
 
-  const firestoreProblem: FirestoreProblem = {
+  const firestoreProblem = {
     ...problem,
     createdAt: dateToTimestamp(problem.createdAt),
     ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
-  }
+  } as FirestoreProblem
 
   await setDoc(problemRef, firestoreProblem, { merge: true })
 }
@@ -213,11 +213,11 @@ export async function backupAllDataToFirestore(
   // Problems
   data.problems.forEach((problem) => {
     const ref = doc(firestore, `${getUserPath(userId)}/problems/${problem.id}`)
-    const firestoreProblem: FirestoreProblem = {
+    const firestoreProblem = {
       ...problem,
       createdAt: dateToTimestamp(problem.createdAt),
       ...(problem.deletedAt ? { deletedAt: dateToTimestamp(problem.deletedAt) } : {})
-    }
+    } as FirestoreProblem
     batch.set(ref, firestoreProblem)
   })
 
