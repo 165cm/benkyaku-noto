@@ -76,8 +76,8 @@ export default function Stats() {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">今日の学習時間</p>
-              <p className="text-2xl font-bold">
+              <p className="text-sm text-gray-600 mb-1" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">今日の学習時間</p>
+              <p className="text-2xl font-bold" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">
                 {formatTime(stats.todayStudyTime)}
               </p>
             </div>
@@ -90,8 +90,8 @@ export default function Stats() {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">今週の学習時間</p>
-              <p className="text-2xl font-bold">
+              <p className="text-sm text-gray-600 mb-1" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">今週の学習時間</p>
+              <p className="text-2xl font-bold" title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）">
                 {formatTime(stats.weekStudyTime)}
               </p>
             </div>
@@ -118,8 +118,8 @@ export default function Stats() {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">正答率</p>
-              <p className="text-2xl font-bold">{stats.correctRate}%</p>
+              <p className="text-sm text-gray-600 mb-1" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">正答率</p>
+              <p className="text-2xl font-bold" title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）">{stats.correctRate}%</p>
             </div>
             <div className="p-2 bg-yellow-100 rounded-lg">
               <Award className="text-yellow-600" size={24} />
@@ -164,7 +164,7 @@ export default function Stats() {
         </Card>
 
         <Card>
-          <h2 className="text-lg font-semibold mb-4">週間正答率</h2>
+          <h2 className="text-lg font-semibold mb-4" title="日別の正答率（日付は夜中の3時で更新）">週間正答率</h2>
           <div className="space-y-3">
             {stats.weeklyData.map((day) => {
               const date = new Date(day.date)
