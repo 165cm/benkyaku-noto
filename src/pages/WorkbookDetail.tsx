@@ -13,7 +13,6 @@ import {
   makeIndependentProblem,
   getSubProblems,
   getStudyRecords,
-  calculateAccuracyForProblem,
   getCategoriesForWorkbook,
   isParentProblem,
   deleteStudyRecordsForWorkbook,
@@ -245,7 +244,7 @@ export default function WorkbookDetail() {
 
     // 学習記録と正答率を読み込む
     const records = await getStudyRecords(problem.id)
-    const accuracy = await calculateAccuracyForProblem(problem.id)
+    const accuracy = await calculateRecentAccuracyForProblems([problem])
     setStudyRecords(records)
     setProblemAccuracy(accuracy)
 
