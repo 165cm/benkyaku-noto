@@ -2,6 +2,12 @@ import Dexie from 'dexie'
 import type { Table } from 'dexie'
 import type { Workbook, Problem, StudyRecord, Explanation } from '@/types'
 import { validateProblem, validateWorkbook, validateStudyRecord } from './validation'
+import { auth } from './firebase'
+import {
+  syncWorkbookToFirestore,
+  syncProblemToFirestore,
+  syncStudyRecordToFirestore
+} from './firestore'
 
 export class BenkyakuDB extends Dexie {
   workbooks!: Table<Workbook>
@@ -92,13 +98,26 @@ export async function addWorkbook(workbook: Omit<Workbook, 'id' | 'createdAt' | 
 
   const id = crypto.randomUUID()
   const now = new Date()
-
-  await db.workbooks.add({
+  const newWorkbook: Workbook = {
     ...workbook,
     id,
     createdAt: now,
     updatedAt: now,
-  })
+  }
+
+  // ローカルに保存
+  await db.workbooks.add(newWorkbook)
+
+  // クラウドに自動バックアップ（ログイン中の場合のみ）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      await syncWorkbookToFirestore(user.uid, newWorkbook)
+      console.log('Auto-backup: Workbook synced to cloud')
+    } catch (error) {
+      console.error('Auto-backup: Failed to sync workbook', error)
+    }
+  }
 
   return id
 }
@@ -120,13 +139,26 @@ export async function addProblem(problem: Omit<Problem, 'id' | 'createdAt' | 'so
     : 0
 
   const sortOrder = maxSortOrder + 100
-
-  await db.problems.add({
+  const newProblem: Problem = {
     ...problem,
     id,
     sortOrder,
     createdAt: new Date(),
-  })
+  }
+
+  // ローカルに保存
+  await db.problems.add(newProblem)
+
+  // クラウドに自動バックアップ（ログイン中の場合のみ）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      await syncProblemToFirestore(user.uid, newProblem)
+      console.log('Auto-backup: Problem synced to cloud')
+    } catch (error) {
+      console.error('Auto-backup: Failed to sync problem', error)
+    }
+  }
 
   return id
 }
@@ -136,12 +168,26 @@ export async function addStudyRecord(record: Omit<StudyRecord, 'id' | 'studiedAt
   await validateStudyRecord(record)
 
   const id = crypto.randomUUID()
-
-  await db.studyRecords.add({
+  const studyRecord: StudyRecord = {
     ...record,
     id,
     studiedAt: new Date(),
-  })
+  }
+
+  // ローカルに保存
+  await db.studyRecords.add(studyRecord)
+
+  // クラウドに自動バックアップ（ログイン中の場合のみ）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      await syncStudyRecordToFirestore(user.uid, studyRecord)
+      console.log('Auto-backup: Study record synced to cloud')
+    } catch (error) {
+      // エラーがあってもローカル保存は成功しているのでサイレントに失敗
+      console.error('Auto-backup: Failed to sync study record', error)
+    }
+  }
 
   return id
 }

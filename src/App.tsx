@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DataMigrationPrompt from '@/components/DataMigrationPrompt'
+import { useAutoSync } from '@/hooks/useAutoSync'
 import Home from '@/pages/Home'
 import Workbooks from '@/pages/Workbooks'
 import WorkbookDetail from '@/pages/WorkbookDetail'
@@ -20,6 +21,9 @@ import SignUp from '@/pages/SignUp'
 import ForgotPassword from '@/pages/ForgotPassword'
 
 export default function App() {
+  // ページロード時の自動同期
+  useAutoSync()
+
   return (
     <BrowserRouter basename="/benkyaku-noto">
       <Routes>
