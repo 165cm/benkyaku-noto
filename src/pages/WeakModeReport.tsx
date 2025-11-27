@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Home, Trophy, TrendingUp, Clock, Target, Zap, Star, ArrowUp, ArrowDown, Minus, Info } from 'lucide-react'
+import { Home, TrendingUp, Target, ArrowUp, ArrowDown, Minus, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getWeakModeSession, clearWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
@@ -20,6 +20,7 @@ export default function WeakModeReport() {
   const [problemDetails, setProblemDetails] = useState<ProblemDetail[]>([])
   const [stats, setStats] = useState<Awaited<ReturnType<typeof calculateWeakModeStats>> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     loadReportData()
@@ -130,272 +131,137 @@ export default function WeakModeReport() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">苦手克服レポート</h1>
-        <p className="text-gray-600">お疲れ様でした！学習結果を確認しましょう</p>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold mb-1">苦手克服レポート</h1>
+        <p className="text-sm text-gray-600">{getEncouragingMessage()}</p>
       </div>
 
-      {/* 励ましメッセージ */}
-      <Card className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white rounded-full">
-            <Trophy className="text-yellow-500" size={24} />
+      {/* コンパクトな統計 */}
+      <Card className="mb-4">
+        <div className="flex items-center justify-between text-sm">
+          <div className="text-center flex-1">
+            <p className="text-xs text-gray-500 mb-1">解答数</p>
+            <p className="text-2xl font-bold text-blue-600">{stats.totalProblems}問</p>
           </div>
-          <p className="font-medium text-gray-800">{getEncouragingMessage()}</p>
-        </div>
-      </Card>
-
-      {/* メイン統計 */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <Card className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Target className="text-blue-600" size={20} />
-            <span className="text-sm text-gray-600">解答数</span>
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-1">今回の正解率</p>
+            <p className="text-2xl font-bold text-green-600">{stats.accuracy}%</p>
           </div>
-          <p className="text-3xl font-bold text-blue-600">{stats.totalProblems}問</p>
-        </Card>
-
-        <Card className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <TrendingUp className="text-green-600" size={20} />
-            <span className="text-sm text-gray-600" title="この学習セッション内の正解率">正解率</span>
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-1">学習時間</p>
+            <p className="text-lg font-bold text-purple-600">{formatTime(stats.totalTime)}</p>
           </div>
-          <p className="text-3xl font-bold text-green-600" title="この学習セッション内の正解率">{stats.accuracy}%</p>
-        </Card>
-
-        <Card className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Clock className="text-purple-600" size={20} />
-            <span className="text-sm text-gray-600">総学習時間</span>
-          </div>
-          <p className="text-2xl font-bold text-purple-600">{formatTime(stats.totalTime)}</p>
-        </Card>
-
-        <Card className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Zap className="text-orange-600" size={20} />
-            <span className="text-sm text-gray-600">平均所要時間</span>
-          </div>
-          <p className="text-2xl font-bold text-orange-600">{formatTime(stats.averageTime)}</p>
-        </Card>
-      </div>
-
-      {/* 達成項目 */}
-      <Card className="mb-6">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
-          <Star className="text-yellow-500" size={20} />
-          達成項目
-        </h2>
-        <div className="space-y-3">
-          {stats.maxStreak >= 2 && (
-            <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-              <span className="text-sm">最大連続正解</span>
-              <span className="font-bold text-green-600">{stats.maxStreak}問</span>
-            </div>
-          )}
-          {stats.improvedCount > 0 && (
-            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-              <span className="text-sm">前回より改善</span>
-              <span className="font-bold text-blue-600">{stats.improvedCount}問</span>
-            </div>
-          )}
-          {stats.masteredCount > 0 && (
-            <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
-              <span className="text-sm">マスター達成</span>
-              <span className="font-bold text-purple-600">{stats.masteredCount}問</span>
-            </div>
-          )}
-          <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-            <span className="text-sm">正解 / 部分正解 / 不正解</span>
-            <span className="font-bold">
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-1">◯/△/×</p>
+            <p className="text-sm font-bold">
               <span className="text-green-600">{stats.correctCount}</span>
               {' / '}
               <span className="text-yellow-600">{stats.partialCount}</span>
               {' / '}
               <span className="text-red-600">{stats.incorrectCount}</span>
-            </span>
+            </p>
           </div>
         </div>
       </Card>
 
-      {/* あなたの成長記録 */}
+      {/* 成長記録 */}
       {stats.studyTimeEstimate && (
-        <div className="space-y-4 mb-6">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <TrendingUp className="text-indigo-600" size={20} />
-            あなたの成長記録
-          </h2>
-
-          {/* 今回解いた問題の正解率変化 */}
-          <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
-            <h3 className="font-medium mb-3 text-sm text-gray-700">📝 今回解いた問題の正解率</h3>
-
-            {stats.studyTimeEstimate.currentAccuracy >= stats.studyTimeEstimate.targetAccuracy ? (
-              <div className="text-center py-3">
-                <p className="text-lg font-bold text-green-600 mb-1">
-                  🎉 {stats.studyTimeEstimate.message}
-                </p>
-                <p className="text-sm text-gray-600">
-                  今回の正解率: {stats.studyTimeEstimate.currentAccuracy}%
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="text-center mb-3">
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <p className="text-sm text-gray-600">{stats.studyTimeEstimate.scopeLabel}の正解率</p>
-                    <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
-                      <Info size={14} className="text-gray-400" />
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 mb-2">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500 mb-1">学習前</p>
-                      <p className="text-2xl font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</p>
-                    </div>
-                    <div className="text-2xl text-gray-400">→</div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500 mb-1">学習後</p>
-                      <p className="text-2xl font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</p>
-                    </div>
-                    {stats.studyTimeEstimate.accuracyChange !== 0 && (
-                      <div className="text-center">
-                        <p className={`text-lg font-bold ${
-                          stats.studyTimeEstimate.accuracyChange > 0
-                            ? 'text-green-600'
-                            : stats.studyTimeEstimate.accuracyChange < 0
-                              ? 'text-red-600'
-                              : 'text-gray-600'
-                        }`}>
-                          {stats.studyTimeEstimate.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.accuracyChange}%
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    目標 {stats.studyTimeEstimate.targetAccuracy}% まであと {stats.studyTimeEstimate.targetAccuracy - stats.studyTimeEstimate.currentAccuracy}ポイント
-                  </p>
-                </div>
-
-                {stats.studyTimeEstimate.canEstimate && (
-                  <>
-                    <div className="p-3 bg-white rounded border border-indigo-200 text-center">
-                      <p className="text-sm text-gray-700 mb-1">💡 このペースなら、</p>
-                      <p className="text-lg font-bold text-indigo-600">
-                        {stats.studyTimeEstimate.estimatedSessionsMin !== null &&
-                         stats.studyTimeEstimate.estimatedSessionsMax !== null &&
-                         stats.studyTimeEstimate.estimatedSessionsMin !== stats.studyTimeEstimate.estimatedSessionsMax
-                          ? `あと${stats.studyTimeEstimate.estimatedSessionsMin}〜${stats.studyTimeEstimate.estimatedSessionsMax}回の苦手克服で達成！`
-                          : stats.studyTimeEstimate.estimatedSessionsMin !== null
-                            ? `あと${stats.studyTimeEstimate.estimatedSessionsMin}回の苦手克服で達成！`
-                            : stats.studyTimeEstimate.estimatedSessionsMax !== null
-                              ? `あと${stats.studyTimeEstimate.estimatedSessionsMax}回の苦手克服で達成！`
-                              : 'もう少しで達成！'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-2">※1回 = 約30分の学習</p>
-                    </div>
-
-                    {stats.studyTimeEstimate.totalSessionCount < 6 && (
-                      <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                        <p className="text-sm text-gray-700 text-center">
-                          📝 まだ{stats.studyTimeEstimate.totalSessionCount}回分のデータです。
-                          <br />
-                          6回くらい続けると予測がより正確になります！
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {!stats.studyTimeEstimate.canEstimate && (
-                  <div className="text-center py-2">
-                    <p className="text-sm text-gray-600">{stats.studyTimeEstimate.message}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-
-          {/* 復習対象全体の正解率変化 */}
+        <div className="space-y-3 mb-4">
+          {/* ホーム画面の正解率変化 */}
           {stats.studyTimeEstimate.overallStats && (
             <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <h3 className="font-medium mb-3 text-sm text-gray-700">🌟 復習対象全体の正解率（ホーム画面の正解率）</h3>
-
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-2">
-                  <p className="text-sm text-gray-600">全{stats.studyTimeEstimate.overallStats.totalProblemsCount}問の正解率</p>
-                  <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
-                    <Info size={14} className="text-gray-400" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={18} className="text-green-600" />
+                  <span className="text-sm font-medium">ホーム画面の正解率</span>
+                  <span title="直近3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="cursor-help">
+                    <Info size={12} className="text-gray-400" />
                   </span>
                 </div>
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-1">学習前</p>
-                    <p className="text-2xl font-bold text-gray-600">{stats.studyTimeEstimate.overallStats.previousAccuracy}%</p>
-                  </div>
-                  <div className="text-2xl text-gray-400">→</div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-1">学習後</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.studyTimeEstimate.overallStats.currentAccuracy}%</p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-gray-600">{stats.studyTimeEstimate.overallStats.previousAccuracy}%</span>
+                  <span className="text-gray-400">→</span>
+                  <span className="text-xl font-bold text-green-600">{stats.studyTimeEstimate.overallStats.currentAccuracy}%</span>
                   {stats.studyTimeEstimate.overallStats.accuracyChange !== 0 && (
-                    <div className="text-center">
-                      <p className={`text-lg font-bold ${
-                        stats.studyTimeEstimate.overallStats.accuracyChange > 0
-                          ? 'text-green-600'
-                          : stats.studyTimeEstimate.overallStats.accuracyChange < 0
-                            ? 'text-red-600'
-                            : 'text-gray-600'
-                      }`}>
-                        {stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.overallStats.accuracyChange}%
-                      </p>
-                    </div>
+                    <span className={`text-lg font-bold ${
+                      stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ({stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.overallStats.accuracyChange}%)
+                    </span>
                   )}
                 </div>
-                {stats.studyTimeEstimate.overallStats.accuracyChange === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">変化なし</p>
-                )}
               </div>
             </Card>
           )}
+
+          {/* 今回解いた問題の正解率 */}
+          <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Target size={18} className="text-indigo-600" />
+                <span className="text-sm font-medium">{stats.studyTimeEstimate.scopeLabel}の正解率</span>
+                <span title="直近3回の重み付け平均" className="cursor-help">
+                  <Info size={12} className="text-gray-400" />
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-lg font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</span>
+                {stats.studyTimeEstimate.accuracyChange !== 0 && (
+                  <span className={`text-base font-bold ${
+                    stats.studyTimeEstimate.accuracyChange > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    ({stats.studyTimeEstimate.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.accuracyChange}%)
+                  </span>
+                )}
+              </div>
+            </div>
+            {stats.studyTimeEstimate.canEstimate && stats.studyTimeEstimate.currentAccuracy < stats.studyTimeEstimate.targetAccuracy && (
+              <p className="text-xs text-gray-600 text-center">
+                💡 目標80%まで あと{stats.studyTimeEstimate.estimatedSessionsMin || stats.studyTimeEstimate.estimatedSessionsMax}回
+              </p>
+            )}
+          </Card>
         </div>
       )}
 
-      {/* 問題別詳細 */}
-      <Card className="mb-6">
-        <h2 className="font-semibold mb-4">問題別の結果</h2>
-        <div className="space-y-2">
-          {problemDetails.map((detail, index) => (
-            <div
-              key={detail.problem.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded"
-            >
-              <div className="flex-1 min-w-0">
-                {detail.problem.category && (
-                  <p className="text-xs text-gray-500">{detail.problem.category}</p>
-                )}
-                <p className="text-sm font-medium truncate">
-                  {index + 1}. {getProblemDisplayTitle(detail.problem)}
-                </p>
-                <p className="text-xs text-gray-500">
-                  過去{detail.previousAttempts}回 · {formatTime(detail.timeSpent)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  {detail.previousResult ? (
-                    getResultIcon(detail.previousResult)
-                  ) : (
-                    <span className="text-gray-400 text-sm">初</span>
-                  )}
-                  <span className="text-gray-400">→</span>
-                  {getResultIcon(detail.currentResult)}
+      {/* 問題別詳細（アコーディオン） */}
+      <Card className="mb-4">
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm">問題別の結果</span>
+            <span className="text-xs text-gray-500">
+              {stats.totalProblems}問中{stats.correctCount}問正解（正解率{stats.accuracy}%）
+            </span>
+          </div>
+          {showDetails ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </button>
+
+        {showDetails && (
+          <div className="border-t mt-2 pt-2 space-y-1">
+            {problemDetails.map((detail, index) => (
+              <div
+                key={detail.problem.id}
+                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium">{index + 1}. {getProblemDisplayTitle(detail.problem)}</span>
+                  <span className="text-xs text-gray-500 ml-2">{formatTime(detail.timeSpent)}</span>
                 </div>
-                {getChangeIcon(detail.previousResult, detail.currentResult)}
+                <div className="flex items-center gap-1">
+                  {detail.previousResult ? getResultIcon(detail.previousResult) : <span className="text-gray-400 text-xs">初</span>}
+                  <span className="text-gray-400 text-xs">→</span>
+                  {getResultIcon(detail.currentResult)}
+                  {getChangeIcon(detail.previousResult, detail.currentResult)}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* ホームに戻るボタン */}
