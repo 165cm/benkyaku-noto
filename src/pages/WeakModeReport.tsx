@@ -37,7 +37,13 @@ export default function WeakModeReport() {
 
   const loadReportData = async () => {
     const session = getWeakModeSession()
+    console.log('WeakModeReport - Loading session:', {
+      session,
+      hasSession: session !== null,
+      resultsCount: session?.results.length || 0
+    })
     if (!session || session.results.length === 0) {
+      console.log('WeakModeReport - No session data, redirecting to home')
       navigate('/')
       return
     }

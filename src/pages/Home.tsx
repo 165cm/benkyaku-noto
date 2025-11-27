@@ -38,7 +38,15 @@ export default function Home() {
     ])
 
     // 今日のレポートがあるかチェック
+    const localStorageData = localStorage.getItem('weak_mode_session')
     const session = getWeakModeSession()
+    console.log('=== WeakModeSession Debug ===')
+    console.log('LocalStorage raw data:', localStorageData)
+    console.log('Parsed session:', session)
+    console.log('Has session:', session !== null)
+    console.log('Results count:', session?.results.length || 0)
+    console.log('hasTodayReport:', session !== null && session.results.length > 0)
+    console.log('===========================')
     setHasTodayReport(session !== null && session.results.length > 0)
 
     setStats(statsData)
