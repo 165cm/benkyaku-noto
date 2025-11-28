@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Home, TrendingUp, Target, ArrowUp, ArrowDown, Minus, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { getWeakModeSession, clearWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
+import { getWeakModeSession, calculateWeakModeStats } from '@/lib/weakModeSession'
 import { getProblem } from '@/lib/db'
 import type { Problem } from '@/types'
 
@@ -80,7 +80,7 @@ export default function WeakModeReport() {
   }
 
   const handleGoHome = () => {
-    clearWeakModeSession()
+    // セッションは日付が変わるまで保持（clearWeakModeSessionを削除）
     navigate('/')
   }
 
