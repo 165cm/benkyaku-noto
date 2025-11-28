@@ -195,76 +195,10 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
   // 正解率の変化
   const accuracyChange = currentAccuracy - previousAccuracy
 
-  // 既に目標達成している場合
-  if (currentAccuracy >= TARGET_ACCURACY) {
-    return {
-      scopeLabel,
-      previousAccuracy,
-      currentAccuracy,
-      accuracyChange,
-      targetAccuracy: TARGET_ACCURACY,
-      canEstimate: false,
-      estimatedSessionsMin: null,
-      estimatedSessionsMax: null,
-      totalSessionCount,
-      message: '目標達成！正解率80%を超えています！',
-    }
-  }
-
   const totalTime = results.reduce((sum, r) => sum + r.timeSpent, 0)
 
-  // 正解率の向上量
-  const accuracyImprovement = accuracyChange
-  const remainingAccuracy = TARGET_ACCURACY - currentAccuracy
-
-  let linearEstimateSeconds: number | null = null
-  let exponentialEstimateSeconds: number | null = null
-
-  // 1. 線形モデル（シンプル・直感的）
-  if (accuracyImprovement > 0 && totalTime > 0) {
-    // 1%の正解率向上にかかる時間
-    const timePerPercent = totalTime / accuracyImprovement
-    linearEstimateSeconds = Math.round(timePerPercent * remainingAccuracy)
-  }
-
-  // 2. 指数関数モデル（より科学的）
-  if (accuracyImprovement > 0 && totalTime > 0 && previousAccuracy < TARGET_ACCURACY) {
-    const maxAccuracy = 100 // 理論上の最大正解率
-    const accuracyDiff = maxAccuracy - currentAccuracy
-    const initialDiff = maxAccuracy - previousAccuracy
-
-    if (initialDiff > 0 && accuracyDiff > 0 && accuracyDiff < initialDiff) {
-      const k = -Math.log(accuracyDiff / initialDiff) / totalTime
-      const targetDiff = maxAccuracy - TARGET_ACCURACY
-      const ratio = targetDiff / initialDiff
-
-      if (ratio > 0 && ratio < 1) {
-        const estimatedTime = -Math.log(ratio) / k
-        exponentialEstimateSeconds = Math.round(estimatedTime - totalTime) // 残り時間
-      }
-    }
-  }
-
-  // 推定時間を回数に変換
-  let estimatedSessionsMin: number | null = null
-  let estimatedSessionsMax: number | null = null
-
-  if (linearEstimateSeconds !== null && linearEstimateSeconds > 0) {
-    estimatedSessionsMin = Math.max(1, Math.ceil(linearEstimateSeconds / SECONDS_PER_SESSION))
-  }
-
-  if (exponentialEstimateSeconds !== null && exponentialEstimateSeconds > 0) {
-    estimatedSessionsMax = Math.max(1, Math.ceil(exponentialEstimateSeconds / SECONDS_PER_SESSION))
-  }
-
-  // 範囲が逆転している場合は入れ替え
-  if (estimatedSessionsMin !== null && estimatedSessionsMax !== null) {
-    if (estimatedSessionsMin > estimatedSessionsMax) {
-      [estimatedSessionsMin, estimatedSessionsMax] = [estimatedSessionsMax, estimatedSessionsMin]
-    }
-  }
-
   // 復習対象全体の正解率変化を計算（ホーム画面と同じ対象）
+  // ※ 目標80%の計算はこちらをベースにする
   let overallStats: StudyTimeEstimate['overallStats'] = undefined
   try {
     // 学習記録があるすべての問題を取得（ホーム画面と同じ）
@@ -314,6 +248,79 @@ async function calculateStudyTimeEstimate(session: WeakModeSession): Promise<Stu
   } catch (error) {
     console.error('Failed to calculate overall stats:', error)
     // エラーが発生しても続行（overallStatsはundefinedのまま）
+  }
+
+  // 目標達成判定と推定計算は復習対象全体の正解率をベースにする
+  const targetCurrentAccuracy = overallStats?.currentAccuracy ?? currentAccuracy
+  const targetPreviousAccuracy = overallStats?.previousAccuracy ?? previousAccuracy
+  const targetAccuracyChange = targetCurrentAccuracy - targetPreviousAccuracy
+
+  // 既に目標達成している場合
+  if (targetCurrentAccuracy >= TARGET_ACCURACY) {
+    return {
+      scopeLabel,
+      previousAccuracy,
+      currentAccuracy,
+      accuracyChange,
+      targetAccuracy: TARGET_ACCURACY,
+      canEstimate: false,
+      estimatedSessionsMin: null,
+      estimatedSessionsMax: null,
+      totalSessionCount,
+      message: '目標達成！正解率80%を超えています！',
+      overallStats,
+    }
+  }
+
+  // 正解率の向上量（復習対象全体ベース）
+  const accuracyImprovement = targetAccuracyChange
+  const remainingAccuracy = TARGET_ACCURACY - targetCurrentAccuracy
+
+  let linearEstimateSeconds: number | null = null
+  let exponentialEstimateSeconds: number | null = null
+
+  // 1. 線形モデル（シンプル・直感的）
+  if (accuracyImprovement > 0 && totalTime > 0) {
+    // 1%の正解率向上にかかる時間
+    const timePerPercent = totalTime / accuracyImprovement
+    linearEstimateSeconds = Math.round(timePerPercent * remainingAccuracy)
+  }
+
+  // 2. 指数関数モデル（より科学的）
+  if (accuracyImprovement > 0 && totalTime > 0 && targetPreviousAccuracy < TARGET_ACCURACY) {
+    const maxAccuracy = 100 // 理論上の最大正解率
+    const accuracyDiff = maxAccuracy - targetCurrentAccuracy
+    const initialDiff = maxAccuracy - targetPreviousAccuracy
+
+    if (initialDiff > 0 && accuracyDiff > 0 && accuracyDiff < initialDiff) {
+      const k = -Math.log(accuracyDiff / initialDiff) / totalTime
+      const targetDiff = maxAccuracy - TARGET_ACCURACY
+      const ratio = targetDiff / initialDiff
+
+      if (ratio > 0 && ratio < 1) {
+        const estimatedTime = -Math.log(ratio) / k
+        exponentialEstimateSeconds = Math.round(estimatedTime - totalTime) // 残り時間
+      }
+    }
+  }
+
+  // 推定時間を回数に変換
+  let estimatedSessionsMin: number | null = null
+  let estimatedSessionsMax: number | null = null
+
+  if (linearEstimateSeconds !== null && linearEstimateSeconds > 0) {
+    estimatedSessionsMin = Math.max(1, Math.ceil(linearEstimateSeconds / SECONDS_PER_SESSION))
+  }
+
+  if (exponentialEstimateSeconds !== null && exponentialEstimateSeconds > 0) {
+    estimatedSessionsMax = Math.max(1, Math.ceil(exponentialEstimateSeconds / SECONDS_PER_SESSION))
+  }
+
+  // 範囲が逆転している場合は入れ替え
+  if (estimatedSessionsMin !== null && estimatedSessionsMax !== null) {
+    if (estimatedSessionsMin > estimatedSessionsMax) {
+      [estimatedSessionsMin, estimatedSessionsMax] = [estimatedSessionsMax, estimatedSessionsMin]
+    }
   }
 
   // メッセージ生成
