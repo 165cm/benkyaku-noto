@@ -21,6 +21,8 @@ export interface Problem {
   parentProblemId?: string // 親問題のID（小問の場合）
   page?: number // ページ数
   memo?: string
+  isBookmarked?: boolean // ブックマーク（苦手な問題マーク）
+  tags?: string[] // タグ（例: ["要復習", "時間がかかる"]）
   createdAt: Date
   deletedAt?: Date // 論理削除用
 }

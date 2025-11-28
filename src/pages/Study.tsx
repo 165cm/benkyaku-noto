@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp, StopCircle } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp, LogOut, Star, Undo2, Tags } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
@@ -51,6 +51,13 @@ export default function Study() {
 
   // 回答処理中フラグ（二重クリック防止）
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Undo機能（履歴スタック）
+  const [problemHistory, setProblemHistory] = useState<string[]>([])
+
+  // タグ入力モーダル
+  const [showTagModal, setShowTagModal] = useState(false)
+  const [newTag, setNewTag] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -244,6 +251,37 @@ export default function Study() {
     setEditingRecord(null)
   }
 
+  // ブックマークをトグル
+  const handleToggleBookmark = async () => {
+    if (!problem) return
+    await toggleBookmark(problem.id)
+    await loadData()
+  }
+
+  // タグを追加
+  const handleAddTag = async () => {
+    if (!problem || !newTag.trim()) return
+    await addTagToProblem(problem.id, newTag.trim())
+    setNewTag('')
+    setShowTagModal(false)
+    await loadData()
+  }
+
+  // タグを削除
+  const handleRemoveTag = async (tag: string) => {
+    if (!problem) return
+    await removeTagFromProblem(problem.id, tag)
+    await loadData()
+  }
+
+  // 前の問題に戻る（Undo）
+  const handleUndo = () => {
+    if (problemHistory.length === 0) return
+    const previousProblemId = problemHistory[problemHistory.length - 1]
+    setProblemHistory(prev => prev.slice(0, -1))
+    navigate(`/study/${previousProblemId}${isWeakMode ? '?mode=weak' : ''}`)
+  }
+
   // 学習記録を削除
   const handleDeleteRecord = async (recordId: string) => {
     if (!confirm('この学習記録を削除しますか？')) return
@@ -257,6 +295,9 @@ export default function Study() {
 
     setIsProcessing(true)
     try {
+      // 履歴に現在の問題を追加（Undo用）
+      setProblemHistory(prev => [...prev, problem.id])
+
       const studyTime = elapsedTime
 
     // 苦手克服モードの場合、前回の結果と回答数を取得
@@ -464,30 +505,55 @@ export default function Study() {
         >
           <ArrowLeft size={16} />
         </Button>
-        <p className="text-sm text-gray-600 truncate mx-2">{workbook.title}</p>
+        <p className="text-sm text-gray-600 truncate mx-2 flex-1 text-center">{workbook.title}</p>
         <div className="flex items-center gap-2">
           {isWeakMode && (
             <button
               onClick={() => navigate('/weak-mode-report')}
-              className="p-2 rounded hover:bg-red-100 transition-colors"
-              title="苦手克服を終了"
+              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 transition-colors text-red-700 text-sm font-medium"
+              title="学習を終了してレポートを見る"
             >
-              <StopCircle size={20} className="text-red-500" />
+              <LogOut size={16} />
+              <span className="hidden sm:inline">終了</span>
             </button>
           )}
           <button
             onClick={togglePause}
-            className="p-2 rounded hover:bg-gray-100 transition-colors"
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+              isPaused
+                ? 'bg-green-50 hover:bg-green-100 text-green-700'
+                : 'bg-orange-50 hover:bg-orange-100 text-orange-700'
+            }`}
+            title={isPaused ? 'タイマーを再開' : 'タイマーを一時停止'}
           >
-            {isPaused ? <Play size={20} className="text-primary" /> : <Pause size={20} className="text-gray-600" />}
+            {isPaused ? (
+              <>
+                <Play size={16} />
+                <span className="hidden sm:inline">再開</span>
+              </>
+            ) : (
+              <>
+                <Pause size={16} />
+                <span className="hidden sm:inline">一時停止</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
+      {/* 一時停止中のメッセージ */}
+      {isPaused && (
+        <div className="mb-3 p-3 bg-orange-50 border border-orange-400 rounded-lg">
+          <p className="text-sm font-bold text-orange-900">⏸ タイマーが一時停止中です</p>
+          <p className="text-xs text-orange-700 mt-1">再開ボタンを押すと、タイマーが動き出します</p>
+        </div>
+      )}
+
       {/* 時間終了メッセージ */}
       {timeExpired && (
-        <div className="mb-3 p-3 bg-orange-50 border border-orange-400 rounded-lg">
-          <p className="text-sm font-bold text-orange-900">⏰ 時間です！この問題で終了してください</p>
+        <div className="mb-3 p-3 bg-red-50 border border-red-400 rounded-lg">
+          <p className="text-sm font-bold text-red-900">⏰ 目標時間に到達しました！</p>
+          <p className="text-xs text-red-700 mt-1">キリの良いところで終了しましょう</p>
         </div>
       )}
 
@@ -500,12 +566,51 @@ export default function Study() {
                 {problem.category}
               </p>
             )}
-            <h1 className="text-xl sm:text-2xl font-bold truncate">
-              {getProblemDisplayTitle(problem)}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold truncate">
+                {getProblemDisplayTitle(problem)}
+              </h1>
+              <button
+                onClick={handleToggleBookmark}
+                className={`p-1.5 rounded-lg transition-all ${
+                  problem.isBookmarked
+                    ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200'
+                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                }`}
+                title={problem.isBookmarked ? '苦手マークを外す' : '苦手な問題としてマーク'}
+              >
+                <Star size={20} fill={problem.isBookmarked ? 'currentColor' : 'none'} />
+              </button>
+            </div>
             {problem.memo && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
             )}
+            {/* タグ表示 */}
+            {problem.tags && problem.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {problem.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className="hover:text-purple-900"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setShowTagModal(true)}
+              className="mt-2 flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800"
+            >
+              <Tags size={14} />
+              <span>タグを追加</span>
+            </button>
           </div>
           {/* ページ数を大きく表示 */}
           {problem.page && (
@@ -544,41 +649,58 @@ export default function Study() {
       </Card>
 
       {/* 解答ボタン */}
-      <div className="space-y-2 mb-4">
+      <div className="space-y-3 mb-4">
+        {/* Undoボタン */}
+        {problemHistory.length > 0 && (
+          <div className="flex justify-center">
+            <button
+              onClick={handleUndo}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700 text-sm font-medium"
+            >
+              <Undo2 size={16} />
+              <span>前の問題に戻る ({problemHistory.length}問前)</span>
+            </button>
+          </div>
+        )}
+
         {/* 正解・不正解ボタン（大きめ、横並び） */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Button
             variant="success"
             size="lg"
             onClick={() => handleRecord('correct')}
             disabled={isProcessing}
-            className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
+            className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
           >
-            <Circle size={28} className="sm:w-10 sm:h-10" />
-            <span className="text-base sm:text-lg font-bold">正解</span>
+            <Circle size={32} className="sm:w-12 sm:h-12" />
+            <span className="text-lg sm:text-xl font-bold">正解</span>
+            <span className="text-xs opacity-75">キー: 1</span>
           </Button>
           <Button
             variant="error"
             size="lg"
             onClick={() => handleRecord('incorrect')}
             disabled={isProcessing}
-            className="flex flex-col items-center gap-1 sm:gap-2 h-24 sm:h-28"
+            className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
           >
-            <X size={28} className="sm:w-10 sm:h-10" />
-            <span className="text-base sm:text-lg font-bold">不正解</span>
+            <X size={32} className="sm:w-12 sm:h-12" />
+            <span className="text-lg sm:text-xl font-bold">不正解</span>
+            <span className="text-xs opacity-75">キー: 3</span>
           </Button>
         </div>
-        {/* 部分正解ボタン（小さめ、中央配置） */}
+
+        {/* 部分正解ボタン */}
         <div className="flex justify-center">
           <Button
             variant="warning"
             size="lg"
             onClick={() => handleRecord('partial')}
             disabled={isProcessing}
-            className="flex items-center gap-2 h-12 sm:h-14 px-6"
+            className="flex items-center gap-2 h-14 px-8 shadow-md hover:shadow-lg transition-all"
           >
-            <Triangle size={18} className="sm:w-5 sm:h-5" />
-            <span className="text-sm sm:text-base">部分正解</span>
+            <Triangle size={20} />
+            <span className="text-base font-bold">部分正解</span>
+            <span className="text-xs opacity-75 ml-2">キー: 2</span>
           </Button>
         </div>
       </div>
@@ -715,6 +837,59 @@ export default function Study() {
                 </Button>
                 <Button variant="primary" onClick={handleSaveEdit}>
                   保存
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* タグ追加モーダル */}
+      {showTagModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">タグを追加</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">タグ名</label>
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="例: 要復習, 時間がかかる"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-600 mb-2">よく使うタグ:</p>
+                <div className="flex flex-wrap gap-2">
+                  {['要復習', '苦手', '時間がかかる', '解法を忘れた', 'ケアレスミス'].map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        setNewTag(tag)
+                      }}
+                      className="px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-full text-xs transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="secondary" onClick={() => {
+                  setShowTagModal(false)
+                  setNewTag('')
+                }}>
+                  キャンセル
+                </Button>
+                <Button variant="primary" onClick={handleAddTag} disabled={!newTag.trim()}>
+                  追加
                 </Button>
               </div>
             </div>
