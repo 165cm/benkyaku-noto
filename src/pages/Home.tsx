@@ -4,16 +4,15 @@ import { BookOpen, Calendar, TrendingUp, Play, Loader2, GraduationCap, Target, S
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
-import { getWorkbooks, getExplanations } from '@/lib/db'
+import { getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
 import { getWeakModeSession } from '@/lib/weakModeSession'
-import type { StudyStats, ReviewSchedule, Workbook } from '@/types'
+import type { StudyStats, ReviewSchedule } from '@/types'
 
 export default function Home() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<StudyStats | null>(null)
   const [reviewList, setReviewList] = useState<ReviewSchedule[]>([])
-  const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'review' | 'firstTime' | 'explanation'>('review')
   const [unstudiedCount, setUnstudiedCount] = useState(0)
@@ -28,10 +27,9 @@ export default function Home() {
 
   const loadData = async () => {
     setLoading(true)
-    const [statsData, reviewData, workbooksData, unstudiedCount, sectionStats, explanations] = await Promise.all([
+    const [statsData, reviewData, unstudiedCount, sectionStats, explanations] = await Promise.all([
       calculateStudyStats(),
       getTodayReviewList(),
-      getWorkbooks(),
       getUnstudiedProblemsCount(),
       calculateSectionStats(),
       getExplanations(),
@@ -50,8 +48,7 @@ export default function Home() {
     setHasTodayReport(session !== null && session.results.length > 0)
 
     setStats(statsData)
-    setReviewList(reviewData.slice(0, 5)) // 上位5件
-    setWorkbooks(workbooksData.slice(0, 3)) // 最新3件
+    setReviewList(reviewData.slice(0, 10)) // 上位10件に増加
     setUnstudiedCount(unstudiedCount)
     setWeakSections(sectionStats.slice(0, 5)) // 苦手セクション上位5件
     setExplanationCount(explanations.length)
@@ -125,453 +122,281 @@ export default function Home() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">ホーム</h1>
-        <p className="text-gray-600">学習の進捗と復習リストを確認できます</p>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">ホーム</h1>
       </div>
 
-      {/* 今日の統計 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Calendar className="text-blue-600" size={24} />
-            </div>
-            <div>
+      {/* 今日の統計 - 2×2グリッド（4カラム） */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="text-blue-600" size={20} />
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
-                <p className="text-sm text-gray-600">今日の学習時間</p>
-                <span title="日付は夜中の3時で更新されます（0時〜2時59分は前日扱い）" className="inline-flex cursor-help">
-                  <Info size={14} className="text-gray-400" />
+                <p className="text-xs text-gray-600">学習時間</p>
+                <span title="日付は夜中の3時で更新されます" className="cursor-help">
+                  <Info size={12} className="text-gray-400" />
                 </span>
               </div>
-              <p className="text-2xl font-bold">
+              <p className="text-xl font-bold truncate">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <BookOpen className="text-green-600" size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">復習待ち</p>
-              <p className="text-2xl font-bold">{reviewList.length}問</p>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="text-green-600" size={20} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-600">復習待ち</p>
+              <p className="text-xl font-bold">{reviewList.length}問</p>
             </div>
           </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <TrendingUp className="text-purple-600" size={24} />
-            </div>
-            <div>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="text-purple-600" size={20} />
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
-                <p className="text-sm text-gray-600">正答率</p>
-                <span title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="inline-flex cursor-help">
-                  <Info size={14} className="text-gray-400" />
+                <p className="text-xs text-gray-600">正答率</p>
+                <span title="最新3回の重み付け平均" className="cursor-help">
+                  <Info size={12} className="text-gray-400" />
                 </span>
               </div>
-              <p className="text-2xl font-bold">
+              <p className="text-xl font-bold">
                 {stats ? stats.correctRate : 0}%
               </p>
             </div>
           </div>
         </Card>
-      </div>
 
-      {/* 今日のレポート */}
-      {hasTodayReport && (
-        <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white rounded-lg shadow-sm">
-                <FileText className="text-blue-600" size={24} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">本日の苦手克服レポート</h3>
-                <p className="text-sm text-gray-600">今日の学習成果を確認しましょう</p>
+        {hasTodayReport ? (
+          <Card
+            className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/weak-mode-report')}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="text-blue-600" size={20} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-600">今日のレポート</p>
+                <p className="text-sm font-bold text-blue-600 truncate">確認する →</p>
               </div>
             </div>
-            <Button
-              onClick={() => navigate('/weak-mode-report')}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <FileText size={18} className="mr-2" />
-              レポートを見る
-            </Button>
-          </div>
-        </Card>
-      )}
+          </Card>
+        ) : (
+          <Card className="p-3 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <FileText className="text-gray-400" size={20} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">今日のレポート</p>
+                <p className="text-sm text-gray-400">未学習</p>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* 学習モード選択（タブ式） */}
-      <Card className="mb-8">
-        {/* タブヘッダー */}
-        <div className="flex border-b border-border mb-6">
+      <Card className="mb-4">
+        {/* タブヘッダー - コンパクト版 */}
+        <div className="flex border-b border-border mb-4">
           <button
             onClick={() => setActiveTab('review')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
               activeTab === 'review'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Target size={18} />
+            <Target size={16} />
             <span>苦手克服</span>
             {weakSections.length > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
                 {weakSections.length}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('firstTime')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
               activeTab === 'firstTime'
                 ? 'text-green-600 border-b-2 border-green-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <GraduationCap size={18} />
+            <GraduationCap size={16} />
             <span>初回学習</span>
             {unstudiedCount > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
                 {unstudiedCount}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('explanation')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors relative ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
               activeTab === 'explanation'
                 ? 'text-purple-600 border-b-2 border-purple-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Sparkles size={18} />
+            <Sparkles size={16} />
             <span>AI解説</span>
             {explanationCount > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
                 {explanationCount}
               </span>
             )}
           </button>
         </div>
 
-        {/* 復習モードのコンテンツ */}
+        {/* 復習モードのコンテンツ - 超コンパクト版 */}
         {activeTab === 'review' && (
           <div>
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Target size={20} className="text-blue-600" />
-                <h2 className="text-xl font-semibold">苦手克服モード</h2>
-              </div>
-              <p className="text-sm text-gray-600">
-                平均点の低いセクションの問題を優先的に復習します
-              </p>
-            </div>
-
-            {/* 苦手セクション一覧 */}
-            {weakSections.length > 0 && (
-              <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-orange-900 mb-3">📊 苦手セクション（正解率の低い順）</h3>
-                <div className="space-y-2">
-                  {weakSections.map((section, index) => {
-                    const colorClass = section.accuracy !== null && section.accuracy >= 80
-                      ? 'text-green-700'
-                      : section.accuracy !== null && section.accuracy >= 50
-                      ? 'text-yellow-700'
-                      : 'text-red-700'
+            {/* 次の問題プレビュー & 苦手セクション */}
+            {weakSections.length > 0 ? (
+              <div className="mb-3">
+                <div className="text-xs text-gray-500 mb-2">
+                  🎯 次: <span className="font-medium text-gray-700">{weakSections[0].title}</span>
+                  {' '}({weakSections[0].accuracy}%)
+                </div>
+                <div className="text-xs text-gray-600 space-y-0.5">
+                  {weakSections.slice(0, 3).map((section, index) => {
+                    const accuracy = section.accuracy ?? 0
+                    const colorClass = accuracy >= 80 ? 'text-green-600' : accuracy >= 50 ? 'text-yellow-600' : 'text-red-600'
                     return (
-                      <div key={section.sectionKey} className="flex items-center justify-between text-sm">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-orange-400 font-bold">{index + 1}.</span>
-                            <div className="min-w-0">
-                              <span className="text-xs text-gray-500 block truncate">
-                                {section.category}
-                              </span>
-                              <span className="font-medium text-gray-700 block truncate">
-                                {section.title}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`font-semibold ${colorClass}`}>
-                            {section.accuracy}%
-                          </span>
-                          <span className="text-gray-500 text-xs">
-                            ({section.studiedCount}/{section.problems.length}問学習済)
-                          </span>
-                        </div>
+                      <div key={section.sectionKey} className="flex items-center justify-between">
+                        <span className="truncate">{index + 1}. {section.title}</span>
+                        <span className={`font-semibold ml-2 ${colorClass}`}>{accuracy}%</span>
                       </div>
                     )
                   })}
                 </div>
               </div>
+            ) : (
+              <p className="text-sm text-gray-600 mb-3">復習できる問題があります</p>
             )}
 
-            {/* 復習開始ボタン */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-              <div className="mb-4">
-                {weakSections.length > 0 && (
-                  <>
-                    <p className="text-xs text-blue-600 mb-1">
-                      {weakSections[0].category}
-                    </p>
-                    <p className="text-blue-900 font-medium mb-2">
-                      次は「{weakSections[0].title}」から出題されます
-                    </p>
-                  </>
-                )}
-                {weakSections.length === 0 && (
-                  <p className="text-blue-900 font-medium mb-2">
-                    復習できる問題があります
-                  </p>
-                )}
-                <p className="text-sm text-blue-700">
-                  苦手な分野を1問ずつ淡々と克服していきましょう
-                </p>
-              </div>
-              <Button
-                onClick={handleStartWeakSectionReview}
-                disabled={weakSections.length === 0 || startingReview}
-                size="lg"
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {startingReview ? (
-                  <>
-                    <Loader2 size={20} className="mr-2 animate-spin" />
-                    開始中...
-                  </>
-                ) : (
-                  <>
-                    <Target size={20} className="mr-2" />
-                    苦手克服を開始
-                  </>
-                )}
-              </Button>
-            </div>
+            {/* 開始ボタン */}
+            <Button
+              onClick={handleStartWeakSectionReview}
+              disabled={weakSections.length === 0 || startingReview}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              {startingReview ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  開始中...
+                </>
+              ) : (
+                <>
+                  <Target size={16} className="mr-2" />
+                  苦手克服を開始
+                </>
+              )}
+            </Button>
           </div>
         )}
 
-        {/* 初回学習モードのコンテンツ */}
+        {/* 初回学習モードのコンテンツ - 超コンパクト版 */}
         {activeTab === 'firstTime' && (
           <div>
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <GraduationCap size={20} className="text-green-600" />
-                <h2 className="text-xl font-semibold">初回学習モード</h2>
-              </div>
-              <p className="text-sm text-gray-600">
-                未学習の問題を1から順番に学習します
-              </p>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-              <div className="mb-4">
-                <p className="text-green-900 font-medium mb-2">
-                  未学習問題: {unstudiedCount}問
-                </p>
-                <p className="text-sm text-green-700">
-                  最初の問題から順番に学習を開始します
-                </p>
-              </div>
-              <Button
-                onClick={handleStartFirstTimeStudy}
-                disabled={unstudiedCount === 0 || loading}
-                size="lg"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={20} className="mr-2 animate-spin" />
-                    開始中...
-                  </>
-                ) : (
-                  <>
-                    <Play size={20} className="mr-2" />
-                    初回学習を開始
-                  </>
-                )}
-              </Button>
-            </div>
+            <p className="text-xs text-gray-600 mb-3">
+              📚 未学習問題: <span className="font-bold text-green-600">{unstudiedCount}問</span>
+            </p>
+            <Button
+              onClick={handleStartFirstTimeStudy}
+              disabled={unstudiedCount === 0 || loading}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  開始中...
+                </>
+              ) : (
+                <>
+                  <Play size={16} className="mr-2" />
+                  初回学習を開始
+                </>
+              )}
+            </Button>
           </div>
         )}
 
-        {/* AI解説モードのコンテンツ */}
+        {/* AI解説モードのコンテンツ - 超コンパクト版 */}
         {activeTab === 'explanation' && (
           <div>
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={20} className="text-purple-600" />
-                <h2 className="text-xl font-semibold">AI解説ライブラリ</h2>
-              </div>
-              <p className="text-sm text-gray-600">
-                苦手セクションの解き方をAIが詳しく解説します
-              </p>
-            </div>
-
-            {/* 苦手セクション一覧 */}
-            {weakSections.length > 0 && (
-              <div className="mb-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-purple-900 mb-3">📚 解説候補セクション</h3>
-                <div className="space-y-2">
-                  {weakSections.slice(0, 3).map((section, index) => {
-                    const colorClass = section.accuracy !== null && section.accuracy >= 80
-                      ? 'text-green-700'
-                      : section.accuracy !== null && section.accuracy >= 50
-                      ? 'text-yellow-700'
-                      : 'text-red-700'
-                    return (
-                      <div key={section.sectionKey} className="flex items-center justify-between text-sm">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-400 font-bold">{index + 1}.</span>
-                            <div className="min-w-0">
-                              <span className="text-xs text-gray-500 block truncate">
-                                {section.category}
-                              </span>
-                              <span className="font-medium text-gray-700 block truncate">
-                                {section.title}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <span className={`font-semibold flex-shrink-0 ${colorClass}`}>
-                          {section.accuracy}%
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
-              <div className="mb-4">
-                <p className="text-purple-900 font-medium mb-2">
-                  {explanationCount > 0
-                    ? `${explanationCount}件の解説がストックされています`
-                    : '苦手セクションの解説を生成しましょう'}
-                </p>
-                <p className="text-sm text-purple-700">
-                  解き方のコツ、典型的な間違い、暗記ポイントなどを確認できます
-                </p>
-              </div>
-              <Button
-                onClick={() => navigate('/explanations')}
-                size="lg"
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                <Sparkles size={20} className="mr-2" />
-                解説ライブラリを開く
-              </Button>
-            </div>
+            <p className="text-xs text-gray-600 mb-3">
+              ✨ ストック: <span className="font-bold text-purple-600">{explanationCount}件</span>
+              {weakSections.length > 0 && (
+                <span className="ml-2 text-gray-500">
+                  | 推奨: {weakSections[0].title} ({weakSections[0].accuracy}%)
+                </span>
+              )}
+            </p>
+            <Button
+              onClick={() => navigate('/explanations')}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              <Sparkles size={16} className="mr-2" />
+              解説ライブラリを開く
+            </Button>
           </div>
         )}
       </Card>
 
-      {/* 復習リストのプレビュー */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">復習リスト（優先度順）</h2>
+      {/* 復習リスト - コンパクトテーブル形式 */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">復習リスト（優先度順）</h2>
           {reviewList.length > 0 && (
             <Button
               variant="secondary"
               size="sm"
               onClick={() => navigate('/review')}
             >
-              すべて表示
+              すべて
             </Button>
           )}
         </div>
 
         {reviewList.length === 0 ? (
-          <Card>
-            <p className="text-center text-gray-500 py-4">
+          <Card className="p-4">
+            <p className="text-center text-gray-500 text-sm">
               復習する問題がありません
             </p>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {reviewList.map((review) => (
-              <Card
-                key={review.problemId}
-                className="flex items-center justify-between"
-              >
-                <div className="flex-1 min-w-0">
-                  {review.category && (
-                    <p className="text-xs text-gray-500">{review.category}</p>
-                  )}
-                  <h3 className="font-medium truncate">{getReviewDisplayTitle(review)}</h3>
-                  <p className="text-sm text-gray-600 truncate">
-                    {review.workbookTitle} · 正答率{' '}
-                    {Math.round(review.averageScore)}%
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => navigate(`/study/${review.problemId}`)}
-                  className="flex-shrink-0"
+          <Card className="overflow-hidden">
+            <div className="divide-y divide-gray-100">
+              {reviewList.map((review, index) => (
+                <div
+                  key={review.problemId}
+                  className="flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
                 >
-                  <Play size={16} className="mr-1" />
-                  学習
-                </Button>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 最近の問題集 */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">最近の問題集</h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate('/workbooks')}
-          >
-            すべて表示
-          </Button>
-        </div>
-
-        {workbooks.length === 0 ? (
-          <Card>
-            <p className="text-center text-gray-500 py-4">
-              問題集がありません
-            </p>
-            <div className="text-center mt-4">
-              <Button onClick={() => navigate('/workbooks')}>
-                問題集を作成
-              </Button>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-4">{index + 1}</span>
+                    <span className="text-sm font-medium truncate">{getReviewDisplayTitle(review)}</span>
+                    <span className="text-xs text-gray-500">|</span>
+                    <span className="text-xs font-semibold text-gray-700">{Math.round(review.averageScore)}%</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate(`/study/${review.problemId}`)}
+                    className="flex-shrink-0 ml-2"
+                  >
+                    <Play size={14} />
+                  </Button>
+                </div>
+              ))}
             </div>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {workbooks.map((workbook) => (
-              <Card
-                key={workbook.id}
-                hover
-                onClick={() => navigate(`/workbooks/${workbook.id}`)}
-              >
-                <h3 className="font-semibold mb-2">{workbook.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  {workbook.subject}
-                </p>
-                <p className="text-sm text-gray-500">
-                  問題数: {workbook.totalProblems}
-                </p>
-              </Card>
-            ))}
-          </div>
         )}
       </div>
+
     </div>
   )
 }
