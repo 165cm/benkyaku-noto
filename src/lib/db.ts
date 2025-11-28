@@ -86,6 +86,14 @@ export class BenkyakuDB extends Dexie {
       studyRecords: 'id, problemId, workbookId, studiedAt',
       explanations: 'id, sectionKey, category, createdAt',
     })
+
+    // ブックマーク機能を追加
+    this.version(7).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId, isBookmarked',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+      explanations: 'id, sectionKey, category, createdAt',
+    })
   }
 }
 
@@ -557,4 +565,50 @@ export async function deleteExplanation(id: string) {
 export async function getExplanationSectionKeys(): Promise<string[]> {
   const explanations = await db.explanations.toArray()
   return explanations.map(e => e.sectionKey)
+}
+
+// ブックマーク関連の関数
+export async function toggleBookmark(problemId: string) {
+  const problem = await db.problems.get(problemId)
+  if (!problem) return
+
+  await db.problems.update(problemId, {
+    isBookmarked: !problem.isBookmarked,
+  })
+}
+
+export async function addTagToProblem(problemId: string, tag: string) {
+  const problem = await db.problems.get(problemId)
+  if (!problem) return
+
+  const tags = problem.tags || []
+  if (!tags.includes(tag)) {
+    await db.problems.update(problemId, {
+      tags: [...tags, tag],
+    })
+  }
+}
+
+export async function removeTagFromProblem(problemId: string, tag: string) {
+  const problem = await db.problems.get(problemId)
+  if (!problem) return
+
+  const tags = problem.tags || []
+  await db.problems.update(problemId, {
+    tags: tags.filter(t => t !== tag),
+  })
+}
+
+export async function getBookmarkedProblems(workbookId?: string): Promise<Problem[]> {
+  let problems = await db.problems.toArray()
+
+  // ブックマークされた問題のみをフィルタ
+  problems = problems.filter(p => p.isBookmarked && !p.deletedAt)
+
+  // 特定の問題集でフィルタ
+  if (workbookId) {
+    problems = problems.filter(p => p.workbookId === workbookId)
+  }
+
+  return problems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
 }
