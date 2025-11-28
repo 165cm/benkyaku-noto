@@ -127,45 +127,45 @@ export default function Home() {
       </div>
 
       {/* 今日の統計 - 2×2グリッド（4カラム） */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="text-blue-600" size={20} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <Card className="p-2">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="text-blue-600 flex-shrink-0" size={18} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <p className="text-xs text-gray-600">学習時間</p>
                 <span title="日付は夜中の3時で更新されます" className="cursor-help">
-                  <Info size={12} className="text-gray-400" />
+                  <Info size={10} className="text-gray-400" />
                 </span>
               </div>
-              <p className="text-xl font-bold truncate">
+              <p className="text-lg md:text-xl font-bold truncate">
                 {stats ? formatTime(stats.todayStudyTime) : '0分'}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <BookOpen className="text-green-600" size={20} />
+        <Card className="p-2">
+          <div className="flex items-center gap-1.5">
+            <BookOpen className="text-green-600 flex-shrink-0" size={18} />
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-600">復習待ち</p>
-              <p className="text-xl font-bold">{reviewList.length}問</p>
+              <p className="text-lg md:text-xl font-bold">{reviewList.length}問</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="text-purple-600" size={20} />
+        <Card className="p-2">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="text-purple-600 flex-shrink-0" size={18} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <p className="text-xs text-gray-600">正答率</p>
                 <span title="最新3回の重み付け平均" className="cursor-help">
-                  <Info size={12} className="text-gray-400" />
+                  <Info size={10} className="text-gray-400" />
                 </span>
               </div>
-              <p className="text-xl font-bold">
+              <p className="text-lg md:text-xl font-bold">
                 {stats ? stats.correctRate : 0}%
               </p>
             </div>
@@ -174,11 +174,11 @@ export default function Home() {
 
         {hasTodayReport ? (
           <Card
-            className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
+            className="p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => navigate('/weak-mode-report')}
           >
-            <div className="flex items-center gap-2">
-              <FileText className="text-blue-600" size={20} />
+            <div className="flex items-center gap-1.5">
+              <FileText className="text-blue-600 flex-shrink-0" size={18} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-600">今日のレポート</p>
                 <p className="text-sm font-bold text-blue-600 truncate">確認する →</p>
@@ -186,9 +186,9 @@ export default function Home() {
             </div>
           </Card>
         ) : (
-          <Card className="p-3 bg-gray-50">
-            <div className="flex items-center gap-2">
-              <FileText className="text-gray-400" size={20} />
+          <Card className="p-2 bg-gray-50">
+            <div className="flex items-center gap-1.5">
+              <FileText className="text-gray-400 flex-shrink-0" size={18} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500">今日のレポート</p>
                 <p className="text-sm text-gray-400">未学習</p>
@@ -199,18 +199,18 @@ export default function Home() {
       </div>
 
       {/* 学習モード選択（タブ式） */}
-      <Card className="mb-4">
+      <Card className="mb-3">
         {/* タブヘッダー - コンパクト版 */}
-        <div className="flex border-b border-border mb-4">
+        <div className="flex border-b border-border mb-3">
           <button
             onClick={() => setActiveTab('review')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors relative ${
               activeTab === 'review'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Target size={16} />
+            <Target size={14} />
             <span>苦手克服</span>
             {weakSections.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
@@ -220,13 +220,13 @@ export default function Home() {
           </button>
           <button
             onClick={() => setActiveTab('firstTime')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors relative ${
               activeTab === 'firstTime'
                 ? 'text-green-600 border-b-2 border-green-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <GraduationCap size={16} />
+            <GraduationCap size={14} />
             <span>初回学習</span>
             {unstudiedCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
@@ -236,13 +236,13 @@ export default function Home() {
           </button>
           <button
             onClick={() => setActiveTab('explanation')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors relative ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors relative ${
               activeTab === 'explanation'
                 ? 'text-purple-600 border-b-2 border-purple-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Sparkles size={16} />
+            <Sparkles size={14} />
             <span>AI解説</span>
             {explanationCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
@@ -349,9 +349,9 @@ export default function Home() {
       </Card>
 
       {/* 復習リスト - コンパクトテーブル形式 */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">復習リスト（優先度順）</h2>
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-base font-semibold">復習リスト（優先度順）</h2>
           {reviewList.length > 0 && (
             <Button
               variant="secondary"
@@ -375,7 +375,7 @@ export default function Home() {
               {reviewList.map((review, index) => (
                 <div
                   key={review.problemId}
-                  className="flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-2">
                     <span className="text-xs text-gray-400 w-4">{index + 1}</span>
