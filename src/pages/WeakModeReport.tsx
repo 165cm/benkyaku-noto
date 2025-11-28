@@ -120,6 +120,21 @@ export default function WeakModeReport() {
     return <Minus size={14} className="text-gray-400" />
   }
 
+  // 結果の変化に応じた背景色を取得
+  const getChangeBackgroundClass = (prev: string | null, curr: string) => {
+    if (!prev) return 'hover:bg-gray-50' // 初回
+
+    const prevScore = prev === 'correct' ? 2 : prev === 'partial' ? 1 : 0
+    const currScore = curr === 'correct' ? 2 : curr === 'partial' ? 1 : 0
+
+    if (currScore > prevScore) {
+      return 'bg-green-50 hover:bg-green-100' // 改善
+    } else if (currScore < prevScore) {
+      return 'bg-red-50 hover:bg-red-100' // 下落
+    }
+    return 'hover:bg-gray-50' // 変化なし
+  }
+
   const getEncouragingMessage = () => {
     if (!stats) return ''
 
@@ -186,29 +201,29 @@ export default function WeakModeReport() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold mb-1">苦手克服レポート</h1>
-        <p className="text-sm text-gray-600">{getEncouragingMessage()}</p>
+      <div className="mb-3">
+        <h1 className="text-lg font-bold mb-0.5">苦手克服レポート</h1>
+        <p className="text-xs text-gray-600">{getEncouragingMessage()}</p>
       </div>
 
       {/* コンパクトな統計 */}
-      <Card className="mb-4">
+      <Card className="mb-3 p-2">
         <div className="flex items-center justify-between text-sm">
           <div className="text-center flex-1">
-            <p className="text-xs text-gray-500 mb-1">解答数</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.totalProblems}問</p>
+            <p className="text-xs text-gray-500 mb-0.5">解答数</p>
+            <p className="text-lg md:text-2xl font-bold text-blue-600">{stats.totalProblems}問</p>
           </div>
           <div className="text-center flex-1 border-l border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">今回の正解率</p>
-            <p className="text-2xl font-bold text-green-600">{stats.accuracy}%</p>
+            <p className="text-xs text-gray-500 mb-0.5">今回の正解率</p>
+            <p className="text-lg md:text-2xl font-bold text-green-600">{stats.accuracy}%</p>
           </div>
           <div className="text-center flex-1 border-l border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">学習時間</p>
-            <p className="text-lg font-bold text-purple-600">{formatTime(stats.totalTime)}</p>
+            <p className="text-xs text-gray-500 mb-0.5">学習時間</p>
+            <p className="text-base md:text-lg font-bold text-purple-600">{formatTime(stats.totalTime)}</p>
           </div>
           <div className="text-center flex-1 border-l border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">◯/△/×</p>
-            <p className="text-sm font-bold">
+            <p className="text-xs text-gray-500 mb-0.5">◯/△/×</p>
+            <p className="text-xs md:text-sm font-bold">
               <span className="text-green-600">{stats.correctCount}</span>
               {' / '}
               <span className="text-yellow-600">{stats.partialCount}</span>
@@ -221,50 +236,23 @@ export default function WeakModeReport() {
 
       {/* 成長記録 */}
       {stats.studyTimeEstimate && (
-        <div className="space-y-3 mb-4">
-          {/* ホーム画面の正解率変化 */}
-          {stats.studyTimeEstimate.overallStats && (
-            <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={18} className="text-green-600" />
-                  <span className="text-sm font-medium">復習対象全体の正解率</span>
-                  <span title="直近3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="cursor-help">
-                    <Info size={12} className="text-gray-400" />
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-gray-600">{stats.studyTimeEstimate.overallStats.previousAccuracy}%</span>
-                  <span className="text-gray-400">→</span>
-                  <span className="text-xl font-bold text-green-600">{stats.studyTimeEstimate.overallStats.currentAccuracy}%</span>
-                  {stats.studyTimeEstimate.overallStats.accuracyChange !== 0 && (
-                    <span className={`text-lg font-bold ${
-                      stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ({stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.overallStats.accuracyChange}%)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* 今回解いた問題の正解率 */}
-          <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Target size={18} className="text-indigo-600" />
-                <span className="text-sm font-medium">{stats.studyTimeEstimate.scopeLabel}の正解率</span>
-                <span title="直近3回の重み付け平均" className="cursor-help">
-                  <Info size={12} className="text-gray-400" />
+        <div className="space-y-2 mb-3">
+          {/* 今回解いた問題の正解率（モチベーション重視で先に表示） */}
+          <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <Target size={16} className="text-indigo-600 flex-shrink-0" />
+                <span className="text-xs font-medium truncate">{stats.studyTimeEstimate.scopeLabel}の正解率</span>
+                <span title="直近3回の重み付け平均" className="cursor-help flex-shrink-0">
+                  <Info size={10} className="text-gray-400" />
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</span>
-                <span className="text-gray-400">→</span>
-                <span className="text-lg font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</span>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-sm md:text-lg font-bold text-gray-600">{stats.studyTimeEstimate.previousAccuracy}%</span>
+                <span className="text-gray-400 text-xs">→</span>
+                <span className="text-sm md:text-lg font-bold text-blue-600">{stats.studyTimeEstimate.currentAccuracy}%</span>
                 {stats.studyTimeEstimate.accuracyChange !== 0 && (
-                  <span className={`text-base font-bold ${
+                  <span className={`text-xs md:text-base font-bold ${
                     stats.studyTimeEstimate.accuracyChange > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
                     ({stats.studyTimeEstimate.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.accuracyChange}%)
@@ -272,36 +260,63 @@ export default function WeakModeReport() {
                 )}
               </div>
             </div>
-            {stats.studyTimeEstimate.canEstimate && stats.studyTimeEstimate.currentAccuracy < stats.studyTimeEstimate.targetAccuracy && (
-              <p className="text-xs text-gray-600 text-center">
-                💡 目標80%まで あと{stats.studyTimeEstimate.estimatedSessionsMin || stats.studyTimeEstimate.estimatedSessionsMax}回
-              </p>
-            )}
           </Card>
+
+          {/* 復習対象全体の正解率（優先KPI、目標80%の基準） */}
+          {stats.studyTimeEstimate.overallStats && (
+            <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 p-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp size={16} className="text-green-600 flex-shrink-0" />
+                  <span className="text-xs font-medium truncate">復習対象全体の正解率</span>
+                  <span title="直近3回の重み付け平均（最新50%、1つ前30%、2つ前20%）" className="cursor-help flex-shrink-0">
+                    <Info size={10} className="text-gray-400" />
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span className="text-sm md:text-xl font-bold text-gray-600">{stats.studyTimeEstimate.overallStats.previousAccuracy}%</span>
+                  <span className="text-gray-400 text-xs">→</span>
+                  <span className="text-sm md:text-xl font-bold text-green-600">{stats.studyTimeEstimate.overallStats.currentAccuracy}%</span>
+                  {stats.studyTimeEstimate.overallStats.accuracyChange !== 0 && (
+                    <span className={`text-xs md:text-lg font-bold ${
+                      stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ({stats.studyTimeEstimate.overallStats.accuracyChange > 0 ? '+' : ''}{stats.studyTimeEstimate.overallStats.accuracyChange}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+              {stats.studyTimeEstimate.canEstimate && stats.studyTimeEstimate.overallStats.currentAccuracy < stats.studyTimeEstimate.targetAccuracy && (
+                <p className="text-xs text-gray-600 text-center">
+                  💡 目標80%まで あと{stats.studyTimeEstimate.estimatedSessionsMin || stats.studyTimeEstimate.estimatedSessionsMax}回
+                </p>
+              )}
+            </Card>
+          )}
         </div>
       )}
 
       {/* 問題別詳細 */}
       {problemDetails.length <= 10 ? (
         // 10問以下：全て表示（アコーディオンなし）
-        <Card className="mb-4">
-          <div className="p-2 mb-2">
-            <span className="font-medium text-sm">問題別の結果</span>
+        <Card className="mb-3 p-2">
+          <div className="mb-1.5">
+            <span className="font-medium text-xs">問題別の結果</span>
             <span className="text-xs text-gray-500 ml-2">
-              {stats.totalProblems}問中{stats.correctCount}問正解（正解率{stats.accuracy}%）
+              {stats.totalProblems}問中{stats.correctCount}問正解（{stats.accuracy}%）
             </span>
           </div>
-          <div className="border-t pt-2 space-y-1">
+          <div className="border-t pt-1.5 space-y-0.5">
             {problemDetails.map((detail, index) => (
               <div
                 key={detail.problem.id}
-                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm"
+                className={`flex items-center justify-between p-1.5 rounded text-xs ${getChangeBackgroundClass(detail.previousResult, detail.currentResult)}`}
               >
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{index + 1}. {getProblemDisplayTitle(detail.problem)}</span>
-                  <span className="text-xs text-gray-500 ml-2">{formatTime(detail.timeSpent)}</span>
+                  <span className="text-xs text-gray-500 ml-1">{formatTime(detail.timeSpent)}</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
                   {detail.previousResult ? getResultIcon(detail.previousResult) : <span className="text-gray-400 text-xs">初</span>}
                   <span className="text-gray-400 text-xs">→</span>
                   {getResultIcon(detail.currentResult)}
@@ -313,42 +328,42 @@ export default function WeakModeReport() {
         </Card>
       ) : (
         // 10問超え：セクション別にアコーディオン表示
-        <div className="space-y-2 mb-4">
-          <div className="px-2 mb-2">
-            <span className="font-medium text-sm">問題別の結果</span>
+        <div className="space-y-1.5 mb-3">
+          <div className="px-2 mb-1.5">
+            <span className="font-medium text-xs">問題別の結果</span>
             <span className="text-xs text-gray-500 ml-2">
-              {stats.totalProblems}問中{stats.correctCount}問正解（正解率{stats.accuracy}%）
+              {stats.totalProblems}問中{stats.correctCount}問正解（{stats.accuracy}%）
             </span>
           </div>
           {groupBySection(problemDetails).map((section) => {
             const accuracy = Math.round((section.correctCount / section.totalCount) * 100)
             return (
-              <Card key={section.sectionKey}>
+              <Card key={section.sectionKey} className="p-0">
                 <button
                   onClick={() => toggleSection(section.sectionKey)}
                   className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
                 >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="font-medium text-sm truncate">{section.sectionTitle}</span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="font-medium text-xs truncate">{section.sectionTitle}</span>
                     <span className="text-xs text-gray-500">
                       {section.totalCount}問中{section.correctCount}問正解 · {accuracy}%
                     </span>
                   </div>
-                  {expandedSections.has(section.sectionKey) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  {expandedSections.has(section.sectionKey) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
                 {expandedSections.has(section.sectionKey) && (
-                  <div className="border-t mt-2 pt-2 space-y-1">
+                  <div className="border-t mt-1 pt-1.5 space-y-0.5 px-2 pb-2">
                     {section.problems.map((detail) => (
                       <div
                         key={detail.problem.id}
-                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm"
+                        className={`flex items-center justify-between p-1.5 rounded text-xs ${getChangeBackgroundClass(detail.previousResult, detail.currentResult)}`}
                       >
                         <div className="flex-1 min-w-0">
                           <span className="font-medium">{getProblemDisplayTitle(detail.problem)}</span>
-                          <span className="text-xs text-gray-500 ml-2">{formatTime(detail.timeSpent)}</span>
+                          <span className="text-xs text-gray-500 ml-1">{formatTime(detail.timeSpent)}</span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
                           {detail.previousResult ? getResultIcon(detail.previousResult) : <span className="text-gray-400 text-xs">初</span>}
                           <span className="text-gray-400 text-xs">→</span>
                           {getResultIcon(detail.currentResult)}
