@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Layout from '@/components/Layout'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
@@ -134,8 +133,11 @@ export default function ImageExplanation() {
   }
 
   return (
-    <Layout title="画像から解説を生成">
-      <div className="space-y-6">
+    <div className="space-y-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-2">📷 画像から解説を生成</h1>
+        <p className="text-gray-600">問題の写真をアップロードして、あなたのレベルに合わせた解説を作成</p>
+      </div>
         {/* エラー表示 */}
         {error && (
           <Card className="bg-red-50 border-red-200">
@@ -296,7 +298,7 @@ export default function ImageExplanation() {
                 </h2>
                 <Button
                   onClick={() => setStep('edit')}
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   disabled={isProcessing}
                 >
@@ -311,7 +313,7 @@ export default function ImageExplanation() {
 
             {/* アクション */}
             <div className="flex gap-3">
-              <Button onClick={handleRegenerateExplanation} variant="outline" disabled={isProcessing}>
+              <Button onClick={handleRegenerateExplanation} variant="secondary" disabled={isProcessing}>
                 🔄 解説を再生成
               </Button>
               <Button onClick={handleSave} disabled={isProcessing} className="flex-1">
@@ -336,7 +338,6 @@ export default function ImageExplanation() {
             </details>
           </>
         )}
-      </div>
-    </Layout>
+    </div>
   )
 }

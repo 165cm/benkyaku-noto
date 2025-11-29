@@ -1,7 +1,6 @@
 import { getOpenAIApiKey } from './storage'
 import { determineUserLevel, getLevelGuidelines } from './userLevel'
 import type { UserLevel } from '@/types'
-import { calculateSectionStats } from './review'
 
 // 画像ベース問題の解説を生成
 export async function generateImageBasedExplanation(
