@@ -58,14 +58,15 @@ export default function Study() {
   // タグ入力（インライン）
   const [showCustomTagInput, setShowCustomTagInput] = useState(false)
   const [customTag, setCustomTag] = useState('')
+  const [showTagHelp, setShowTagHelp] = useState(false)
 
-  // よく使うタグのプリセット
+  // よく使うタグのプリセット（明確な分類）
   const COMMON_TAGS = [
-    '計算ミス',
-    '解き方を調べた',
-    'ケアレスミス',
-    '時間がかかる',
-    '要復習',
+    { name: '解法を知らない', emoji: '🎓', help: '解き方を全く知らない、初めて見た問題 → 解説・教科書を読む' },
+    { name: '理解があいまい', emoji: '🤔', help: '解き方は知っているが自信がない、理解が浅い → 概念を学び直す、類題を解く' },
+    { name: 'うっかりミス', emoji: '😅', help: '分かっていたのにミスした（計算・転記・読み間違い）→ 見直しを徹底、落ち着いて解く' },
+    { name: '時間が足りない', emoji: '⏱️', help: '時間をかければ解けた → 時間を測って練習、解法を効率化' },
+    { name: '反復練習が必要', emoji: '🔁', help: '完全に覚えたい、定着させたい → 間隔をあけて繰り返し解く' },
   ]
 
   useEffect(() => {
@@ -719,37 +720,64 @@ export default function Study() {
 
       {/* タグセクション（インライン） */}
       <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Tags size={16} className="text-purple-600" />
-          <h3 className="text-sm font-medium text-gray-700">タグで整理</h3>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Tags size={16} className="text-purple-600" />
+            <h3 className="text-sm font-medium text-gray-700">タグで整理</h3>
+          </div>
+          <button
+            onClick={() => setShowTagHelp(!showTagHelp)}
+            className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+          >
+            <span className="text-base">❓</span>
+            <span>{showTagHelp ? '閉じる' : '使い分け'}</span>
+          </button>
         </div>
+
+        {/* タグヘルプ */}
+        {showTagHelp && (
+          <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs space-y-2">
+            <p className="font-bold text-purple-900 mb-2">📚 タグの使い分けガイド</p>
+            {COMMON_TAGS.map(tag => (
+              <div key={tag.name} className="flex gap-2">
+                <span className="flex-shrink-0">{tag.emoji}</span>
+                <div>
+                  <span className="font-medium text-purple-900">{tag.name}:</span>
+                  <span className="text-purple-700 ml-1">{tag.help}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* よく使うタグ（トグルボタン） */}
         <div className="flex flex-wrap gap-2 mb-3">
           {COMMON_TAGS.map(tag => {
-            const isActive = problem?.tags?.includes(tag)
+            const isActive = problem?.tags?.includes(tag.name)
             return (
               <button
-                key={tag}
-                onClick={() => handleToggleTag(tag)}
+                key={tag.name}
+                onClick={() => handleToggleTag(tag.name)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
+                title={tag.help}
               >
-                {tag}
+                <span className="mr-1">{tag.emoji}</span>
+                {tag.name}
               </button>
             )
           })}
         </div>
 
         {/* カスタムタグ表示 */}
-        {problem?.tags && problem.tags.filter(tag => !COMMON_TAGS.includes(tag)).length > 0 && (
+        {problem?.tags && problem.tags.filter(tag => !COMMON_TAGS.some(ct => ct.name === tag)).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             <span className="text-xs text-gray-500">その他:</span>
             {problem.tags
-              .filter(tag => !COMMON_TAGS.includes(tag))
+              .filter(tag => !COMMON_TAGS.some(ct => ct.name === tag))
               .map(tag => (
                 <span
                   key={tag}
