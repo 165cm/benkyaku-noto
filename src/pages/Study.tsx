@@ -626,19 +626,25 @@ export default function Study() {
 
             {/* AI解説リンク */}
             {problem.category && problem.sectionTitle && (
-              <button
-                onClick={() => hasExplanation && explanationId && navigate(`/explanations/${explanationId}`)}
-                disabled={!hasExplanation}
-                className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  hasExplanation
-                    ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200'
-                    : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                }`}
-                title={hasExplanation ? 'AI解説を見る' : 'この問題のAI解説はまだありません'}
-              >
-                <BookOpen size={14} />
-                <span>{hasExplanation ? 'AI解説を見る' : '解説なし'}</span>
-              </button>
+              hasExplanation ? (
+                <button
+                  onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
+                  title="AI解説を見る"
+                >
+                  <BookOpen size={16} />
+                  <span>AI解説を見る</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/explanations')}
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  title="AI解説ライブラリで解説を作成"
+                >
+                  <BookOpen size={12} />
+                  <span>AI解説を作る</span>
+                </button>
+              )
             )}
           </div>
           {/* ページ数を大きく表示 */}
