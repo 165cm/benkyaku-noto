@@ -104,9 +104,12 @@ export interface ImageBasedExplanation {
   extractedText: string // OCRで抽出した問題文
   editedText?: string // ユーザーが編集した問題文
   answer?: string // 問題の答え（ユーザーが入力）
+  targetProblemNumber?: string // 解説対象の問題番号（例：1-3、問題3など）
 
   // 解説内容
   explanationContent: string // マークダウン形式の解説
+  suggestedQuestions?: string[] // AIが提案する追加質問（4択）
+  followUpExplanations?: { question: string; answer: string }[] // 追加の解説履歴
 
   // ユーザーレベル情報（生成時点）
   userLevel: UserLevel
