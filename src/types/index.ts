@@ -79,3 +79,51 @@ export interface Explanation {
   accuracy: number // 生成時の正答率
   createdAt: Date
 }
+
+// ユーザーレベル
+export type UserLevelType = 'beginner' | 'intermediate' | 'advanced'
+export type StudyVolumeType = 'low' | 'medium' | 'high'
+export type TrendType = 'improving' | 'stable' | 'declining'
+
+export interface UserLevel {
+  level: UserLevelType
+  overallAccuracy: number
+  weakSections: string[] // セクションキーの配列
+  studyVolume: StudyVolumeType
+  recentTrend?: TrendType
+}
+
+// 画像ベースのAI解説
+export interface ImageBasedExplanation {
+  id: string
+
+  // 画像情報
+  imageUrl: string // アップロード画像のURL（Data URL）
+
+  // 問題文（OCRで抽出、編集可能）
+  extractedText: string // OCRで抽出した問題文
+  editedText?: string // ユーザーが編集した問題文
+
+  // 解説内容
+  explanationContent: string // マークダウン形式の解説
+
+  // ユーザーレベル情報（生成時点）
+  userLevel: UserLevel
+
+  // 問題分類（オプション）
+  category?: string
+  sectionTitle?: string
+  tags?: string[]
+
+  // 関連付け（オプション）
+  problemId?: string // 既存の問題に紐付ける場合
+  workbookId?: string // 既存の問題集に紐付ける場合
+
+  // メタデータ
+  generatedAt: Date // 初回生成日時
+  updatedAt?: Date // 再生成日時
+  regenerationCount: number // 再生成回数
+
+  createdAt: Date
+  deletedAt?: Date // 論理削除
+}

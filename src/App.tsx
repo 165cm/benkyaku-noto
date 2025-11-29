@@ -16,6 +16,7 @@ import ImportFromImage from '@/pages/ImportFromImage'
 import Trash from '@/pages/Trash'
 import Debug from '@/pages/Debug'
 import Explanations from '@/pages/Explanations'
+import ImageExplanation from '@/pages/ImageExplanation'
 import Login from '@/pages/Login'
 import SignUp from '@/pages/SignUp'
 import ForgotPassword from '@/pages/ForgotPassword'
@@ -52,6 +53,7 @@ export default function App() {
                     <Route path="/stats" element={<Stats />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/explanations" element={<Explanations />} />
+                    <Route path="/explanations/image-upload" element={<ImageExplanation />} />
                     <Route path="/trash" element={<Trash />} />
                     <Route path="/debug" element={<Debug />} />
                   </Routes>

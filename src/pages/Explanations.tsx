@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react'
+import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
@@ -89,38 +89,56 @@ export default function Explanations() {
       </div>
 
       {/* 生成ボタン */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <div className="flex flex-col h-full">
             <h2 className="font-semibold mb-1">新しい解説を生成</h2>
             {canGenerate ? (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 mb-4 flex-1">
                 AIが学習データを分析し、最優先で理解すべきトピックを選定します
               </p>
             ) : (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 mb-4 flex-1">
                 全てのセクションの解説が生成済みです
               </p>
             )}
+            <Button
+              onClick={handleGenerate}
+              disabled={generating || !canGenerate}
+              className="w-full"
+            >
+              {generating ? (
+                <>
+                  <Loader2 size={18} className="mr-2 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} className="mr-2" />
+                  解説を生成
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={handleGenerate}
-            disabled={generating || !canGenerate}
-          >
-            {generating ? (
-              <>
-                <Loader2 size={18} className="mr-2 animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} className="mr-2" />
-                解説を生成
-              </>
-            )}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+          <div className="flex flex-col h-full">
+            <h2 className="font-semibold mb-1">📷 画像から解説を生成</h2>
+            <p className="text-sm text-gray-600 mb-4 flex-1">
+              問題の写真をアップロードして、あなたのレベルに合わせた解説を作成
+            </p>
+            <Button
+              onClick={() => navigate('/explanations/image-upload')}
+              variant="outline"
+              className="w-full border-blue-300 hover:bg-blue-100"
+            >
+              <Camera size={18} className="mr-2" />
+              画像をアップロード
+            </Button>
+          </div>
+        </Card>
+      </div>
 
       {/* 解説一覧 */}
       {explanations.length === 0 ? (
