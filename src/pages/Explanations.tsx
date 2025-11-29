@@ -396,6 +396,28 @@ export default function Explanations() {
                   <div>
                     <MarkdownRenderer content={explanation.explanationContent} />
                   </div>
+
+                  {/* 追加質問と回答の表示 */}
+                  {explanation.followUpExplanations && explanation.followUpExplanations.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <hr className="border-purple-200" />
+                      <h4 className="text-sm font-semibold text-purple-800">💬 追加の質問と回答</h4>
+                      {explanation.followUpExplanations.map((qa, index) => (
+                        <div key={index} className="bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
+                          <div className="flex items-start gap-2 mb-2">
+                            <span className="text-purple-600 font-bold">Q{index + 1}:</span>
+                            <p className="font-semibold text-gray-800">{qa.question}</p>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="text-pink-600 font-bold">A{index + 1}:</span>
+                            <div className="flex-1 prose prose-sm max-w-none">
+                              <MarkdownRenderer content={qa.answer} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
