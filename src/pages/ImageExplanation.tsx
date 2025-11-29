@@ -21,6 +21,7 @@ export default function ImageExplanation() {
   const [imageBase64, setImageBase64] = useState<string>('')
   const [extractedText, setExtractedText] = useState('')
   const [editedText, setEditedText] = useState('')
+  const [answer, setAnswer] = useState('')
   const [explanation, setExplanation] = useState('')
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -53,6 +54,7 @@ export default function ImageExplanation() {
     setImageBase64('')
     setExtractedText('')
     setEditedText('')
+    setAnswer('')
     setError(null)
     setStep('upload')
   }
@@ -97,7 +99,11 @@ export default function ImageExplanation() {
 
     try {
       const base64 = await imageToBase64(imageFile)
-      const explanationContent = await generateImageBasedExplanation(editedText, base64)
+      const explanationContent = await generateImageBasedExplanation(
+        editedText,
+        answer || undefined,
+        base64
+      )
 
       setExplanation(explanationContent)
       setStep('result')
@@ -118,7 +124,12 @@ export default function ImageExplanation() {
 
     try {
       const base64 = await imageToBase64(imageFile)
-      const explanationContent = await regenerateExplanation(editedText, userLevel, base64)
+      const explanationContent = await regenerateExplanation(
+        editedText,
+        userLevel,
+        answer || undefined,
+        base64
+      )
 
       setExplanation(explanationContent)
     } catch (err) {
@@ -140,6 +151,7 @@ export default function ImageExplanation() {
         imageUrl: imageBase64, // Base64 Data URLで保存
         extractedText,
         editedText: editedText !== extractedText ? editedText : undefined,
+        answer: answer || undefined,
         explanationContent: explanation,
         userLevel,
         regenerationCount: 0,
@@ -276,6 +288,26 @@ export default function ImageExplanation() {
 
               {editedText !== extractedText && (
                 <p className="text-sm text-blue-600 mt-2">✏️ 編集されました</p>
+              )}
+            </Card>
+
+            {/* 答え入力 */}
+            <Card>
+              <h2 className="text-xl font-bold mb-4">✅ この問題の答え（任意）</h2>
+              <p className="text-gray-600 text-sm mb-3">
+                答えを入力すると、その答えを前提とした正確な解説が生成されます。
+                <br />
+                入力しない場合、AIが問題を解いて答えを推測します。
+              </p>
+              <input
+                type="text"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="例: 3、A、12.5、など"
+              />
+              {answer && (
+                <p className="text-sm text-green-600 mt-2">✓ 答え「{answer}」を前提に解説を生成します</p>
               )}
             </Card>
 

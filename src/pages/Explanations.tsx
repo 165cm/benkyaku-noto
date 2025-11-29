@@ -217,6 +217,16 @@ export default function Explanations() {
                     </div>
                   )}
 
+                  {/* 答え */}
+                  {explanation.answer && (
+                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                      <h4 className="text-sm font-semibold mb-2 text-green-800">✅ この問題の答え</h4>
+                      <p className="text-sm font-medium text-green-900">
+                        {explanation.answer}
+                      </p>
+                    </div>
+                  )}
+
                   {/* 元の画像 */}
                   {explanation.imageUrl && (
                     <details className="bg-gray-50 p-3 rounded-lg">
