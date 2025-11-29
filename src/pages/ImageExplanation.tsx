@@ -9,7 +9,7 @@ import { addImageBasedExplanation } from '@/lib/db'
 import { determineUserLevel } from '@/lib/userLevel'
 import type { UserLevel } from '@/types'
 
-type Step = 'upload' | 'edit' | 'generating' | 'result'
+type Step = 'upload' | 'preview' | 'processing' | 'edit' | 'generating' | 'result'
 
 export default function ImageExplanation() {
   const navigate = useNavigate()
@@ -42,17 +42,32 @@ export default function ImageExplanation() {
 
     setError(null)
 
-    // OCR処理を開始
-    await performOCR(file)
+    // プレビュー画面へ
+    setStep('preview')
   }
 
-  // OCR処理
-  const performOCR = async (file: File) => {
+  // 画像をキャンセルして最初に戻る
+  const handleCancelImage = () => {
+    setImageFile(null)
+    setImagePreview('')
+    setImageBase64('')
+    setExtractedText('')
+    setEditedText('')
+    setError(null)
+    setStep('upload')
+  }
+
+  // 解説生成を開始（OCR処理から）
+  const handleStartGeneration = async () => {
+    if (!imageFile) return
+
+    setStep('processing')
     setIsProcessing(true)
     setError(null)
 
     try {
-      const base64 = await imageToBase64(file)
+      // OCR処理
+      const base64 = imageBase64
       const ocrResult = await extractProblemTextFromImage(base64)
 
       setExtractedText(ocrResult.problemText)
@@ -66,6 +81,7 @@ export default function ImageExplanation() {
       setStep('edit')
     } catch (err) {
       setError(err instanceof Error ? err.message : '画像の読み取りに失敗しました')
+      setStep('preview')
     } finally {
       setIsProcessing(false)
     }
@@ -169,26 +185,62 @@ export default function ImageExplanation() {
               className="hidden"
             />
 
-            <div className="space-y-3">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessing}
-                className="w-full"
-              >
-                {isProcessing ? '読み取り中...' : '画像を選択'}
-              </Button>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full"
+            >
+              画像を選択
+            </Button>
+          </Card>
+        )}
 
-              {isProcessing && (
-                <div className="text-center text-gray-600">
-                  <div className="animate-spin inline-block w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full mb-2"></div>
-                  <p>画像を読み取っています...</p>
-                </div>
+        {/* ステップ2: 画像プレビュー */}
+        {step === 'preview' && (
+          <>
+            <Card>
+              <h2 className="text-xl font-bold mb-4">📸 画像プレビュー</h2>
+              <p className="text-gray-600 mb-4">
+                この画像で解説を生成しますか？
+              </p>
+              {imagePreview && (
+                <img
+                  src={imagePreview}
+                  alt="プレビュー"
+                  className="w-full max-w-2xl mx-auto rounded-lg shadow-md"
+                />
               )}
+            </Card>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleCancelImage}
+                variant="secondary"
+                className="flex-1"
+              >
+                ❌ キャンセル
+              </Button>
+              <Button
+                onClick={handleStartGeneration}
+                className="flex-1"
+              >
+                ✓ この画像で解説を生成
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* ステップ3: OCR処理中 */}
+        {step === 'processing' && (
+          <Card>
+            <div className="text-center py-12">
+              <div className="animate-spin inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+              <h2 className="text-xl font-bold mb-2">画像を読み取り中...</h2>
+              <p className="text-gray-600">問題文を抽出しています</p>
             </div>
           </Card>
         )}
 
-        {/* ステップ2: 問題文編集 */}
+        {/* ステップ4: 問題文編集 */}
         {step === 'edit' && (
           <>
             {/* 画像プレビュー */}
@@ -269,7 +321,7 @@ export default function ImageExplanation() {
           </>
         )}
 
-        {/* ステップ3: 生成中 */}
+        {/* ステップ5: 生成中 */}
         {step === 'generating' && (
           <Card>
             <div className="text-center py-12">
@@ -288,7 +340,7 @@ export default function ImageExplanation() {
           </Card>
         )}
 
-        {/* ステップ4: 解説表示 */}
+        {/* ステップ6: 解説表示 */}
         {step === 'result' && (
           <>
             <Card>
