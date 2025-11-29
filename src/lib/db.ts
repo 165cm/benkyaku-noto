@@ -650,6 +650,13 @@ export async function getImageBasedExplanation(id: string) {
   return await db.imageBasedExplanations.get(id)
 }
 
+export async function getImageBasedExplanationsByProblemId(problemId: string) {
+  const allExplanations = await db.imageBasedExplanations.toArray()
+  return allExplanations
+    .filter(e => e.problemId === problemId && !e.deletedAt)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+}
+
 export async function updateImageBasedExplanation(
   id: string,
   updates: Partial<Omit<ImageBasedExplanation, 'id' | 'createdAt' | 'generatedAt'>>

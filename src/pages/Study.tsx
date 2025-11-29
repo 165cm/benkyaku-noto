@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, Undo2, Tags, BookOpen } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, Undo2, Tags, BookOpen, Image, Camera } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey } from '@/lib/db'
+import MarkdownRenderer from '@/components/MarkdownRenderer'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
@@ -19,7 +20,7 @@ import {
   getNextProblemId,
   clearSession,
 } from '@/lib/studySession'
-import type { Problem, Workbook, StudyRecord, StudyResult } from '@/types'
+import type { Problem, Workbook, StudyRecord, StudyResult, ImageBasedExplanation } from '@/types'
 
 export default function Study() {
   const { id } = useParams<{ id: string }>()
@@ -32,6 +33,8 @@ export default function Study() {
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
   const [hasExplanation, setHasExplanation] = useState(false)
   const [explanationId, setExplanationId] = useState<string | null>(null)
+  const [imageExplanations, setImageExplanations] = useState<ImageBasedExplanation[]>([])
+  const [showImageExplanations, setShowImageExplanations] = useState(false)
   const [startTime, setStartTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
@@ -223,6 +226,10 @@ export default function Study() {
         setHasExplanation(false)
         setExplanationId(null)
       }
+
+      // 画像ベース解説の存在チェック
+      const imgExplanations = await getImageBasedExplanationsByProblemId(id)
+      setImageExplanations(imgExplanations)
     }
   }
 
@@ -625,27 +632,50 @@ export default function Study() {
             </div>
 
             {/* AI解説リンク */}
-            {problem.category && problem.sectionTitle && (
-              hasExplanation ? (
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {problem.category && problem.sectionTitle && (
+                hasExplanation ? (
+                  <button
+                    onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
+                    title="AI解説を見る"
+                  >
+                    <BookOpen size={16} />
+                    <span>AI解説を見る</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate('/explanations')}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    title="AI解説ライブラリで解説を作成"
+                  >
+                    <BookOpen size={12} />
+                    <span>AI解説を作る</span>
+                  </button>
+                )
+              )}
+
+              {/* 画像ベース解説ボタン */}
+              {imageExplanations.length > 0 ? (
                 <button
-                  onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
-                  title="AI解説を見る"
+                  onClick={() => setShowImageExplanations(!showImageExplanations)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 shadow-sm"
+                  title="画像から作成した解説を見る"
                 >
-                  <BookOpen size={16} />
-                  <span>AI解説を見る</span>
+                  <Image size={16} />
+                  <span>画像解説 ({imageExplanations.length})</span>
                 </button>
               ) : (
                 <button
-                  onClick={() => navigate('/explanations')}
-                  className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  title="AI解説ライブラリで解説を作成"
+                  onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-gray-50 text-gray-600 hover:bg-gray-100 active:bg-gray-200 shadow-sm"
+                  title="画像から解説を作成"
                 >
-                  <BookOpen size={12} />
-                  <span>AI解説を作る</span>
+                  <Camera size={16} />
+                  <span>画像で解説を作る</span>
                 </button>
-              )
-            )}
+              )}
+            </div>
           </div>
           {/* ページ数を大きく表示 */}
           {problem.page && (
@@ -1028,6 +1058,99 @@ export default function Study() {
               </div>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* 画像ベース解説表示エリア */}
+      {showImageExplanations && imageExplanations.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowImageExplanations(false)}>
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-border p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Image size={20} className="text-green-600" />
+                画像から作成した解説 ({imageExplanations.length}件)
+              </h2>
+              <button
+                onClick={() => setShowImageExplanations(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {imageExplanations.map((explanation, index) => (
+                <Card key={explanation.id} className="border-l-4 border-l-green-500">
+                  <div className="space-y-4">
+                    {/* ヘッダー */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-lg">解説 #{imageExplanations.length - index}</h3>
+                        <p className="text-sm text-gray-500">
+                          レベル: {explanation.userLevel.level === 'beginner' ? '初級' : explanation.userLevel.level === 'intermediate' ? '中級' : '上級'}
+                          ({explanation.userLevel.overallAccuracy}%)
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(explanation.createdAt).toLocaleDateString('ja-JP', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 問題文 */}
+                    {(explanation.editedText || explanation.extractedText) && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <h4 className="text-sm font-semibold mb-2">📝 問題文</h4>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {explanation.editedText || explanation.extractedText}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 答え */}
+                    {explanation.answer && (
+                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                        <h4 className="text-sm font-semibold mb-2 text-green-800">✅ この問題の答え</h4>
+                        <p className="text-sm font-medium text-green-900">
+                          {explanation.answer}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 元の画像 */}
+                    {explanation.imageUrl && (
+                      <details className="bg-gray-50 p-3 rounded-lg">
+                        <summary className="text-sm font-semibold cursor-pointer">📸 元の画像を見る</summary>
+                        <img
+                          src={explanation.imageUrl}
+                          alt="問題画像"
+                          className="mt-2 w-full max-w-2xl rounded-lg"
+                        />
+                      </details>
+                    )}
+
+                    {/* 解説内容 */}
+                    <div>
+                      <MarkdownRenderer content={explanation.explanationContent} />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t border-border p-4">
+              <Button
+                onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
+                className="w-full"
+              >
+                <Camera size={18} className="mr-2" />
+                新しい画像解説を作成
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
