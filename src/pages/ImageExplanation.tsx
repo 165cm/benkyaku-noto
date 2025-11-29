@@ -18,6 +18,7 @@ export default function ImageExplanation() {
   const [step, setStep] = useState<Step>('upload')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
+  const [imageBase64, setImageBase64] = useState<string>('')
   const [extractedText, setExtractedText] = useState('')
   const [editedText, setEditedText] = useState('')
   const [explanation, setExplanation] = useState('')
@@ -34,6 +35,11 @@ export default function ImageExplanation() {
     setImageFile(file)
     const preview = URL.createObjectURL(file)
     setImagePreview(preview)
+
+    // Base64に変換（保存用）
+    const base64 = await imageToBase64(file)
+    setImageBase64(base64)
+
     setError(null)
 
     // OCR処理を開始
@@ -115,7 +121,7 @@ export default function ImageExplanation() {
 
     try {
       await addImageBasedExplanation({
-        imageUrl: imagePreview,
+        imageUrl: imageBase64, // Base64 Data URLで保存
         extractedText,
         editedText: editedText !== extractedText ? editedText : undefined,
         explanationContent: explanation,
