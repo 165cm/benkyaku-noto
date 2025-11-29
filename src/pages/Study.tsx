@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, Undo2, Tags } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, Undo2, Tags, BookOpen } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
@@ -30,6 +30,8 @@ export default function Study() {
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
+  const [hasExplanation, setHasExplanation] = useState(false)
+  const [explanationId, setExplanationId] = useState<string | null>(null)
   const [startTime, setStartTime] = useState(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
@@ -210,6 +212,17 @@ export default function Study() {
 
       const records = await getStudyRecords(id)
       setStudyRecords(records)
+
+      // AI解説の存在チェック
+      if (problemData.category && problemData.sectionTitle) {
+        const sectionKey = `${problemData.category}-${problemData.sectionTitle}`
+        const explanation = await getExplanationBySectionKey(sectionKey)
+        setHasExplanation(!!explanation)
+        setExplanationId(explanation?.id || null)
+      } else {
+        setHasExplanation(false)
+        setExplanationId(null)
+      }
     }
   }
 
@@ -610,8 +623,28 @@ export default function Study() {
                 <Star size={20} fill={problem.isBookmarked ? 'currentColor' : 'none'} />
               </button>
             </div>
-            {problem.memo && (
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
+
+            {/* AI解説リンク */}
+            {problem.category && problem.sectionTitle && (
+              hasExplanation ? (
+                <button
+                  onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
+                  title="AI解説を見る"
+                >
+                  <BookOpen size={16} />
+                  <span>AI解説を見る</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/explanations')}
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  title="AI解説ライブラリで解説を作成"
+                >
+                  <BookOpen size={12} />
+                  <span>AI解説を作る</span>
+                </button>
+              )
             )}
           </div>
           {/* ページ数を大きく表示 */}
