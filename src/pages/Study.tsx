@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, ChevronDown, ChevronUp, LogOut, Star, Undo2, Tags } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, Undo2, Tags } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
@@ -55,9 +55,18 @@ export default function Study() {
   // Undo機能（履歴スタック）
   const [problemHistory, setProblemHistory] = useState<string[]>([])
 
-  // タグ入力モーダル
-  const [showTagModal, setShowTagModal] = useState(false)
-  const [newTag, setNewTag] = useState('')
+  // タグ入力（インライン）
+  const [showCustomTagInput, setShowCustomTagInput] = useState(false)
+  const [customTag, setCustomTag] = useState('')
+
+  // よく使うタグのプリセット
+  const COMMON_TAGS = [
+    '計算ミス',
+    '解き方を調べた',
+    'ケアレスミス',
+    '時間がかかる',
+    '要復習',
+  ]
 
   useEffect(() => {
     if (id) {
@@ -258,19 +267,24 @@ export default function Study() {
     await loadData()
   }
 
-  // タグを追加
-  const handleAddTag = async () => {
-    if (!problem || !newTag.trim()) return
-    await addTagToProblem(problem.id, newTag.trim())
-    setNewTag('')
-    setShowTagModal(false)
+  // タグをトグル（追加/削除）
+  const handleToggleTag = async (tag: string) => {
+    if (!problem) return
+    const currentTags = problem.tags || []
+    if (currentTags.includes(tag)) {
+      await removeTagFromProblem(problem.id, tag)
+    } else {
+      await addTagToProblem(problem.id, tag)
+    }
     await loadData()
   }
 
-  // タグを削除
-  const handleRemoveTag = async (tag: string) => {
-    if (!problem) return
-    await removeTagFromProblem(problem.id, tag)
+  // カスタムタグを追加
+  const handleAddCustomTag = async () => {
+    if (!problem || !customTag.trim()) return
+    await addTagToProblem(problem.id, customTag.trim())
+    setCustomTag('')
+    setShowCustomTagInput(false)
     await loadData()
   }
 
@@ -299,38 +313,45 @@ export default function Study() {
       setProblemHistory(prev => [...prev, problem.id])
 
       const studyTime = elapsedTime
+      const currentProblemId = problem.id
+      const currentWorkbookId = problem.workbookId
+      const currentMemo = memo
 
     // 苦手克服モードの場合、前回の結果と回答数を取得
     let previousResult: StudyResult | null = null
     let previousAttempts = 0
     if (isWeakMode) {
-      const records = await getStudyRecords(problem.id)
+      const records = await getStudyRecords(currentProblemId)
       previousAttempts = records.length
       if (records.length > 0) {
         previousResult = records[0].result // 最新の記録
       }
     }
 
-    await addStudyRecord({
-      problemId: problem.id,
-      workbookId: problem.workbookId,
+    // 学習記録を非同期で保存（画面遷移をブロックしない）
+    const saveRecord = addStudyRecord({
+      problemId: currentProblemId,
+      workbookId: currentWorkbookId,
       result,
       studyTime,
-      memo: memo || undefined,
+      memo: currentMemo || undefined,
     })
 
     // 苦手克服モードの場合は次の優先度の高い問題へ（セッションより優先）
     if (isWeakMode) {
       // セッションに結果を保存
-      addWeakModeResult(problem.id, result, previousResult, studyTime, previousAttempts)
+      addWeakModeResult(currentProblemId, result, previousResult, studyTime, previousAttempts)
 
-      const nextProblem = await getNextWeakProblem(problem.id)
+      const nextProblem = await getNextWeakProblem(currentProblemId)
+
+      // 学習記録の保存を待たずに画面遷移
       if (nextProblem) {
         navigate(`/study/${nextProblem.id}?mode=weak`)
-        return
+      } else {
+        navigate('/weak-mode-report')
       }
-      // 復習する問題がない場合はレポートへ
-      navigate('/weak-mode-report')
+      // バックグラウンドで保存を完了
+      await saveRecord
       return
     }
 
@@ -338,12 +359,13 @@ export default function Study() {
     const session = getSession()
     if (session) {
       // セッション結果に追加
-      addResult(problem.id, result, studyTime)
+      addResult(currentProblemId, result, studyTime)
 
       // 更新後のセッションを再取得（currentIndexが更新されているため）
       const updatedSession = getSession()
       if (!updatedSession) {
         navigate('/study-report')
+        await saveRecord
         return
       }
 
@@ -351,6 +373,7 @@ export default function Study() {
       if (isSessionComplete(updatedSession)) {
         // レポートページへ
         navigate('/study-report')
+        await saveRecord
         return
       }
 
@@ -358,11 +381,13 @@ export default function Study() {
       const nextProblemId = getNextProblemId(updatedSession)
       if (nextProblemId) {
         navigate(`/study/${nextProblemId}`)
+        await saveRecord
         return
       }
 
       // 問題がない場合はレポートへ
       navigate('/study-report')
+      await saveRecord
       return
     }
 
@@ -434,12 +459,14 @@ export default function Study() {
       if (records.length === 0) {
         // 未学習の問題が見つかった
         navigate(`/study/${p.id}`)
+        await saveRecord
         return
       }
     }
 
     // 未学習問題がない場合は問題集詳細ページに戻る
-    navigate(`/workbooks/${problem.workbookId}`)
+    navigate(`/workbooks/${currentWorkbookId}`)
+    await saveRecord
     } finally {
       setIsProcessing(false)
     }
@@ -585,32 +612,6 @@ export default function Study() {
             {problem.memo && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
             )}
-            {/* タグ表示 */}
-            {problem.tags && problem.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {problem.tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(tag)}
-                      className="hover:text-purple-900"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => setShowTagModal(true)}
-              className="mt-2 flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800"
-            >
-              <Tags size={14} />
-              <span>タグを追加</span>
-            </button>
           </div>
           {/* ページ数を大きく表示 */}
           {problem.page && (
@@ -716,54 +717,179 @@ export default function Study() {
         />
       </div>
 
-      {/* 学習履歴（折りたたみ可能） */}
-      {studyRecords.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center justify-between w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors mb-2"
-          >
-            <span className="text-sm font-medium text-gray-700">
-              学習履歴 ({studyRecords.length}回)
-            </span>
-            {showHistory ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </button>
+      {/* タグセクション（インライン） */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Tags size={16} className="text-purple-600" />
+          <h3 className="text-sm font-medium text-gray-700">タグで整理</h3>
+        </div>
 
-          {showHistory && (
-            <div className="space-y-2 mb-4">
-              {studyRecords.map((record) => (
-                <Card key={record.id} className="p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {getResultIcon(record.result)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{getResultText(record.result)}</p>
-                        <p className="text-xs text-gray-600">
-                          {new Date(record.studiedAt).toLocaleDateString('ja-JP')} · {formatTime(record.studyTime)}
-                        </p>
-                        {record.memo && (
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{record.memo}</p>
-                        )}
+        {/* よく使うタグ（トグルボタン） */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {COMMON_TAGS.map(tag => {
+            const isActive = problem?.tags?.includes(tag)
+            return (
+              <button
+                key={tag}
+                onClick={() => handleToggleTag(tag)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {tag}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* カスタムタグ表示 */}
+        {problem?.tags && problem.tags.filter(tag => !COMMON_TAGS.includes(tag)).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            <span className="text-xs text-gray-500">その他:</span>
+            {problem.tags
+              .filter(tag => !COMMON_TAGS.includes(tag))
+              .map(tag => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs"
+                >
+                  {tag}
+                  <button
+                    onClick={() => handleToggleTag(tag)}
+                    className="hover:text-blue-900"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+          </div>
+        )}
+
+        {/* カスタムタグ入力 */}
+        {showCustomTagInput ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customTag}
+              onChange={(e) => setCustomTag(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTag()}
+              className="flex-1 px-3 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="カスタムタグを入力"
+              autoFocus
+            />
+            <button
+              onClick={handleAddCustomTag}
+              className="px-3 py-1.5 bg-purple-600 text-white rounded-md text-xs font-medium hover:bg-purple-700 transition-colors"
+            >
+              追加
+            </button>
+            <button
+              onClick={() => {
+                setShowCustomTagInput(false)
+                setCustomTag('')
+              }}
+              className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-300 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowCustomTagInput(true)}
+            className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+          >
+            + カスタムタグを追加
+          </button>
+        )}
+      </div>
+
+      {/* 学習履歴（横スクロール可能） */}
+      {studyRecords.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-700">
+              学習履歴 ({studyRecords.length}回)
+            </h3>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              {showHistory ? '履歴を隠す' : '全て表示'}
+            </button>
+          </div>
+
+          {/* 横スクロール可能な履歴カード */}
+          <div className="overflow-x-auto pb-2 -mx-2 px-2">
+            <div className="flex gap-3 min-w-min">
+              {studyRecords.slice(0, showHistory ? undefined : 5).map((record) => (
+                <Card
+                  key={record.id}
+                  className="flex-shrink-0 w-44 p-3 bg-gradient-to-br from-white to-gray-50"
+                >
+                  <div className="space-y-2">
+                    {/* 結果アイコンと日時 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getResultIcon(record.result)}
+                        <span className="text-sm font-bold">
+                          {getResultText(record.result)}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex gap-1 flex-shrink-0">
+
+                    {/* 時間 */}
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <span>⏱️</span>
+                      <span className="font-mono font-medium">{formatTime(record.studyTime)}</span>
+                    </div>
+
+                    {/* 日付 */}
+                    <div className="text-xs text-gray-500">
+                      {new Date(record.studiedAt).toLocaleDateString('ja-JP', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+
+                    {/* メモ */}
+                    {record.memo && (
+                      <p className="text-xs text-gray-600 line-clamp-2 pt-1 border-t border-gray-200">
+                        {record.memo}
+                      </p>
+                    )}
+
+                    {/* 編集・削除ボタン */}
+                    <div className="flex gap-1 pt-1">
                       <button
                         onClick={() => openEditModal(record)}
-                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        className="flex-1 p-1.5 hover:bg-blue-100 rounded transition-colors text-center"
+                        title="編集"
                       >
-                        <Edit2 size={14} className="text-primary" />
+                        <Edit2 size={12} className="text-primary mx-auto" />
                       </button>
                       <button
                         onClick={() => handleDeleteRecord(record.id)}
-                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                        className="flex-1 p-1.5 hover:bg-red-100 rounded transition-colors text-center"
+                        title="削除"
                       >
-                        <Trash2 size={14} className="text-error" />
+                        <Trash2 size={12} className="text-error mx-auto" />
                       </button>
                     </div>
                   </div>
                 </Card>
               ))}
             </div>
+          </div>
+
+          {/* スクロールのヒント */}
+          {studyRecords.length > 3 && !showHistory && (
+            <p className="text-xs text-gray-400 text-center mt-2">
+              ← スワイプして過去の履歴を確認 →
+            </p>
           )}
         </div>
       )}
@@ -844,58 +970,6 @@ export default function Study() {
         </div>
       )}
 
-      {/* タグ追加モーダル */}
-      {showTagModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">タグを追加</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">タグ名</label>
-                <input
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="例: 要復習, 時間がかかる"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-600 mb-2">よく使うタグ:</p>
-                <div className="flex flex-wrap gap-2">
-                  {['要復習', '苦手', '時間がかかる', '解法を忘れた', 'ケアレスミス'].map(tag => (
-                    <button
-                      key={tag}
-                      onClick={() => {
-                        setNewTag(tag)
-                      }}
-                      className="px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-full text-xs transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2 justify-end">
-                <Button variant="secondary" onClick={() => {
-                  setShowTagModal(false)
-                  setNewTag('')
-                }}>
-                  キャンセル
-                </Button>
-                <Button variant="primary" onClick={handleAddTag} disabled={!newTag.trim()}>
-                  追加
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
         </div>
 
         {/* PDFビューアエリア */}
