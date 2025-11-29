@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera } from 'lucide-react'
+import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera, Image } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
-import { getExplanations, deleteExplanation } from '@/lib/db'
+import { getExplanations, deleteExplanation, getImageBasedExplanations, deleteImageBasedExplanation } from '@/lib/db'
 import { generateAndSaveExplanation, hasUnexplainedSections } from '@/lib/aiExplanation'
 import { getOpenAIApiKey } from '@/lib/storage'
-import type { Explanation } from '@/types'
+import type { Explanation, ImageBasedExplanation } from '@/types'
 
 export default function Explanations() {
   const navigate = useNavigate()
   const [explanations, setExplanations] = useState<Explanation[]>([])
+  const [imageExplanations, setImageExplanations] = useState<ImageBasedExplanation[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -26,6 +27,9 @@ export default function Explanations() {
     setLoading(true)
     const data = await getExplanations()
     setExplanations(data)
+
+    const imageData = await getImageBasedExplanations()
+    setImageExplanations(imageData)
 
     const hasMore = await hasUnexplainedSections()
     setCanGenerate(hasMore)
@@ -62,6 +66,13 @@ export default function Explanations() {
     if (!confirm('この解説を削除しますか？')) return
 
     await deleteExplanation(id)
+    await loadData()
+  }
+
+  const handleDeleteImageExplanation = async (id: string) => {
+    if (!confirm('この解説を削除しますか？')) return
+
+    await deleteImageBasedExplanation(id)
     await loadData()
   }
 
@@ -141,7 +152,7 @@ export default function Explanations() {
       </div>
 
       {/* 解説一覧 */}
-      {explanations.length === 0 ? (
+      {explanations.length === 0 && imageExplanations.length === 0 ? (
         <Card>
           <div className="text-center py-8">
             <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
@@ -153,6 +164,81 @@ export default function Explanations() {
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* 画像ベースの解説 */}
+          {imageExplanations.map((explanation) => (
+            <Card key={explanation.id} className="border-l-4 border-l-blue-500">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => toggleExpand(explanation.id)}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Image size={16} className="text-blue-500" />
+                    <h3 className="font-semibold">
+                      画像から生成した解説
+                      {explanation.category && explanation.sectionTitle &&
+                        ` - ${explanation.category} ${explanation.sectionTitle}`
+                      }
+                    </h3>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    レベル: {explanation.userLevel.level === 'beginner' ? '初級' : explanation.userLevel.level === 'intermediate' ? '中級' : '上級'}
+                    ({explanation.userLevel.overallAccuracy}%) · {formatDate(explanation.createdAt)}
+                    {explanation.regenerationCount > 0 && ` · 再生成${explanation.regenerationCount}回`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteImageExplanation(explanation.id)
+                    }}
+                    className="p-2 hover:bg-red-100 rounded transition-colors"
+                  >
+                    <Trash2 size={16} className="text-red-500" />
+                  </button>
+                  {expandedId === explanation.id ? (
+                    <ChevronUp size={20} className="text-gray-400" />
+                  ) : (
+                    <ChevronDown size={20} className="text-gray-400" />
+                  )}
+                </div>
+              </div>
+
+              {expandedId === explanation.id && (
+                <div className="mt-4 pt-4 border-t border-border space-y-4">
+                  {/* 問題文 */}
+                  {(explanation.editedText || explanation.extractedText) && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <h4 className="text-sm font-semibold mb-2">📝 問題文</h4>
+                      <p className="text-sm whitespace-pre-wrap">
+                        {explanation.editedText || explanation.extractedText}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 元の画像 */}
+                  {explanation.imageUrl && (
+                    <details className="bg-gray-50 p-3 rounded-lg">
+                      <summary className="text-sm font-semibold cursor-pointer">📸 元の画像を見る</summary>
+                      <img
+                        src={explanation.imageUrl}
+                        alt="問題画像"
+                        className="mt-2 w-full max-w-2xl rounded-lg"
+                      />
+                    </details>
+                  )}
+
+                  {/* 解説 */}
+                  <div>
+                    <MarkdownRenderer content={explanation.explanationContent} />
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+
+          {/* セクション別の解説 */}
           {explanations.map((explanation) => (
             <Card key={explanation.id}>
               <div
