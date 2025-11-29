@@ -1,6 +1,6 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-import type { Workbook, Problem, StudyRecord, Explanation } from '@/types'
+import type { Workbook, Problem, StudyRecord, Explanation, ImageBasedExplanation } from '@/types'
 import { validateProblem, validateWorkbook, validateStudyRecord } from './validation'
 import { auth } from './firebase'
 import {
@@ -14,6 +14,7 @@ export class BenkyakuDB extends Dexie {
   problems!: Table<Problem>
   studyRecords!: Table<StudyRecord>
   explanations!: Table<Explanation>
+  imageBasedExplanations!: Table<ImageBasedExplanation>
 
   constructor() {
     super('BenkyakuNoto')
@@ -93,6 +94,15 @@ export class BenkyakuDB extends Dexie {
       problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId, isBookmarked',
       studyRecords: 'id, problemId, workbookId, studiedAt',
       explanations: 'id, sectionKey, category, createdAt',
+    })
+
+    // 画像ベースAI解説テーブルを追加
+    this.version(8).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId, isBookmarked',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+      explanations: 'id, sectionKey, category, createdAt',
+      imageBasedExplanations: 'id, createdAt, generatedAt, deletedAt',
     })
   }
 }
@@ -611,4 +621,47 @@ export async function getBookmarkedProblems(workbookId?: string): Promise<Proble
   }
 
   return problems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+}
+
+// 画像ベース解説関連の関数
+export async function addImageBasedExplanation(
+  explanation: Omit<ImageBasedExplanation, 'id' | 'createdAt' | 'generatedAt'>
+) {
+  const id = crypto.randomUUID()
+  const now = new Date()
+  await db.imageBasedExplanations.add({
+    ...explanation,
+    id,
+    createdAt: now,
+    generatedAt: now,
+  })
+  return id
+}
+
+export async function getImageBasedExplanations() {
+  const explanations = await db.imageBasedExplanations.toArray()
+  // 削除されていない解説のみを返す
+  return explanations
+    .filter(e => !e.deletedAt)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+}
+
+export async function getImageBasedExplanation(id: string) {
+  return await db.imageBasedExplanations.get(id)
+}
+
+export async function updateImageBasedExplanation(
+  id: string,
+  updates: Partial<Omit<ImageBasedExplanation, 'id' | 'createdAt' | 'generatedAt'>>
+) {
+  await db.imageBasedExplanations.update(id, updates)
+}
+
+export async function deleteImageBasedExplanation(id: string) {
+  // 論理削除
+  await db.imageBasedExplanations.update(id, { deletedAt: new Date() })
+}
+
+export async function permanentlyDeleteImageBasedExplanation(id: string) {
+  await db.imageBasedExplanations.delete(id)
 }
