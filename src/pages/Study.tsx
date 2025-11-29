@@ -659,7 +659,7 @@ export default function Study() {
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700 text-sm font-medium"
             >
               <Undo2 size={16} />
-              <span>前の問題に戻る ({problemHistory.length}問前)</span>
+              <span>1問前に戻る {problemHistory.length > 1 && `(履歴: ${problemHistory.length}問)`}</span>
             </button>
           </div>
         )}
