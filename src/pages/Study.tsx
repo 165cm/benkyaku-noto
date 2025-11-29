@@ -610,9 +610,6 @@ export default function Study() {
                 <Star size={20} fill={problem.isBookmarked ? 'currentColor' : 'none'} />
               </button>
             </div>
-            {problem.memo && (
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{problem.memo}</p>
-            )}
           </div>
           {/* ページ数を大きく表示 */}
           {problem.page && (
