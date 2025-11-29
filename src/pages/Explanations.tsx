@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera, Image } from 'lucide-react'
+import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera, Image, Filter, Search, SortAsc } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getExplanations, deleteExplanation, getImageBasedExplanations, deleteImageBasedExplanation } from '@/lib/db'
 import { generateAndSaveExplanation, hasUnexplainedSections } from '@/lib/aiExplanation'
 import { getOpenAIApiKey } from '@/lib/storage'
-import type { Explanation, ImageBasedExplanation } from '@/types'
+import type { Explanation, ImageBasedExplanation, UserLevelType } from '@/types'
+
+type SortOption = 'newest' | 'oldest' | 'level-asc' | 'level-desc' | 'regeneration'
 
 export default function Explanations() {
   const navigate = useNavigate()
@@ -18,6 +20,12 @@ export default function Explanations() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [canGenerate, setCanGenerate] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
+
+  // フィルター・検索・ソート用のstate
+  const [searchQuery, setSearchQuery] = useState('')
+  const [levelFilter, setLevelFilter] = useState<UserLevelType | 'all'>('all')
+  const [sortOption, setSortOption] = useState<SortOption>('newest')
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -88,6 +96,58 @@ export default function Explanations() {
     })
   }
 
+  // フィルター・ソート・検索の適用
+  const filteredAndSortedImageExplanations = useMemo(() => {
+    let filtered = [...imageExplanations]
+
+    // レベルフィルター
+    if (levelFilter !== 'all') {
+      filtered = filtered.filter(exp => exp.userLevel.level === levelFilter)
+    }
+
+    // 検索フィルター（問題文、答え、カテゴリ、セクション名で検索）
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(exp => {
+        const text = (exp.editedText || exp.extractedText).toLowerCase()
+        const answer = (exp.answer || '').toLowerCase()
+        const category = (exp.category || '').toLowerCase()
+        const section = (exp.sectionTitle || '').toLowerCase()
+        return text.includes(query) || answer.includes(query) || category.includes(query) || section.includes(query)
+      })
+    }
+
+    // ソート
+    filtered.sort((a, b) => {
+      switch (sortOption) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        case 'level-asc':
+          const levelOrder = { beginner: 0, intermediate: 1, advanced: 2 }
+          return levelOrder[a.userLevel.level] - levelOrder[b.userLevel.level]
+        case 'level-desc':
+          const levelOrderDesc = { beginner: 0, intermediate: 1, advanced: 2 }
+          return levelOrderDesc[b.userLevel.level] - levelOrderDesc[a.userLevel.level]
+        case 'regeneration':
+          return b.regenerationCount - a.regenerationCount
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [imageExplanations, levelFilter, searchQuery, sortOption])
+
+  const getLevelLabel = (level: UserLevelType) => {
+    switch (level) {
+      case 'beginner': return '初級'
+      case 'intermediate': return '中級'
+      case 'advanced': return '上級'
+    }
+  }
+
   if (loading) {
     return <div>読み込み中...</div>
   }
@@ -151,6 +211,99 @@ export default function Explanations() {
         </Card>
       </div>
 
+      {/* フィルター・検索・ソートセクション */}
+      {imageExplanations.length > 0 && (
+        <Card className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Filter size={18} />
+              フィルター・検索
+            </h3>
+            <Button
+              variant="secondary"
+              onClick={() => setShowFilters(!showFilters)}
+              className="text-sm"
+            >
+              {showFilters ? 'フィルターを隠す' : 'フィルターを表示'}
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="space-y-4">
+              {/* 検索バー */}
+              <div>
+                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                  <Search size={16} />
+                  キーワード検索
+                </label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="問題文、答え、カテゴリで検索..."
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* レベルフィルター */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">レベル</label>
+                  <select
+                    value={levelFilter}
+                    onChange={(e) => setLevelFilter(e.target.value as UserLevelType | 'all')}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="all">全てのレベル</option>
+                    <option value="beginner">初級</option>
+                    <option value="intermediate">中級</option>
+                    <option value="advanced">上級</option>
+                  </select>
+                </div>
+
+                {/* ソートオプション */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                    <SortAsc size={16} />
+                    並び替え
+                  </label>
+                  <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value as SortOption)}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="newest">新しい順</option>
+                    <option value="oldest">古い順</option>
+                    <option value="level-asc">レベル: 初級→上級</option>
+                    <option value="level-desc">レベル: 上級→初級</option>
+                    <option value="regeneration">再生成回数が多い順</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* フィルター結果サマリー */}
+              <div className="text-sm text-gray-600 pt-2 border-t border-border">
+                <span className="font-medium">{filteredAndSortedImageExplanations.length}件</span> の解説を表示中
+                {(searchQuery || levelFilter !== 'all') && (
+                  <span className="ml-2">
+                    （全{imageExplanations.length}件中）
+                    <button
+                      onClick={() => {
+                        setSearchQuery('')
+                        setLevelFilter('all')
+                      }}
+                      className="ml-2 text-primary hover:underline"
+                    >
+                      フィルターをリセット
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* 解説一覧 */}
       {explanations.length === 0 && imageExplanations.length === 0 ? (
         <Card>
@@ -165,7 +318,7 @@ export default function Explanations() {
       ) : (
         <div className="space-y-4">
           {/* 画像ベースの解説 */}
-          {imageExplanations.map((explanation) => (
+          {filteredAndSortedImageExplanations.map((explanation) => (
             <Card key={explanation.id} className="border-l-4 border-l-blue-500">
               <div
                 className="flex items-center justify-between cursor-pointer"
@@ -182,7 +335,7 @@ export default function Explanations() {
                     </h3>
                   </div>
                   <p className="text-sm text-gray-500">
-                    レベル: {explanation.userLevel.level === 'beginner' ? '初級' : explanation.userLevel.level === 'intermediate' ? '中級' : '上級'}
+                    レベル: {getLevelLabel(explanation.userLevel.level)}
                     ({explanation.userLevel.overallAccuracy}%) · {formatDate(explanation.createdAt)}
                     {explanation.regenerationCount > 0 && ` · 再生成${explanation.regenerationCount}回`}
                   </p>

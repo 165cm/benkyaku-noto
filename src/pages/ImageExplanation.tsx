@@ -1,18 +1,19 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { imageToBase64, extractProblemTextFromImage } from '@/lib/openai'
 import { generateImageBasedExplanation, regenerateExplanation } from '@/lib/imageExplanation'
-import { addImageBasedExplanation } from '@/lib/db'
+import { addImageBasedExplanation, db, getWorkbook } from '@/lib/db'
 import { determineUserLevel } from '@/lib/userLevel'
-import type { UserLevel } from '@/types'
+import type { UserLevel, UserLevelType, Problem, Workbook } from '@/types'
 
 type Step = 'upload' | 'preview' | 'processing' | 'edit' | 'generating' | 'result'
 
 export default function ImageExplanation() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>('upload')
@@ -27,6 +28,89 @@ export default function ImageExplanation() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ocrConfidence, setOcrConfidence] = useState<number>(0)
+
+  // 手動レベル選択
+  const [manualLevelOverride, setManualLevelOverride] = useState<UserLevelType | null>(null)
+  const [showManualLevelSelector, setShowManualLevelSelector] = useState(false)
+
+  // 成長可視化
+  const [showLevelUpNotification, setShowLevelUpNotification] = useState(false)
+  const [levelUpInfo, setLevelUpInfo] = useState<{ from: UserLevelType; to: UserLevelType } | null>(null)
+
+  // 問題紐付け機能
+  const [linkedProblemId, setLinkedProblemId] = useState<string | null>(null)
+  const [linkedWorkbookId, setLinkedWorkbookId] = useState<string | null>(null)
+  const [problems, setProblems] = useState<Problem[]>([])
+  const [workbooks, setWorkbooks] = useState<Map<string, Workbook>>(new Map())
+  const [showProblemSelector, setShowProblemSelector] = useState(false)
+
+  // URLパラメータから問題IDを取得（Study画面から遷移した場合）
+  useEffect(() => {
+    const problemId = searchParams.get('problemId')
+    if (problemId) {
+      setLinkedProblemId(problemId)
+      loadProblemInfo(problemId)
+    }
+  }, [searchParams])
+
+  // 問題情報を読み込む
+  const loadProblemInfo = async (problemId: string) => {
+    try {
+      const problem = await db.problems.get(problemId)
+      if (problem) {
+        setLinkedWorkbookId(problem.workbookId)
+      }
+    } catch (err) {
+      console.error('Failed to load problem info:', err)
+    }
+  }
+
+  // 全問題を読み込む（問題選択用）
+  const loadAllProblems = async () => {
+    try {
+      const allProblems = await db.problems
+        .where('deletedAt')
+        .equals(undefined as any)
+        .toArray()
+
+      setProblems(allProblems)
+
+      // 問題集情報も取得
+      const workbookMap = new Map<string, Workbook>()
+      for (const problem of allProblems) {
+        if (!workbookMap.has(problem.workbookId)) {
+          const wb = await getWorkbook(problem.workbookId)
+          if (wb) {
+            workbookMap.set(problem.workbookId, wb)
+          }
+        }
+      }
+      setWorkbooks(workbookMap)
+    } catch (err) {
+      console.error('Failed to load problems:', err)
+    }
+  }
+
+  // レベルアップチェック
+  const checkLevelUp = (currentLevel: UserLevelType) => {
+    try {
+      const previousLevel = localStorage.getItem('lastUserLevel') as UserLevelType | null
+
+      if (previousLevel && previousLevel !== currentLevel) {
+        const levelOrder = { beginner: 0, intermediate: 1, advanced: 2 }
+        if (levelOrder[currentLevel] > levelOrder[previousLevel]) {
+          // レベルアップ！
+          setLevelUpInfo({ from: previousLevel, to: currentLevel })
+          setShowLevelUpNotification(true)
+        }
+      }
+
+      // 現在のレベルを保存
+      localStorage.setItem('lastUserLevel', currentLevel)
+    } catch (err) {
+      console.error('Failed to check level up:', err)
+    }
+  }
 
   // 画像選択
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,12 +164,26 @@ export default function ImageExplanation() {
       const level = await determineUserLevel()
       setUserLevel(level)
 
+      // レベルアップチェック
+      checkLevelUp(level.level)
+
       setStep('edit')
     } catch (err) {
       setError(err instanceof Error ? err.message : '画像の読み取りに失敗しました')
       setStep('preview')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  // 有効なユーザーレベルを取得（手動選択があればそれを優先）
+  const getEffectiveUserLevel = (): UserLevel | null => {
+    if (!userLevel) return null
+    if (!manualLevelOverride) return userLevel
+
+    return {
+      ...userLevel,
+      level: manualLevelOverride,
     }
   }
 
@@ -99,6 +197,9 @@ export default function ImageExplanation() {
 
     try {
       const base64 = await imageToBase64(imageFile)
+      const effectiveLevel = getEffectiveUserLevel()!
+
+      // 手動レベルを使う場合、一時的にuserLevelを上書き
       const explanationContent = await generateImageBasedExplanation(
         editedText,
         answer || undefined,
@@ -106,6 +207,12 @@ export default function ImageExplanation() {
       )
 
       setExplanation(explanationContent)
+
+      // 手動選択した場合、userLevelを更新
+      if (manualLevelOverride) {
+        setUserLevel(effectiveLevel)
+      }
+
       setStep('result')
     } catch (err) {
       setError(err instanceof Error ? err.message : '解説の生成に失敗しました')
@@ -124,9 +231,11 @@ export default function ImageExplanation() {
 
     try {
       const base64 = await imageToBase64(imageFile)
+      const effectiveLevel = getEffectiveUserLevel()!
+
       const explanationContent = await regenerateExplanation(
         editedText,
-        userLevel,
+        effectiveLevel,
         answer || undefined,
         base64
       )
@@ -155,10 +264,18 @@ export default function ImageExplanation() {
         explanationContent: explanation,
         userLevel,
         regenerationCount: 0,
+        problemId: linkedProblemId || undefined,
+        workbookId: linkedWorkbookId || undefined,
       })
 
       alert('解説を保存しました！')
-      navigate('/explanations')
+
+      // 問題と紐付いている場合は問題画面に戻る、それ以外は解説一覧へ
+      if (linkedProblemId) {
+        navigate(`/study/${linkedProblemId}`)
+      } else {
+        navigate('/explanations')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました')
     } finally {
@@ -311,39 +428,185 @@ export default function ImageExplanation() {
               )}
             </Card>
 
+            {/* 問題との紐付け（オプション） */}
+            <Card className="bg-gray-50">
+              <h2 className="text-xl font-bold mb-4">🔗 問題との紐付け（任意）</h2>
+              <p className="text-gray-600 text-sm mb-3">
+                既存の問題と紐付けると、学習画面からこの解説を参照できます。
+              </p>
+
+              {linkedProblemId ? (
+                <div className="space-y-2">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ 問題に紐付けられています
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setLinkedProblemId(null)
+                      setLinkedWorkbookId(null)
+                    }}
+                    className="w-full"
+                  >
+                    紐付けを解除
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  {!showProblemSelector ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowProblemSelector(true)
+                        loadAllProblems()
+                      }}
+                      className="w-full"
+                    >
+                      問題を選択
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <select
+                        value={linkedProblemId || ''}
+                        onChange={(e) => {
+                          setLinkedProblemId(e.target.value || null)
+                          const problem = problems.find(p => p.id === e.target.value)
+                          if (problem) {
+                            setLinkedWorkbookId(problem.workbookId)
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">問題を選択してください</option>
+                        {problems.map((problem) => {
+                          const workbook = workbooks.get(problem.workbookId)
+                          return (
+                            <option key={problem.id} value={problem.id}>
+                              {workbook?.title} - 問題{problem.problemNumber}
+                              {problem.sectionTitle && ` (${problem.sectionTitle})`}
+                            </option>
+                          )
+                        })}
+                      </select>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setShowProblemSelector(false)}
+                        className="w-full"
+                      >
+                        キャンセル
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
             {/* ユーザーレベル表示 */}
             {userLevel && (
               <Card className="bg-blue-50 border-blue-200">
-                <h2 className="text-xl font-bold mb-4">💡 あなたの学習状況</h2>
-                <div className="space-y-2">
-                  <p>
-                    • 全体正解率: <strong>{userLevel.overallAccuracy}%</strong> (
-                    {userLevel.level === 'beginner'
-                      ? '初級レベル'
-                      : userLevel.level === 'intermediate'
-                      ? '中級レベル'
-                      : '上級レベル'}
-                    )
-                  </p>
-                  {userLevel.weakSections.length > 0 && (
-                    <p>
-                      • 特に苦手:{' '}
-                      <strong>
-                        {userLevel.weakSections
-                          .slice(0, 3)
-                          .map((key) => {
-                            const [, ...title] = key.split('-')
-                            return title.join('-')
-                          })
-                          .join(', ')}
-                      </strong>
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-600 mt-3">
-                    この情報をもとに、<strong>あなた向けに最適化された解説</strong>
-                    を生成します。
-                  </p>
+                <div className="flex items-start justify-between mb-4">
+                  <h2 className="text-xl font-bold">💡 あなたの学習状況</h2>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowManualLevelSelector(!showManualLevelSelector)}
+                    className="text-sm"
+                  >
+                    {showManualLevelSelector ? 'キャンセル' : 'レベルを変更'}
+                  </Button>
                 </div>
+
+                {!showManualLevelSelector ? (
+                  <div className="space-y-2">
+                    <p>
+                      • 全体正解率: <strong>{userLevel.overallAccuracy}%</strong> (
+                      {manualLevelOverride
+                        ? `${manualLevelOverride === 'beginner' ? '初級' : manualLevelOverride === 'intermediate' ? '中級' : '上級'}レベル（手動選択）`
+                        : `${userLevel.level === 'beginner' ? '初級' : userLevel.level === 'intermediate' ? '中級' : '上級'}レベル`
+                      }
+                      )
+                    </p>
+                    {userLevel.weakSections.length > 0 && (
+                      <p>
+                        • 特に苦手:{' '}
+                        <strong>
+                          {userLevel.weakSections
+                            .slice(0, 3)
+                            .map((key) => {
+                              const [, ...title] = key.split('-')
+                              return title.join('-')
+                            })
+                            .join(', ')}
+                        </strong>
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-600 mt-3">
+                      この情報をもとに、<strong>あなた向けに最適化された解説</strong>
+                      を生成します。
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-700">
+                      解説の難易度レベルを手動で選択できます。自動判定より優先されます。
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => setManualLevelOverride('beginner')}
+                        className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                          manualLevelOverride === 'beginner'
+                            ? 'border-blue-500 bg-blue-100 text-blue-900 font-semibold'
+                            : 'border-gray-300 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="text-lg mb-1">🌱</div>
+                        <div className="text-sm">初級</div>
+                      </button>
+                      <button
+                        onClick={() => setManualLevelOverride('intermediate')}
+                        className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                          manualLevelOverride === 'intermediate'
+                            ? 'border-blue-500 bg-blue-100 text-blue-900 font-semibold'
+                            : 'border-gray-300 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="text-lg mb-1">🌿</div>
+                        <div className="text-sm">中級</div>
+                      </button>
+                      <button
+                        onClick={() => setManualLevelOverride('advanced')}
+                        className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                          manualLevelOverride === 'advanced'
+                            ? 'border-blue-500 bg-blue-100 text-blue-900 font-semibold'
+                            : 'border-gray-300 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="text-lg mb-1">🌳</div>
+                        <div className="text-sm">上級</div>
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setManualLevelOverride(null)
+                          setShowManualLevelSelector(false)
+                        }}
+                        className="flex-1"
+                      >
+                        自動判定に戻す
+                      </Button>
+                      <Button
+                        onClick={() => setShowManualLevelSelector(false)}
+                        disabled={!manualLevelOverride}
+                        className="flex-1"
+                      >
+                        ✓ 確定
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
             )}
 
@@ -428,6 +691,40 @@ export default function ImageExplanation() {
             </details>
           </>
         )}
+
+      {/* レベルアップ通知モーダル */}
+      {showLevelUpNotification && levelUpInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 text-center animate-bounce-in">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl font-bold mb-2 text-green-600">レベルアップ！</h2>
+            <p className="text-gray-700 mb-4">
+              <span className="text-lg">
+                {levelUpInfo.from === 'beginner' ? '初級' : levelUpInfo.from === 'intermediate' ? '中級' : '上級'}
+              </span>
+              <span className="mx-2">→</span>
+              <span className="text-xl font-bold text-green-600">
+                {levelUpInfo.to === 'beginner' ? '初級' : levelUpInfo.to === 'intermediate' ? '中級' : '上級'}
+              </span>
+              <span className="ml-1">
+                {levelUpInfo.to === 'intermediate' ? '🌿' : '🌳'}
+              </span>
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              {levelUpInfo.to === 'intermediate'
+                ? '基礎が身についてきました！パターン認識力を磨いていきましょう。'
+                : '素晴らしい！より効率的で洗練された解法を学んでいきましょう。'
+              }
+            </p>
+            <Button
+              onClick={() => setShowLevelUpNotification(false)}
+              className="w-full"
+            >
+              ✓ ありがとう！
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
