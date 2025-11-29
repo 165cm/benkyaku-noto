@@ -103,6 +103,7 @@ export interface ImageBasedExplanation {
   // 問題文（OCRで抽出、編集可能）
   extractedText: string // OCRで抽出した問題文
   editedText?: string // ユーザーが編集した問題文
+  answer?: string // 問題の答え（ユーザーが入力）
 
   // 解説内容
   explanationContent: string // マークダウン形式の解説

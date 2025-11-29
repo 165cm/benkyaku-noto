@@ -5,6 +5,7 @@ import type { UserLevel } from '@/types'
 // 画像ベース問題の解説を生成
 export async function generateImageBasedExplanation(
   problemText: string,
+  answer?: string,
   imageBase64?: string
 ): Promise<string> {
   const apiKey = getOpenAIApiKey()
@@ -17,7 +18,7 @@ export async function generateImageBasedExplanation(
 
   // プロンプトを構築
   const systemPrompt = buildSystemPrompt(userLevel)
-  const userPrompt = buildUserPrompt(problemText, userLevel, imageBase64)
+  const userPrompt = buildUserPrompt(problemText, userLevel, answer, imageBase64)
 
   // メッセージコンテンツを構築
   const messageContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
@@ -93,6 +94,9 @@ ${getLevelGuidelines(userLevel.level)}
 
 必ず以下の構造で出力してください:
 
+## ✅ この問題の答え
+[問題の正解。答えが指定されている場合は必ずそれを記載してください]
+
 ## 🎯 この問題のポイント
 [問題の本質、何を問われているか]
 
@@ -127,6 +131,7 @@ ${userLevel.weakSections.length > 0 ?
 function buildUserPrompt(
   problemText: string,
   userLevel: UserLevel,
+  answer?: string,
   imageBase64?: string
 ): string {
   return `以下の問題について、上記の学習者プロフィールに基づいて最適化された解説を生成してください。
@@ -134,11 +139,14 @@ function buildUserPrompt(
 # 問題文
 ${problemText}
 
+${answer ? `# この問題の答え\n${answer}\n\n**重要**: 上記の答えを前提として、解説を生成してください。解説の冒頭「## ✅ この問題の答え」セクションに必ずこの答えを記載してください。` : ''}
+
 ${imageBase64 ? `# 問題画像\n[画像が添付されています。問題文と合わせて確認してください]` : ''}
 
 # 指示
 - 学習者のレベル（${getLevelLabel(userLevel.level)}）に合わせた説明をしてください
 - 学習者の苦手分野を考慮し、関連する知識を補足してください
+${answer ? '- **この問題の答えは「' + answer + '」です。この答えを前提に解説を書いてください**' : '- 問題を解いて答えを導き出し、「## ✅ この問題の答え」セクションに記載してください'}
 - 出力形式に従って、構造化されたMarkdownで解説を生成してください
 - 数式がある場合はLaTeX記法（$...$）を使用してください`
 }
@@ -191,6 +199,7 @@ function getTrendLabel(trend?: string): string {
 export async function regenerateExplanation(
   editedText: string,
   userLevel: UserLevel,
+  answer?: string,
   imageBase64?: string
 ): Promise<string> {
   // 既存のuserLevelを使用して再生成
@@ -200,7 +209,7 @@ export async function regenerateExplanation(
   }
 
   const systemPrompt = buildSystemPrompt(userLevel)
-  const userPrompt = buildUserPrompt(editedText, userLevel, imageBase64)
+  const userPrompt = buildUserPrompt(editedText, userLevel, answer, imageBase64)
 
   const messageContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
     {
