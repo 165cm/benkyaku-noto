@@ -1,7 +1,6 @@
 import type { UserLevel, UserLevelType, StudyVolumeType, TrendType } from '@/types'
 import { calculateSectionStats } from './review'
 import { db } from './db'
-import { getStudyDate } from './dateUtils'
 
 // ユーザーレベルを判定
 export async function determineUserLevel(): Promise<UserLevel> {

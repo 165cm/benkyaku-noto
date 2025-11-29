@@ -130,7 +130,7 @@ export default function Explanations() {
             </p>
             <Button
               onClick={() => navigate('/explanations/image-upload')}
-              variant="outline"
+              variant="secondary"
               className="w-full border-blue-300 hover:bg-blue-100"
             >
               <Camera size={18} className="mr-2" />
