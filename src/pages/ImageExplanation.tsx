@@ -4,7 +4,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { imageToBase64, extractProblemTextFromImage } from '@/lib/openai'
-import { generateImageBasedExplanation, regenerateExplanation } from '@/lib/imageExplanation'
+import { generateImageBasedExplanation, regenerateExplanation, answerFollowUpQuestion } from '@/lib/imageExplanation'
 import { addImageBasedExplanation, db, getWorkbook } from '@/lib/db'
 import { determineUserLevel } from '@/lib/userLevel'
 import type { UserLevel, UserLevelType, Problem, Workbook } from '@/types'
@@ -23,7 +23,9 @@ export default function ImageExplanation() {
   const [extractedText, setExtractedText] = useState('')
   const [editedText, setEditedText] = useState('')
   const [answer, setAnswer] = useState('')
+  const [targetProblemNumber, setTargetProblemNumber] = useState('')
   const [explanation, setExplanation] = useState('')
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +38,11 @@ export default function ImageExplanation() {
   // 成長可視化
   const [showLevelUpNotification, setShowLevelUpNotification] = useState(false)
   const [levelUpInfo, setLevelUpInfo] = useState<{ from: UserLevelType; to: UserLevelType } | null>(null)
+
+  // インタラクティブQ&A
+  const [followUpQuestion, setFollowUpQuestion] = useState('')
+  const [followUpAnswers, setFollowUpAnswers] = useState<{ question: string; answer: string }[]>([])
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false)
 
   // 問題紐付け機能
   const [linkedProblemId, setLinkedProblemId] = useState<string | null>(null)
@@ -200,13 +207,15 @@ export default function ImageExplanation() {
       const effectiveLevel = getEffectiveUserLevel()!
 
       // 手動レベルを使う場合、一時的にuserLevelを上書き
-      const explanationContent = await generateImageBasedExplanation(
+      const result = await generateImageBasedExplanation(
         editedText,
         answer || undefined,
-        base64
+        base64,
+        targetProblemNumber || undefined
       )
 
-      setExplanation(explanationContent)
+      setExplanation(result.explanation)
+      setSuggestedQuestions(result.suggestedQuestions)
 
       // 手動選択した場合、userLevelを更新
       if (manualLevelOverride) {
@@ -248,6 +257,32 @@ export default function ImageExplanation() {
     }
   }
 
+  // 追加質問を処理
+  const handleFollowUpQuestion = async (question: string) => {
+    if (!userLevel) return
+
+    setIsGeneratingFollowUp(true)
+    setError(null)
+
+    try {
+      const base64 = imageFile ? await imageToBase64(imageFile) : undefined
+      const answer = await answerFollowUpQuestion(
+        question,
+        editedText || extractedText,
+        explanation,
+        userLevel,
+        base64
+      )
+
+      setFollowUpAnswers([...followUpAnswers, { question, answer }])
+      setFollowUpQuestion('') // フリーチャット欄をクリア
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '追加質問の処理に失敗しました')
+    } finally {
+      setIsGeneratingFollowUp(false)
+    }
+  }
+
   // 保存
   const handleSave = async () => {
     if (!imageFile || !userLevel) return
@@ -261,7 +296,10 @@ export default function ImageExplanation() {
         extractedText,
         editedText: editedText !== extractedText ? editedText : undefined,
         answer: answer || undefined,
+        targetProblemNumber: targetProblemNumber || undefined,
         explanationContent: explanation,
+        suggestedQuestions: suggestedQuestions.length > 0 ? suggestedQuestions : undefined,
+        followUpExplanations: followUpAnswers.length > 0 ? followUpAnswers : undefined,
         userLevel,
         regenerationCount: 0,
         problemId: linkedProblemId || undefined,
@@ -405,6 +443,33 @@ export default function ImageExplanation() {
 
               {editedText !== extractedText && (
                 <p className="text-sm text-blue-600 mt-2">✏️ 編集されました</p>
+              )}
+            </Card>
+
+            {/* 問題番号指定 */}
+            <Card className="bg-yellow-50 border-yellow-200">
+              <h2 className="text-xl font-bold mb-4">🎯 解説対象の問題（任意）</h2>
+              <p className="text-gray-600 text-sm mb-3">
+                画像に複数の問題（例：1-1、1-2、1-3）が含まれる場合、どの問題について解説するか指定できます。
+                <br />
+                前提問題も文脈として活用しながら、指定した問題のみ解説します。
+              </p>
+              <input
+                type="text"
+                value={targetProblemNumber}
+                onChange={(e) => setTargetProblemNumber(e.target.value)}
+                className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white"
+                placeholder="例: 1-3、問題3、(3)、など"
+              />
+              {targetProblemNumber && (
+                <p className="text-sm text-yellow-800 mt-2 bg-yellow-100 p-2 rounded">
+                  💡 問題「{targetProblemNumber}」について解説します。他の問題は前提として参照します。
+                </p>
+              )}
+              {!targetProblemNumber && (
+                <p className="text-xs text-gray-500 mt-2">
+                  未入力の場合、画像内の全ての問題について解説します
+                </p>
               )}
             </Card>
 
@@ -662,6 +727,81 @@ export default function ImageExplanation() {
               <div className="prose prose-sm max-w-none">
                 <MarkdownRenderer content={explanation} />
               </div>
+            </Card>
+
+            {/* 追加質問セクション */}
+            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+              <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+                <span>🙋</span>
+                もっと詳しく知りたいことはありますか？
+              </h3>
+
+              {/* 4択ボタン */}
+              {suggestedQuestions.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-700 mb-3">よくある質問：</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {suggestedQuestions.map((q, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleFollowUpQuestion(q)}
+                        disabled={isGeneratingFollowUp}
+                        className="text-left px-4 py-3 bg-white hover:bg-purple-100 border-2 border-purple-300 rounded-lg transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {index + 1}. {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* フリーチャット入力 */}
+              <div>
+                <p className="text-sm text-gray-700 mb-2">他にも質問があればどうぞ：</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={followUpQuestion}
+                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && followUpQuestion.trim() && !isGeneratingFollowUp) {
+                        handleFollowUpQuestion(followUpQuestion.trim())
+                      }
+                    }}
+                    placeholder="例：この公式はどこから来たの？"
+                    disabled={isGeneratingFollowUp}
+                    className="flex-1 px-4 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                  />
+                  <Button
+                    onClick={() => handleFollowUpQuestion(followUpQuestion.trim())}
+                    disabled={!followUpQuestion.trim() || isGeneratingFollowUp}
+                    variant="secondary"
+                  >
+                    {isGeneratingFollowUp ? '生成中...' : '質問'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* 追加解説の表示 */}
+              {followUpAnswers.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <hr className="border-purple-200" />
+                  {followUpAnswers.map((qa, index) => (
+                    <div key={index} className="bg-white rounded-lg p-4 border-2 border-purple-200">
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-purple-600 font-bold">Q{index + 1}:</span>
+                        <p className="font-semibold text-gray-800">{qa.question}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-pink-600 font-bold">A{index + 1}:</span>
+                        <div className="flex-1 prose prose-sm max-w-none">
+                          <MarkdownRenderer content={qa.answer} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {/* アクション */}
