@@ -686,29 +686,35 @@ export default function Study() {
           )}
         </div>
 
-        {/* 時間表示 */}
+        {/* 時間表示 - 今日の学習時間を強調 */}
         <div className="mt-4 pt-4 border-t border-border">
-          <div className={`grid gap-3 text-center ${getSession() ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div className="bg-blue-50 rounded-lg p-2">
-              <p className="text-xs text-blue-600">今日の学習</p>
-              <p className="text-lg font-bold font-mono text-blue-700">
-                {formatTime(todayStudyTime)}
-              </p>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-3">
+            <p className="text-xs text-gray-600 mb-1">📊 今日の学習時間</p>
+            <p className="text-4xl font-bold text-blue-700 mb-2">
+              {formatTime(todayStudyTime)}
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min((todayStudyTime / 3600) * 100, 100)}%`,
+                }}
+              />
             </div>
+            <p className="text-xs text-gray-600">
+              目標1時間まで
+              {todayStudyTime < 3600
+                ? `あと${formatTime(3600 - todayStudyTime)}`
+                : '達成！🎉'}
+            </p>
+          </div>
+
+          {/* サブ情報 */}
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>この問題: {isPaused && '⏸ '}{formatTime(elapsedTime)}</span>
             {getSession() && (
-              <div className="bg-purple-50 rounded-lg p-2">
-                <p className="text-xs text-purple-600">セッション</p>
-                <p className="text-lg font-bold font-mono text-purple-700">
-                  {formatTime(sessionElapsedTime)}
-                </p>
-              </div>
+              <span>セッション: {formatTime(sessionElapsedTime)}</span>
             )}
-            <div className="bg-gray-50 rounded-lg p-2">
-              <p className="text-xs text-gray-600">この問題</p>
-              <p className={`text-lg font-bold font-mono ${isPaused ? 'text-orange-600' : 'text-gray-700'}`}>
-                {isPaused && '⏸ '}{formatTime(elapsedTime)}
-              </p>
-            </div>
           </div>
         </div>
       </Card>
