@@ -218,89 +218,176 @@ export default function Stats() {
           </span>
         </div>
 
-        <ResponsiveContainer width="100%" height={250}>
-          <ComposedChart
-            data={stats.weeklyData.map(day => ({
-              ...day,
-              dateLabel: new Date(day.date).toLocaleDateString('ja-JP', {
-                month: 'numeric',
-                day: 'numeric',
-              }),
-              studyTimeHours: day.studyTime / 3600,
-            }))}
-            margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis
-              dataKey="dateLabel"
-              tick={{ fontSize: 10 }}
-              stroke="#6b7280"
-            />
-            <YAxis
-              yAxisId="left"
-              orientation="left"
-              stroke="#3b82f6"
-              tick={{ fontSize: 10 }}
-              width={35}
-              tickFormatter={(value) => {
-                if (value >= 1) return `${value.toFixed(1)}h`
-                return `${Math.round(value * 60)}m`
-              }}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              stroke="#10b981"
-              tick={{ fontSize: 10 }}
-              width={30}
-              domain={[0, 100]}
-              tickFormatter={(value) => `${value}%`}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload || payload.length === 0) return null
-                const data = payload[0].payload
-                return (
-                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2">
-                    <p className="font-semibold text-xs mb-1">{data.dateLabel}</p>
-                    <p className="text-xs text-blue-600">
-                      {formatTime(data.studyTime)} ({data.problemsSolved}問)
-                    </p>
-                    {data.accuracy !== null && data.accuracy !== undefined && (
-                      <p className="text-xs text-green-600">
-                        正答率 {data.accuracy}%
+        {/* スマホ用グラフ */}
+        <div className="block md:hidden">
+          <ResponsiveContainer width="100%" height={250}>
+            <ComposedChart
+              data={stats.weeklyData.map(day => ({
+                ...day,
+                dateLabel: new Date(day.date).toLocaleDateString('ja-JP', {
+                  month: 'numeric',
+                  day: 'numeric',
+                }),
+              }))}
+              margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="dateLabel"
+                tick={{ fontSize: 10 }}
+                stroke="#6b7280"
+              />
+              <YAxis
+                yAxisId="left"
+                orientation="left"
+                stroke="#3b82f6"
+                tick={{ fontSize: 10 }}
+                width={35}
+                tickFormatter={(value) => {
+                  const hours = value / 3600
+                  if (hours >= 1) return `${hours.toFixed(1)}h`
+                  return `${Math.round(value / 60)}m`
+                }}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#10b981"
+                tick={{ fontSize: 10 }}
+                width={30}
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || payload.length === 0) return null
+                  const data = payload[0].payload
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2">
+                      <p className="font-semibold text-xs mb-1">{data.dateLabel}</p>
+                      <p className="text-xs text-blue-600">
+                        {formatTime(data.studyTime)} ({data.problemsSolved}問)
                       </p>
-                    )}
-                  </div>
-                )
-              }}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 12 }}
-              iconType="line"
-              iconSize={10}
-            />
-            <Bar
-              yAxisId="left"
-              dataKey="studyTime"
-              fill="#3b82f6"
-              opacity={0.8}
-              name="学習時間"
-              radius={[4, 4, 0, 0]}
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="accuracy"
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={{ fill: '#10b981', strokeWidth: 2, r: 4, stroke: '#fff' }}
-              activeDot={{ r: 6 }}
-              name="正答率"
-              connectNulls
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+                      {data.accuracy !== null && data.accuracy !== undefined && (
+                        <p className="text-xs text-green-600">
+                          正答率 {data.accuracy}%
+                        </p>
+                      )}
+                    </div>
+                  )
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 12 }}
+                iconType="line"
+                iconSize={10}
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="studyTime"
+                fill="#3b82f6"
+                opacity={0.8}
+                name="学習時間"
+                radius={[4, 4, 0, 0]}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="accuracy"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={{ fill: '#10b981', strokeWidth: 2, r: 4, stroke: '#fff' }}
+                activeDot={{ r: 6 }}
+                name="正答率"
+                connectNulls
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* PC用グラフ */}
+        <div className="hidden md:block">
+          <ResponsiveContainer width="100%" height={320}>
+            <ComposedChart
+              data={stats.weeklyData.map(day => ({
+                ...day,
+                dateLabel: new Date(day.date).toLocaleDateString('ja-JP', {
+                  month: 'numeric',
+                  day: 'numeric',
+                }),
+              }))}
+              margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="dateLabel"
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+              />
+              <YAxis
+                yAxisId="left"
+                orientation="left"
+                stroke="#3b82f6"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => {
+                  const hours = value / 3600
+                  if (hours >= 1) return `${hours.toFixed(1)}h`
+                  return `${Math.round(value / 60)}m`
+                }}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#10b981"
+                tick={{ fontSize: 12 }}
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || payload.length === 0) return null
+                  const data = payload[0].payload
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                      <p className="font-semibold text-sm mb-2">{data.dateLabel}</p>
+                      <p className="text-sm text-blue-600">
+                        学習時間: {formatTime(data.studyTime)} ({data.problemsSolved}問)
+                      </p>
+                      {data.accuracy !== null && data.accuracy !== undefined && (
+                        <p className="text-sm text-green-600">
+                          正答率: {data.accuracy}%
+                        </p>
+                      )}
+                    </div>
+                  )
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 14 }}
+                iconType="line"
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="studyTime"
+                fill="#3b82f6"
+                opacity={0.8}
+                name="学習時間"
+                radius={[4, 4, 0, 0]}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="accuracy"
+                stroke="#10b981"
+                strokeWidth={3}
+                dot={{ fill: '#10b981', strokeWidth: 2, r: 5, stroke: '#fff' }}
+                activeDot={{ r: 7 }}
+                name="正答率"
+                connectNulls
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </Card>
 
       {/* 総合情報 */}
