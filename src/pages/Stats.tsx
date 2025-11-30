@@ -227,38 +227,51 @@ export default function Stats() {
 
           {/* グラフエリア */}
           <div className="absolute left-12 right-12 top-0 bottom-8">
-            {/* 背景グリッド */}
-            <div className="absolute inset-0 flex flex-col justify-between">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="border-t border-gray-200" />
+            <svg className="w-full h-full" viewBox="0 0 700 200" preserveAspectRatio="none">
+              {/* 背景グリッド */}
+              {[0, 1, 2, 3, 4].map((i) => (
+                <line
+                  key={`grid-${i}`}
+                  x1="0"
+                  y1={i * 50}
+                  x2="700"
+                  y2={i * 50}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
               ))}
-            </div>
 
-            {/* 学習時間の棒グラフ（HTML/CSSベース） */}
-            <div className="absolute inset-0 flex items-end justify-around gap-1">
-              {stats.weeklyData.map((day, i) => {
+              {/* 学習時間の棒グラフ */}
+              {(() => {
                 const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
-                const heightPercent = (day.studyTime / maxTime) * 100
-                return (
-                  <div key={`bar-${i}`} className="flex-1 flex items-end justify-center">
-                    <div
-                      className="w-3/4 bg-blue-600 opacity-80 hover:opacity-100 cursor-pointer transition-opacity rounded-t"
-                      style={{ height: `${heightPercent}%` }}
-                      title={`${formatTime(day.studyTime)} (${day.problemsSolved}問)`}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+                const barWidth = 700 / stats.weeklyData.length
+                const barPadding = barWidth * 0.15
 
-            {/* 正答率の折れ線グラフ（絶対配置のSVG） */}
-            <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
-              <defs>
-                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.1"/>
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
+                return stats.weeklyData.map((day, i) => {
+                  const height = (day.studyTime / maxTime) * 200
+                  const x = i * barWidth + barPadding
+                  const y = 200 - height
+                  const width = barWidth - barPadding * 2
+
+                  return (
+                    <rect
+                      key={`bar-${i}`}
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill="#3b82f6"
+                      opacity="0.8"
+                      className="hover:opacity-100"
+                    >
+                      <title>{formatTime(day.studyTime)} ({day.problemsSolved}問)</title>
+                    </rect>
+                  )
+                })
+              })()}
+
+              {/* 正答率の折れ線グラフ */}
               {(() => {
                 const validData = stats.weeklyData.map((day, i) => ({
                   index: i,
@@ -268,35 +281,42 @@ export default function Stats() {
 
                 if (validData.length === 0) return null
 
+                const barWidth = 700 / stats.weeklyData.length
+
+                // 折れ線のパス
+                const linePoints = validData.map(d => {
+                  const x = (d.index + 0.5) * barWidth
+                  const y = 200 - ((d.accuracy || 0) / 100) * 200
+                  return `${x},${y}`
+                }).join(' ')
+
                 return (
                   <g>
                     {/* 折れ線 */}
                     {validData.length > 1 && (
                       <polyline
-                        points={validData.map(d => {
-                          const x = ((d.index + 0.5) / stats.weeklyData.length) * 100
-                          const y = 100 - (d.accuracy || 0)
-                          return `${x}%,${y}%`
-                        }).join(' ')}
+                        points={linePoints}
                         fill="none"
                         stroke="#10b981"
-                        strokeWidth="2"
+                        strokeWidth="3"
                         vectorEffect="non-scaling-stroke"
                       />
                     )}
 
                     {/* ドット */}
                     {validData.map((d) => {
-                      const x = ((d.index + 0.5) / stats.weeklyData.length) * 100
-                      const y = 100 - (d.accuracy || 0)
+                      const x = (d.index + 0.5) * barWidth
+                      const y = 200 - ((d.accuracy || 0) / 100) * 200
                       return (
                         <circle
                           key={`accuracy-${d.index}`}
-                          cx={`${x}%`}
-                          cy={`${y}%`}
-                          r="4"
+                          cx={x}
+                          cy={y}
+                          r="5"
                           fill="#10b981"
-                          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                          stroke="#fff"
+                          strokeWidth="2"
+                          vectorEffect="non-scaling-stroke"
                         >
                           <title>{d.accuracy}% ({d.problems}問)</title>
                         </circle>
