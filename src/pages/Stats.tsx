@@ -199,93 +199,141 @@ export default function Stats() {
         </Card>
       </div>
 
-      {/* 週間グラフ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <Card>
-          <h2 className="text-lg font-semibold mb-4">週間学習時間</h2>
-          <div className="space-y-3">
+      {/* 週間グラフ - 折れ線グラフ */}
+      <Card className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-semibold">週間の推移</h2>
+          <span title="学習時間と正答率の7日間の推移（日付は夜中の3時で更新）" className="inline-flex cursor-help">
+            <Info size={16} className="text-gray-400" />
+          </span>
+        </div>
+
+        <div className="relative h-64 mb-8">
+          {/* Y軸ラベル（学習時間） */}
+          <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-500 pr-2">
+            {(() => {
+              const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
+              const step = Math.ceil(maxTime / 4 / 300) * 300 // 5分刻み
+              return [4, 3, 2, 1, 0].map(i => (
+                <span key={i}>{formatTime(step * i)}</span>
+              ))
+            })()}
+          </div>
+
+          {/* Y軸ラベル（正答率） */}
+          <div className="absolute right-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-500 pl-2">
+            <span>100%</span>
+            <span>75%</span>
+            <span>50%</span>
+            <span>25%</span>
+            <span>0%</span>
+          </div>
+
+          {/* グラフエリア */}
+          <div className="absolute left-12 right-12 top-0 bottom-8">
+            {/* 背景グリッド */}
+            <div className="absolute inset-0 flex flex-col justify-between">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="border-t border-gray-200" />
+              ))}
+            </div>
+
+            {/* 学習時間の折れ線 */}
+            <svg className="absolute inset-0 w-full h-full">
+              <polyline
+                points={stats.weeklyData.map((day, i) => {
+                  const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
+                  const x = (i / (stats.weeklyData.length - 1)) * 100
+                  const y = 100 - (day.studyTime / maxTime * 100)
+                  return `${x}%,${y}%`
+                }).join(' ')}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {stats.weeklyData.map((day, i) => {
+                const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
+                const x = (i / (stats.weeklyData.length - 1)) * 100
+                const y = 100 - (day.studyTime / maxTime * 100)
+                return (
+                  <circle
+                    key={`time-${i}`}
+                    cx={`${x}%`}
+                    cy={`${y}%`}
+                    r="4"
+                    fill="#3b82f6"
+                    className="cursor-pointer hover:r-6"
+                  >
+                    <title>{formatTime(day.studyTime)} ({day.problemsSolved}問)</title>
+                  </circle>
+                )
+              })}
+            </svg>
+
+            {/* 正答率の折れ線 */}
+            <svg className="absolute inset-0 w-full h-full">
+              <polyline
+                points={stats.weeklyData.map((day, i) => {
+                  const x = (i / (stats.weeklyData.length - 1)) * 100
+                  const y = (day.accuracy !== null && day.accuracy !== undefined) ? 100 - day.accuracy : 100
+                  return `${x}%,${y}%`
+                }).join(' ')}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={stats.weeklyData.some(d => d.accuracy === null || d.accuracy === undefined) ? "4,4" : "none"}
+              />
+              {stats.weeklyData.map((day, i) => {
+                if (day.accuracy === null || day.accuracy === undefined) return null
+                const x = (i / (stats.weeklyData.length - 1)) * 100
+                const y = 100 - day.accuracy
+                return (
+                  <circle
+                    key={`accuracy-${i}`}
+                    cx={`${x}%`}
+                    cy={`${y}%`}
+                    r="4"
+                    fill="#10b981"
+                    className="cursor-pointer hover:r-6"
+                  >
+                    <title>{day.accuracy}% ({day.problemsSolved}問)</title>
+                  </circle>
+                )
+              })}
+            </svg>
+          </div>
+
+          {/* X軸ラベル（日付） */}
+          <div className="absolute left-12 right-12 bottom-0 flex justify-between text-xs text-gray-500">
             {stats.weeklyData.map((day) => {
-              const maxTime = Math.max(...stats.weeklyData.map((d) => d.studyTime))
-              const percentage = maxTime > 0 ? (day.studyTime / maxTime) * 100 : 0
               const date = new Date(day.date)
               const dayLabel = date.toLocaleDateString('ja-JP', {
-                month: 'short',
+                month: 'numeric',
                 day: 'numeric',
-                weekday: 'short',
               })
-
               return (
-                <div key={day.date}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">{dayLabel}</span>
-                    <span className="font-medium">
-                      {formatTime(day.studyTime)} ({day.problemsSolved}問)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary rounded-full h-2 transition-all"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
+                <span key={day.date} className="text-center">{dayLabel}</span>
               )
             })}
           </div>
-        </Card>
+        </div>
 
-        <Card>
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-lg font-semibold">週間正答率</h2>
-            <span title="日別の正答率（日付は夜中の3時で更新）" className="inline-flex cursor-help">
-              <Info size={16} className="text-gray-400" />
-            </span>
+        {/* 凡例 */}
+        <div className="flex items-center justify-center gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-blue-600"></div>
+            <span className="text-gray-600">学習時間</span>
           </div>
-          <div className="space-y-3">
-            {stats.weeklyData.map((day) => {
-              const date = new Date(day.date)
-              const dayLabel = date.toLocaleDateString('ja-JP', {
-                month: 'short',
-                day: 'numeric',
-                weekday: 'short',
-              })
-
-              return (
-                <div key={day.date}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">{dayLabel}</span>
-                    <span className="font-medium">
-                      {day.accuracy !== null && day.accuracy !== undefined ? (
-                        <>
-                          {day.accuracy}% ({day.problemsSolved}問)
-                        </>
-                      ) : (
-                        <span className="text-gray-400">データなし</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    {day.accuracy !== null && day.accuracy !== undefined ? (
-                      <div
-                        className={`rounded-full h-2 transition-all ${
-                          day.accuracy >= 80
-                            ? 'bg-green-500'
-                            : day.accuracy >= 50
-                            ? 'bg-yellow-500'
-                            : 'bg-red-500'
-                        }`}
-                        style={{ width: `${day.accuracy}%` }}
-                      />
-                    ) : (
-                      <div className="bg-gray-300 rounded-full h-2 w-0" />
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-green-600"></div>
+            <span className="text-gray-600">正答率</span>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       {/* 総合情報 */}
       <Card>
