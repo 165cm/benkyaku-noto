@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
 import Button from '@/components/Button'
@@ -172,21 +172,21 @@ export default function WorkbookDetail() {
   }, [problems, subProblemsMap])
 
   // Wrapper handlers that close modals and reload data
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     handleProblemSubmit(e, () => {
       setIsModalOpen(false)
       loadData()
     })
-  }
+  }, [handleProblemSubmit, loadData])
 
-  const handleDelete = (problemId: string) => {
+  const handleDelete = useCallback((problemId: string) => {
     handleProblemDelete(problemId, loadData)
-  }
+  }, [handleProblemDelete, loadData])
 
-  const handleEditProblem = async (problem: Problem) => {
+  const handleEditProblem = useCallback(async (problem: Problem) => {
     await handleEdit(problem)
     setIsModalOpen(true)
-  }
+  }, [handleEdit])
 
   const handleStartGroupStudy = async (groupProblems: Problem[]) => {
     if (groupProblems.length === 0) return
@@ -401,10 +401,10 @@ export default function WorkbookDetail() {
     return hierarchy
   }
 
-  const problemHierarchy = groupProblemsByHierarchy()
+  const problemHierarchy = useMemo(() => groupProblemsByHierarchy(), [problems])
 
   // 実際の学習可能な問題数を計算（親問題を除き、小問を含む）
-  const getActualProblemCount = (problems: Problem[]) => {
+  const getActualProblemCount = useCallback((problems: Problem[]) => {
     let count = 0
     for (const problem of problems) {
       const subProblems = subProblemsMap.get(problem.id) || []
@@ -417,37 +417,37 @@ export default function WorkbookDetail() {
       }
     }
     return count
-  }
+  }, [subProblemsMap])
 
 
-  const handleEditCategoryWrapper = (category: string, categoryProblems: Problem[][]) => {
+  const handleEditCategoryWrapper = useCallback((category: string, categoryProblems: Problem[][]) => {
     handleEditCategory(category, categoryProblems)
     setIsCategoryModalOpen(true)
-  }
+  }, [handleEditCategory])
 
-  const handleCategorySubmit = (e: React.FormEvent) => {
+  const handleCategorySubmit = useCallback((e: React.FormEvent) => {
     handleCategorySubmitOriginal(e, () => {
       setIsCategoryModalOpen(false)
       loadData()
     })
-  }
+  }, [handleCategorySubmitOriginal, loadData])
 
-  const handleCloseCategoryModal = () => {
+  const handleCloseCategoryModal = useCallback(() => {
     setIsCategoryModalOpen(false)
     resetCategoryForm()
-  }
+  }, [resetCategoryForm])
 
 
   // ドラッグアンドドロップのハンドラー
-  const handleDragStart = (problem: Problem) => {
+  const handleDragStart = useCallback((problem: Problem) => {
     setDraggedProblem(problem)
-  }
+  }, [])
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault() // ドロップを有効にする
-  }
+  }, [])
 
-  const handleDrop = async (targetProblem: Problem) => {
+  const handleDrop = useCallback(async (targetProblem: Problem) => {
     if (!draggedProblem || draggedProblem.id === targetProblem.id) {
       setDraggedProblem(null)
       return
@@ -486,7 +486,7 @@ export default function WorkbookDetail() {
       setDraggedProblem(null)
       setLastDragOperation(null)
     }
-  }
+  }, [draggedProblem, skipConfirmUntil, loadData])
 
   const handleUndoLastDrag = async () => {
     if (!lastDragOperation) return
