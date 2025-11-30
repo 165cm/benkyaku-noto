@@ -234,73 +234,77 @@ export default function Stats() {
               ))}
             </div>
 
-            {/* 学習時間の棒グラフ */}
-            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+            {/* 学習時間の棒グラフ（HTML/CSSベース） */}
+            <div className="absolute inset-0 flex items-end justify-around gap-1">
               {stats.weeklyData.map((day, i) => {
                 const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
-                const barWidth = 100 / stats.weeklyData.length
-                const barPadding = barWidth * 0.2
-                const x = (i * barWidth) + barPadding
-                const width = barWidth - (barPadding * 2)
-                const height = (day.studyTime / maxTime) * 100
-                const y = 100 - height
+                const heightPercent = (day.studyTime / maxTime) * 100
+                return (
+                  <div key={`bar-${i}`} className="flex-1 flex items-end justify-center">
+                    <div
+                      className="w-3/4 bg-blue-600 opacity-80 hover:opacity-100 cursor-pointer transition-opacity rounded-t"
+                      style={{ height: `${heightPercent}%` }}
+                      title={`${formatTime(day.studyTime)} (${day.problemsSolved}問)`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* 正答率の折れ線グラフ（絶対配置のSVG） */}
+            <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
+              <defs>
+                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.1"/>
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+                </linearGradient>
+              </defs>
+              {(() => {
+                const validData = stats.weeklyData.map((day, i) => ({
+                  index: i,
+                  accuracy: day.accuracy,
+                  problems: day.problemsSolved
+                })).filter(d => d.accuracy !== null && d.accuracy !== undefined)
+
+                if (validData.length === 0) return null
 
                 return (
-                  <g key={`bar-${i}`}>
-                    <rect
-                      x={`${x}%`}
-                      y={`${y}%`}
-                      width={`${width}%`}
-                      height={`${height}%`}
-                      fill="#3b82f6"
-                      opacity="0.8"
-                      className="hover:opacity-100 cursor-pointer"
-                    >
-                      <title>{formatTime(day.studyTime)} ({day.problemsSolved}問)</title>
-                    </rect>
+                  <g>
+                    {/* 折れ線 */}
+                    {validData.length > 1 && (
+                      <polyline
+                        points={validData.map(d => {
+                          const x = ((d.index + 0.5) / stats.weeklyData.length) * 100
+                          const y = 100 - (d.accuracy || 0)
+                          return `${x}%,${y}%`
+                        }).join(' ')}
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+
+                    {/* ドット */}
+                    {validData.map((d) => {
+                      const x = ((d.index + 0.5) / stats.weeklyData.length) * 100
+                      const y = 100 - (d.accuracy || 0)
+                      return (
+                        <circle
+                          key={`accuracy-${d.index}`}
+                          cx={`${x}%`}
+                          cy={`${y}%`}
+                          r="4"
+                          fill="#10b981"
+                          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                        >
+                          <title>{d.accuracy}% ({d.problems}問)</title>
+                        </circle>
+                      )
+                    })}
                   </g>
                 )
-              })}
-            </svg>
-
-            {/* 正答率の折れ線グラフ */}
-            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-              {/* 折れ線 */}
-              {stats.weeklyData.filter(d => d.accuracy !== null && d.accuracy !== undefined).length > 1 && (
-                <polyline
-                  points={stats.weeklyData.map((day, i) => {
-                    const barWidth = 100 / stats.weeklyData.length
-                    const x = (i * barWidth) + (barWidth / 2)
-                    const y = (day.accuracy !== null && day.accuracy !== undefined) ? 100 - day.accuracy : 100
-                    return `${x},${y}`
-                  }).join(' ')}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2"
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-
-              {/* ドット */}
-              {stats.weeklyData.map((day, i) => {
-                if (day.accuracy === null || day.accuracy === undefined) return null
-                const barWidth = 100 / stats.weeklyData.length
-                const x = (i * barWidth) + (barWidth / 2)
-                const y = 100 - day.accuracy
-                return (
-                  <circle
-                    key={`accuracy-${i}`}
-                    cx={`${x}%`}
-                    cy={`${y}%`}
-                    r="4"
-                    fill="#10b981"
-                    vectorEffect="non-scaling-stroke"
-                    className="cursor-pointer"
-                  >
-                    <title>{day.accuracy}% ({day.problemsSolved}問)</title>
-                  </circle>
-                )
-              })}
+              })()}
             </svg>
           </div>
 
