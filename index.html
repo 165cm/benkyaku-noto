@@ -9,6 +9,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // GitHub Pages SPA routing workaround
+      // This script reads the route from the query parameter set by 404.html
+      // and updates the browser history to show the correct URL
+      (function() {
+        var query = window.location.search;
+        if (query) {
+          var match = query.match(/[?&]p=([^&]*)/);
+          if (match) {
+            var route = decodeURIComponent(match[1]);
+            // Replace the current history entry with the correct route
+            window.history.replaceState(
+              null,
+              null,
+              window.location.pathname.split('?')[0] + route +
+              (query.replace(/[?&]p=[^&]*/, '').replace(/^&/, '?') || '') +
+              window.location.hash
+            );
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

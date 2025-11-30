@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, BookOpen, TrendingUp, Award, Info } from 'lucide-react'
+import { Clock, BookOpen, TrendingUp, Award, Info, AlertCircle } from 'lucide-react'
 import Card from '@/components/Card'
 import { calculateStudyStatsByWorkbook } from '@/lib/review'
 import { getWorkbooks } from '@/lib/db'
@@ -8,6 +8,7 @@ import type { StudyStats, Workbook } from '@/types'
 export default function Stats() {
   const [stats, setStats] = useState<StudyStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [selectedWorkbookId, setSelectedWorkbookId] = useState<string>('')
 
@@ -20,16 +21,28 @@ export default function Stats() {
   }, [selectedWorkbookId])
 
   const loadWorkbooks = async () => {
-    const data = await getWorkbooks()
-    setWorkbooks(data)
+    try {
+      const data = await getWorkbooks()
+      setWorkbooks(data)
+    } catch (err) {
+      console.error('Failed to load workbooks:', err)
+      setError('問題集の読み込みに失敗しました')
+    }
   }
 
   const loadStats = async () => {
-    setLoading(true)
-    const workbookId = selectedWorkbookId || undefined
-    const data = await calculateStudyStatsByWorkbook(workbookId)
-    setStats(data)
-    setLoading(false)
+    try {
+      setLoading(true)
+      setError(null)
+      const workbookId = selectedWorkbookId || undefined
+      const data = await calculateStudyStatsByWorkbook(workbookId)
+      setStats(data)
+    } catch (err) {
+      console.error('Failed to load stats:', err)
+      setError('統計の読み込みに失敗しました')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -42,8 +55,51 @@ export default function Stats() {
     return `${minutes}分`
   }
 
-  if (loading || !stats) {
-    return <div>読み込み中...</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">統計を読み込んでいます...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card>
+          <div className="flex items-center gap-3 text-red-600">
+            <AlertCircle size={24} />
+            <div>
+              <p className="font-semibold">エラーが発生しました</p>
+              <p className="text-sm text-gray-600">{error}</p>
+              <button
+                onClick={loadStats}
+                className="mt-3 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+              >
+                再読み込み
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card>
+          <div className="text-center py-8">
+            <BookOpen className="mx-auto mb-4 text-gray-400" size={48} />
+            <p className="text-gray-600 mb-2">まだ学習記録がありません</p>
+            <p className="text-sm text-gray-500">問題集を追加して学習を開始しましょう</p>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>勉強ノート</title>
+    <script>
+      // GitHub Pages SPA routing workaround
+      // This script takes the current URL and converts it to a query parameter
+      // that will be read by index.html
+      (function() {
+        var pathSegmentsToKeep = 1; // Change to 0 if deploying at root
+
+        var location = window.location;
+        var pathName = location.pathname;
+
+        // Get the base path (e.g., /benkyaku-noto/)
+        var segments = pathName.split('/').filter(function(segment) {
+          return segment !== '';
+        });
+
+        // Keep only the base path segment
+        var basePath = '/' + (segments[0] || '');
+        var route = '/' + segments.slice(1).join('/');
+
+        // Redirect to index.html with the route as a query parameter
+        location.replace(
+          basePath + '/?p=' + encodeURIComponent(route) +
+          (location.search ? '&' + location.search.slice(1) : '') +
+          location.hash
+        );
+      })();
+    </script>
+  </head>
+  <body>
+    <div style="
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+    ">
+      <div style="text-align: center;">
+        <div style="
+          width: 48px;
+          height: 48px;
+          border: 3px solid #3b82f6;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 16px;
+        "></div>
+        <p style="color: #6b7280;">読み込み中...</p>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </body>
+</html>
