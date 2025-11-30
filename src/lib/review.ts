@@ -267,16 +267,20 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
 export async function calculateRecentAccuracyForProblems(problems: Problem[]): Promise<number | null> {
   if (problems.length === 0) return null
 
-  const recentScores: number[] = []
-
-  // 各問題の最新3回の学習記録を取得して重み付け平均でスコア化
-  for (const problem of problems) {
-    const records = await db.studyRecords
+  // 各問題の最新3回の学習記録を並列で取得
+  const recordsPromises = problems.map(problem =>
+    db.studyRecords
       .where('problemId')
       .equals(problem.id)
       .reverse()
       .sortBy('studiedAt')
+  )
 
+  const allRecords = await Promise.all(recordsPromises)
+
+  // 重み付け平均でスコア化
+  const recentScores: number[] = []
+  for (const records of allRecords) {
     if (records.length > 0) {
       // 最新3回の記録を取得してcalculateWeightedAverageを使用
       const recent3 = records.slice(0, 3)
