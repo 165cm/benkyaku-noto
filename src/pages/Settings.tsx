@@ -9,6 +9,7 @@ import {
   saveOpenAIApiKey,
   getOpenAIApiKey,
   removeOpenAIApiKey,
+  isUsingEnvApiKey,
   getExcludedCategories,
   saveExcludedCategories,
   getExcludedSections,
@@ -45,6 +46,7 @@ export default function Settings() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showApiKeySection, setShowApiKeySection] = useState(false)
+  const [usingEnvKey, setUsingEnvKey] = useState(false)
 
   // 除外設定
   const [workbookGroups, setWorkbookGroups] = useState<WorkbookGroup[]>([])
@@ -61,6 +63,9 @@ export default function Settings() {
   const [lastRestoreTime, setLastRestoreTime] = useState<Date | null>(null)
 
   useEffect(() => {
+    // 環境変数チェック
+    setUsingEnvKey(isUsingEnvApiKey())
+
     const existingKey = getOpenAIApiKey()
     if (existingKey) {
       setApiKey(existingKey)
@@ -529,7 +534,16 @@ export default function Settings() {
               )}
             </button>
 
-            {isApiKeySet && !showApiKeySection && (
+            {/* 環境変数で設定されている場合 */}
+            {usingEnvKey && !showApiKeySection && (
+              <div className="flex items-center gap-1 text-success text-xs">
+                <CheckCircle size={14} />
+                <span>環境変数で設定済み（自分専用モード）</span>
+              </div>
+            )}
+
+            {/* localStorageで設定されている場合 */}
+            {!usingEnvKey && isApiKeySet && !showApiKeySection && (
               <div className="flex items-center gap-1 text-success text-xs">
                 <CheckCircle size={14} />
                 <span>設定済み: {maskedApiKey}</span>
@@ -539,73 +553,114 @@ export default function Settings() {
             {showApiKeySection && (
               <>
                 <p className="text-xs text-gray-600 mb-2">
-                  目次画像から問題集を作成する機能で使用
+                  目次画像から問題集を作成する機能、AI解説生成で使用
                 </p>
 
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2 mb-3">
-                  <div className="flex items-start gap-1">
-                    <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={14} />
-                    <div className="text-xs text-yellow-800">
-                      <p className="font-semibold mb-0.5">セキュリティについて</p>
-                      <p className="text-xs">
-                        APIキーはブラウザのローカルストレージに保存されます。
-                      </p>
+                {/* 環境変数で設定されている場合の表示 */}
+                {usingEnvKey ? (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-green-800 mb-1">
+                          ✅ 環境変数で設定されています（自分専用モード）
+                        </p>
+                        <p className="text-xs text-green-700 mb-2">
+                          OpenAI APIキーは環境変数 <code className="bg-green-100 px-1 py-0.5 rounded text-xs">VITE_OPENAI_API_KEY</code> から読み込まれています。
+                        </p>
+                        <div className="text-xs text-green-700">
+                          <p className="font-medium mb-1">📝 このモードの特徴：</p>
+                          <ul className="list-disc ml-5 space-y-0.5">
+                            <li>APIキーを毎回入力する必要がありません</li>
+                            <li>環境変数はビルド時に埋め込まれます</li>
+                            <li>自分専用として使う場合に最適です</li>
+                          </ul>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">
-                      APIキー
-                    </label>
-                    <div className="flex gap-2 mb-1">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="sk-..."
-                        className="flex-1 px-2 py-1.5 border border-border rounded text-xs font-mono"
-                      />
-                      <Button
-                        variant="secondary"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="text-xs py-1.5 px-3"
-                      >
-                        {showApiKey ? '隠す' : '表示'}
-                      </Button>
+                ) : (
+                  /* 環境変数が設定されていない場合（ユーザー入力モード） */
+                  <>
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={16} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-yellow-800 mb-1">⚠️ APIキーの取り扱いについて</p>
+                          <ul className="list-disc ml-5 text-xs text-yellow-800 space-y-1">
+                            <li>APIキーは<strong>あなたのブラウザにのみ保存</strong>されます</li>
+                            <li>開発者（サーバー）には<strong>送信されません</strong></li>
+                            <li className="text-red-700 font-bold">公共のPCでは使用しないでください</li>
+                            <li className="text-red-700 font-bold">
+                              OpenAI側で使用量制限を必ず設定してください
+                            </li>
+                          </ul>
+                          <a
+                            href="https://platform.openai.com/settings/organization/limits"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-2 text-xs text-blue-700 font-semibold hover:text-blue-800 underline"
+                          >
+                            → OpenAIで使用量制限を設定する（重要！）
+                          </a>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      <a
-                        href="https://platform.openai.com/api-keys"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        OpenAI
-                      </a>
-                      で取得
-                    </p>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <Button onClick={handleSave} disabled={!apiKey.trim()} className="text-sm py-1.5">
-                      保存
-                    </Button>
-                    {isApiKeySet && (
-                      <Button variant="error" onClick={handleRemove} className="text-sm py-1.5">
-                        削除
-                      </Button>
-                    )}
-                  </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium mb-1">
+                          APIキー
+                        </label>
+                        <div className="flex gap-2 mb-1">
+                          <input
+                            type={showApiKey ? 'text' : 'password'}
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="sk-proj-..."
+                            className="flex-1 px-2 py-1.5 border border-border rounded text-xs font-mono"
+                          />
+                          <Button
+                            variant="secondary"
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="text-xs py-1.5 px-3"
+                          >
+                            {showApiKey ? '隠す' : '表示'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          <a
+                            href="https://platform.openai.com/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline"
+                          >
+                            OpenAI Platform
+                          </a>
+                          でAPIキーを取得できます
+                        </p>
+                      </div>
 
-                  {saved && (
-                    <div className="flex items-center gap-1 text-success text-xs">
-                      <CheckCircle size={14} />
-                      <span>保存しました</span>
+                      <div className="flex gap-2">
+                        <Button onClick={handleSave} disabled={!apiKey.trim()} className="text-sm py-1.5">
+                          保存
+                        </Button>
+                        {isApiKeySet && (
+                          <Button variant="error" onClick={handleRemove} className="text-sm py-1.5">
+                            削除
+                          </Button>
+                        )}
+                      </div>
+
+                      {saved && (
+                        <div className="flex items-center gap-1 text-success text-xs">
+                          <CheckCircle size={14} />
+                          <span>保存しました</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </>
             )}
           </div>
