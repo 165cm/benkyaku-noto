@@ -4,74 +4,97 @@ import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Downlo
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
-  getWorkbook,
-  getProblems,
-  addProblem,
-  deleteProblem,
   db,
   makeSubProblem,
   makeIndependentProblem,
-  getSubProblems,
-  getStudyRecords,
-  getCategoriesForWorkbook,
   isParentProblem,
   deleteStudyRecordsForWorkbook,
+  addProblem,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
-import type { Workbook, Problem, StudyRecord } from '@/types'
+import type { Problem } from '@/types'
+import { useWorkbookData } from '@/hooks/useWorkbookData'
+import { useProblemsForm } from '@/hooks/useProblemsForm'
+import { useGroupForm } from '@/hooks/useGroupForm'
+import { useCategoryForm } from '@/hooks/useCategoryForm'
+import { useWorkbookForm } from '@/hooks/useWorkbookForm'
+import { useCollapsibleUI } from '@/hooks/useCollapsibleUI'
 
 export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [workbook, setWorkbook] = useState<Workbook | null>(null)
-  const [problems, setProblems] = useState<Problem[]>([])
+
+  // Custom hooks for data and form management
+  const {
+    workbook,
+    problems,
+    subProblemsMap,
+    availableCategories,
+    loadData,
+  } = useWorkbookData(id)
+
+  const {
+    editingProblem,
+    formData,
+    setFormData,
+    studyRecords,
+    problemAccuracy,
+    showCustomCategoryInput,
+    setShowCustomCategoryInput,
+    handleSubmit: handleProblemSubmit,
+    handleEdit,
+    handleDelete: handleProblemDelete,
+    resetForm: resetProblemForm,
+  } = useProblemsForm(id, availableCategories)
+
+  const {
+    editingGroup,
+    groupFormData,
+    setGroupFormData,
+    handleEditGroup,
+    handleGroupSubmit: handleGroupSubmitOriginal,
+    resetForm: resetGroupForm,
+  } = useGroupForm()
+
+  const {
+    editingCategory,
+    categoryFormData,
+    setCategoryFormData,
+    handleEditCategory,
+    handleCategorySubmit: handleCategorySubmitOriginal,
+    resetForm: resetCategoryForm,
+  } = useCategoryForm()
+
+  const {
+    isEditingWorkbook,
+    workbookFormData,
+    setWorkbookFormData,
+    handleEditWorkbook: handleEditWorkbookOriginal,
+    handleSaveWorkbook: handleSaveWorkbookOriginal,
+    handleCancelEditWorkbook,
+  } = useWorkbookForm(id)
+
+  const {
+    expandedCategories,
+    expandedTitles,
+    expandedParents,
+    toggleCategory,
+    toggleTitle,
+    toggleParent,
+  } = useCollapsibleUI(problems)
+
+  // Local state for modals and UI
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
-  const [formData, setFormData] = useState({
-    problemNumber: '',
-    category: '',
-    page: '',
-    memo: '',
-  })
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<{
-    groupKey: string
-    problems: Problem[]
-  } | null>(null)
-  const [groupFormData, setGroupFormData] = useState({
-    groupName: '',
-    category: '',
-    page: '',
-  })
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
-  const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set())
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<{
-    oldCategory: string
-    problems: Problem[]
-  } | null>(null)
-  const [categoryFormData, setCategoryFormData] = useState({
-    categoryName: '',
-  })
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
-  const [subProblemsMap, setSubProblemsMap] = useState<Map<string, Problem[]>>(new Map())
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
-  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
-  const [studyRecords, setStudyRecords] = useState<StudyRecord[]>([])
-  const [problemAccuracy, setProblemAccuracy] = useState<number | null>(null)
-  const [availableCategories, setAvailableCategories] = useState<string[]>([])
-  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false)
-  const [isEditingWorkbook, setIsEditingWorkbook] = useState(false)
-  const [workbookFormData, setWorkbookFormData] = useState({
-    title: '',
-    subject: '',
-  })
   const [lastDragOperation, setLastDragOperation] = useState<{
     problemId: string
     originalParentId: string | undefined
@@ -85,12 +108,6 @@ export default function WorkbookDetail() {
     total: number
     phase: 'importing' | 'relations'
   } | null>(null)
-
-  useEffect(() => {
-    if (id) {
-      loadData()
-    }
-  }, [id])
 
   // 各セクションおよびカテゴリの直近回答の正解率を計算
   useEffect(() => {
@@ -154,115 +171,21 @@ export default function WorkbookDetail() {
     }
   }, [problems, subProblemsMap])
 
-  const loadData = async () => {
-    if (!id) return
-
-    const workbookData = await getWorkbook(id)
-    let problemsData = await getProblems(id)
-
-    // ページ数でソート（ページ数がある場合）、なければ問題番号でソート
-    problemsData = problemsData.sort((a, b) => {
-      if (a.page && b.page) {
-        return a.page - b.page
-      }
-      return a.problemNumber.localeCompare(b.problemNumber)
-    })
-
-    setWorkbook(workbookData || null)
-    setProblems(problemsData)
-
-    // 各親問題の小問を読み込む
-    const subProblemsMapTemp = new Map<string, Problem[]>()
-    for (const problem of problemsData) {
-      const subProblems = await getSubProblems(problem.id)
-      if (subProblems.length > 0) {
-        subProblemsMapTemp.set(problem.id, subProblems)
-      }
-    }
-    setSubProblemsMap(subProblemsMapTemp)
-
-    // 既存のカテゴリを読み込む
-    const categories = await getCategoriesForWorkbook(id)
-    setAvailableCategories(categories)
-
-    // カテゴリをデフォルトで展開状態にする
-    const categorySet = new Set<string>()
-    problemsData.forEach((problem) => {
-      if (!problem.parentProblemId) {
-        const category = problem.category || '未分類'
-        categorySet.add(category)
-      }
-    })
-    setExpandedCategories(categorySet)
-
-    // 問題数を更新
-    if (workbookData && workbookData.totalProblems !== problemsData.length) {
-      await db.workbooks.update(id, {
-        totalProblems: problemsData.length,
-        updatedAt: new Date(),
-      })
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!id) return
-
-    if (editingProblem) {
-      // 編集モード
-      await db.problems.update(editingProblem.id, {
-        problemNumber: formData.problemNumber,
-        category: formData.category || undefined,
-        page: formData.page ? parseInt(formData.page) : undefined,
-        memo: formData.memo || undefined,
-      })
-    } else {
-      // 新規追加モード
-      await addProblem({
-        workbookId: id,
-        problemNumber: formData.problemNumber,
-        category: formData.category || undefined,
-        page: formData.page ? parseInt(formData.page) : undefined,
-        memo: formData.memo || undefined,
-      })
-    }
-
-    setFormData({ problemNumber: '', category: '', page: '', memo: '' })
-    setEditingProblem(null)
-    setIsModalOpen(false)
-    loadData()
-  }
-
-  const handleEdit = async (problem: Problem) => {
-    setEditingProblem(problem)
-    setFormData({
-      problemNumber: problem.problemNumber,
-      category: problem.category || '',
-      page: problem.page?.toString() || '',
-      memo: problem.memo || '',
-    })
-
-    // 学習記録と正答率を読み込む
-    const records = await getStudyRecords(problem.id)
-    const accuracy = await calculateRecentAccuracyForProblems([problem])
-    setStudyRecords(records)
-    setProblemAccuracy(accuracy)
-
-    // カテゴリが既存のものでない場合、カスタム入力を表示
-    setShowCustomCategoryInput(
-      problem.category !== undefined &&
-      problem.category !== '' &&
-      !availableCategories.includes(problem.category)
-    )
-
-    setIsModalOpen(true)
-  }
-
-  const handleDelete = async (problemId: string) => {
-    if (confirm('この問題を削除しますか？学習記録もすべて削除されます。')) {
-      await deleteProblem(problemId)
+  // Wrapper handlers that close modals and reload data
+  const handleSubmit = (e: React.FormEvent) => {
+    handleProblemSubmit(e, () => {
+      setIsModalOpen(false)
       loadData()
-    }
+    })
+  }
+
+  const handleDelete = (problemId: string) => {
+    handleProblemDelete(problemId, loadData)
+  }
+
+  const handleEditProblem = async (problem: Problem) => {
+    await handleEdit(problem)
+    setIsModalOpen(true)
   }
 
   const handleStartGroupStudy = async (groupProblems: Problem[]) => {
@@ -339,68 +262,26 @@ export default function WorkbookDetail() {
     navigate(`/study/${firstProblem.id}`)
   }
 
-  const handleEditGroup = (groupKey: string, groupProblems: Problem[]) => {
-    setEditingGroup({ groupKey, problems: groupProblems })
-
-    // グループ内の最初の問題のページ数とカテゴリを取得
-    const firstProblemWithPage = groupProblems.find(p => p.page !== undefined)
-    const firstProblemWithCategory = groupProblems.find(p => p.category !== undefined)
-
-    setGroupFormData({
-      groupName: groupKey,
-      category: firstProblemWithCategory?.category || '',
-      page: firstProblemWithPage?.page?.toString() || '',
-    })
+  const handleEditGroupWrapper = (groupKey: string, groupProblems: Problem[]) => {
+    handleEditGroup(groupKey, groupProblems)
     setIsGroupModalOpen(true)
   }
 
-  const handleGroupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingGroup) return
-
-    const newPage = groupFormData.page ? parseInt(groupFormData.page) : undefined
-    const newCategory = groupFormData.category || undefined
-
-    // グループ内のすべての問題のページ数とカテゴリを更新
-    for (const problem of editingGroup.problems) {
-      await db.problems.update(problem.id, {
-        category: newCategory,
-        page: newPage,
-      })
-    }
-
-    // グループ名が変更された場合、問題番号のプレフィックスを更新
-    if (groupFormData.groupName !== editingGroup.groupKey) {
-      for (const problem of editingGroup.problems) {
-        const parts = problem.problemNumber.split('-')
-        if (parts.length > 1) {
-          parts[0] = groupFormData.groupName
-          await db.problems.update(problem.id, {
-            problemNumber: parts.join('-'),
-          })
-        }
-      }
-    }
-
-    setIsGroupModalOpen(false)
-    setEditingGroup(null)
-    setGroupFormData({ groupName: '', category: '', page: '' })
-    loadData()
+  const handleGroupSubmit = (e: React.FormEvent) => {
+    handleGroupSubmitOriginal(e, () => {
+      setIsGroupModalOpen(false)
+      loadData()
+    })
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
-    setEditingProblem(null)
-    setFormData({ problemNumber: '', category: '', page: '', memo: '' })
-    setStudyRecords([])
-    setProblemAccuracy(null)
-    setShowCustomCategoryInput(false)
+    resetProblemForm()
   }
 
   const handleCloseGroupModal = () => {
     setIsGroupModalOpen(false)
-    setEditingGroup(null)
-    setGroupFormData({ groupName: '', category: '', page: '' })
+    resetGroupForm()
   }
 
   // 問題からカテゴリとセクションタイトルを抽出
@@ -538,62 +419,22 @@ export default function WorkbookDetail() {
     return count
   }
 
-  const toggleCategory = (category: string) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category)
-    } else {
-      newExpanded.add(category)
-    }
-    setExpandedCategories(newExpanded)
-  }
 
-  const toggleTitle = (titleKey: string) => {
-    const newExpanded = new Set(expandedTitles)
-    if (newExpanded.has(titleKey)) {
-      newExpanded.delete(titleKey)
-    } else {
-      newExpanded.add(titleKey)
-    }
-    setExpandedTitles(newExpanded)
-  }
-
-  const handleEditCategory = (category: string, categoryProblems: Problem[][]) => {
-    // カテゴリ内のすべての問題をフラット化
-    const allProblems = categoryProblems.flat()
-
-    setEditingCategory({
-      oldCategory: category,
-      problems: allProblems,
-    })
-    setCategoryFormData({ categoryName: category })
+  const handleEditCategoryWrapper = (category: string, categoryProblems: Problem[][]) => {
+    handleEditCategory(category, categoryProblems)
     setIsCategoryModalOpen(true)
   }
 
-  const handleCategorySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingCategory) return
-
-    const newCategory = categoryFormData.categoryName.trim()
-    if (!newCategory) return
-
-    // カテゴリ内のすべての問題のcategoryフィールドを更新
-    for (const problem of editingCategory.problems) {
-      await db.problems.update(problem.id, {
-        category: newCategory,
-      })
-    }
-
-    setIsCategoryModalOpen(false)
-    setEditingCategory(null)
-    setCategoryFormData({ categoryName: '' })
-    loadData()
+  const handleCategorySubmit = (e: React.FormEvent) => {
+    handleCategorySubmitOriginal(e, () => {
+      setIsCategoryModalOpen(false)
+      loadData()
+    })
   }
 
   const handleCloseCategoryModal = () => {
     setIsCategoryModalOpen(false)
-    setEditingCategory(null)
-    setCategoryFormData({ categoryName: '' })
+    resetCategoryForm()
   }
 
 
@@ -682,16 +523,6 @@ export default function WorkbookDetail() {
     }
   }
 
-  // 親問題の折りたたみ切り替え
-  const toggleParent = (problemId: string) => {
-    const newExpanded = new Set(expandedParents)
-    if (newExpanded.has(problemId)) {
-      newExpanded.delete(problemId)
-    } else {
-      newExpanded.add(problemId)
-    }
-    setExpandedParents(newExpanded)
-  }
 
   // 小問を追加
   const handleAddSubProblem = async (parentProblem: Problem) => {
@@ -740,33 +571,11 @@ export default function WorkbookDetail() {
 
   const handleEditWorkbook = () => {
     if (!workbook) return
-    setWorkbookFormData({
-      title: workbook.title,
-      subject: workbook.subject,
-    })
-    setIsEditingWorkbook(true)
+    handleEditWorkbookOriginal(workbook)
   }
 
-  const handleSaveWorkbook = async () => {
-    if (!id || !workbookFormData.title.trim()) return
-
-    try {
-      await db.workbooks.update(id, {
-        title: workbookFormData.title.trim(),
-        subject: workbookFormData.subject.trim(),
-        updatedAt: new Date(),
-      })
-      setIsEditingWorkbook(false)
-      loadData()
-    } catch (error) {
-      console.error('問題集の更新に失敗しました:', error)
-      alert('問題集の更新に失敗しました')
-    }
-  }
-
-  const handleCancelEditWorkbook = () => {
-    setIsEditingWorkbook(false)
-    setWorkbookFormData({ title: '', subject: '' })
+  const handleSaveWorkbook = () => {
+    handleSaveWorkbookOriginal(loadData)
   }
 
   // PDF削除 - 一時的に無効化
@@ -1157,7 +966,7 @@ export default function WorkbookDetail() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleEditCategory(category, Object.values(titles))
+                      handleEditCategoryWrapper(category, Object.values(titles))
                     }}
                     className="p-2 hover:bg-blue-100 rounded transition-colors"
                   >
@@ -1232,7 +1041,7 @@ export default function WorkbookDetail() {
                                 </Button>
                                 <button
                                   onClick={() =>
-                                    handleEditGroup(
+                                    handleEditGroupWrapper(
                                       `${category}${title}`,
                                       titleProblems
                                     )
@@ -1303,7 +1112,7 @@ export default function WorkbookDetail() {
                                             <Plus size={14} className="text-green-600" />
                                           </button>
                                           <button
-                                            onClick={() => handleEdit(problem)}
+                                            onClick={() => handleEditProblem(problem)}
                                             className="p-1.5 hover:bg-blue-100 rounded transition-colors"
                                           >
                                             <Edit2 size={14} className="text-primary" />
@@ -1344,7 +1153,7 @@ export default function WorkbookDetail() {
 
                                               <div className="flex items-center gap-1">
                                                 <button
-                                                  onClick={() => handleEdit(subProblem)}
+                                                  onClick={() => handleEditProblem(subProblem)}
                                                   className="p-1.5 hover:bg-blue-200 rounded transition-colors"
                                                 >
                                                   <Edit2 size={14} className="text-primary" />
