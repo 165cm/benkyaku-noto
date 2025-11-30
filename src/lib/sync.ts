@@ -1,5 +1,6 @@
 import { db } from './db'
 import { backupAllDataToFirestore, restoreAllDataFromFirestore } from './firestore'
+import { saveLastBackupTime, saveLastRestoreTime } from './storage'
 
 export interface SyncProgress {
   stage: 'workbooks' | 'problems' | 'studyRecords' | 'explanations' | 'complete'
@@ -69,6 +70,9 @@ export async function backupToCloud(
       studyRecords,
       explanations
     })
+
+    // 最終バックアップ時刻を保存
+    saveLastBackupTime()
 
     onProgress?.({
       stage: 'complete',
@@ -144,6 +148,9 @@ export async function restoreFromCloud(
     for (const explanation of cloudData.explanations) {
       await db.explanations.put(explanation)
     }
+
+    // 最終復元時刻を保存
+    saveLastRestoreTime()
 
     onProgress?.({
       stage: 'complete',

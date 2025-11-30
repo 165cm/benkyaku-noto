@@ -6,6 +6,8 @@ const STORAGE_KEYS = {
   OPENAI_API_KEY: 'benkyaku-openai-api-key',
   EXCLUDED_CATEGORIES: 'benkyaku-excluded-categories',
   EXCLUDED_SECTIONS: 'benkyaku-excluded-sections',
+  LAST_BACKUP_TIME: 'benkyaku-last-backup-time',
+  LAST_RESTORE_TIME: 'benkyaku-last-restore-time',
 } as const
 
 // 除外カテゴリの保存
@@ -48,6 +50,28 @@ export function removeOpenAIApiKey(): void {
 // APIキーが設定されているか確認
 export function hasOpenAIApiKey(): boolean {
   return !!getOpenAIApiKey()
+}
+
+// 最終バックアップ時刻の保存
+export function saveLastBackupTime(): void {
+  localStorage.setItem(STORAGE_KEYS.LAST_BACKUP_TIME, new Date().toISOString())
+}
+
+// 最終バックアップ時刻の取得
+export function getLastBackupTime(): Date | null {
+  const stored = localStorage.getItem(STORAGE_KEYS.LAST_BACKUP_TIME)
+  return stored ? new Date(stored) : null
+}
+
+// 最終復元時刻の保存
+export function saveLastRestoreTime(): void {
+  localStorage.setItem(STORAGE_KEYS.LAST_RESTORE_TIME, new Date().toISOString())
+}
+
+// 最終復元時刻の取得
+export function getLastRestoreTime(): Date | null {
+  const stored = localStorage.getItem(STORAGE_KEYS.LAST_RESTORE_TIME)
+  return stored ? new Date(stored) : null
 }
 
 // ===== Firebase Storage (PDF管理) =====
