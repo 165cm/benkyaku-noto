@@ -229,7 +229,7 @@ export default function Stats() {
                   day: 'numeric',
                 }),
               }))}
-              margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
+              margin={{ top: 5, right: 5, left: -10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
@@ -242,7 +242,6 @@ export default function Stats() {
                 orientation="left"
                 stroke="#3b82f6"
                 tick={{ fontSize: 10 }}
-                width={35}
                 tickFormatter={(value) => {
                   const hours = value / 3600
                   if (hours >= 1) return `${hours.toFixed(1)}h`
@@ -254,7 +253,6 @@ export default function Stats() {
                 orientation="right"
                 stroke="#10b981"
                 tick={{ fontSize: 10 }}
-                width={30}
                 domain={[0, 100]}
                 tickFormatter={(value) => `${value}%`}
               />
