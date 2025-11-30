@@ -57,9 +57,12 @@ export default function Stats() {
   }
 
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    return `${hours}:${minutes.toString().padStart(2, '0')}`
+    const hours = seconds / 3600
+    if (hours >= 1) {
+      return `${hours.toFixed(1)}h`
+    }
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes}m`
   }
 
   if (loading) {
@@ -215,7 +218,7 @@ export default function Stats() {
           </span>
         </div>
 
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={250}>
           <ComposedChart
             data={stats.weeklyData.map(day => ({
               ...day,
@@ -223,46 +226,49 @@ export default function Stats() {
                 month: 'numeric',
                 day: 'numeric',
               }),
-              studyTimeMinutes: Math.round(day.studyTime / 60),
+              studyTimeHours: day.studyTime / 3600,
             }))}
-            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey="dateLabel"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 10 }}
               stroke="#6b7280"
             />
             <YAxis
               yAxisId="left"
               orientation="left"
               stroke="#3b82f6"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `${Math.floor(value / 60)}:${(value % 60).toString().padStart(2, '0')}`}
-              label={{ value: '学習時間', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+              tick={{ fontSize: 10 }}
+              width={35}
+              tickFormatter={(value) => {
+                if (value >= 1) return `${value.toFixed(1)}h`
+                return `${Math.round(value * 60)}m`
+              }}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
               stroke="#10b981"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 10 }}
+              width={30}
               domain={[0, 100]}
               tickFormatter={(value) => `${value}%`}
-              label={{ value: '正答率', angle: 90, position: 'insideRight', style: { fontSize: 12 } }}
             />
             <Tooltip
               content={({ active, payload }) => {
                 if (!active || !payload || payload.length === 0) return null
                 const data = payload[0].payload
                 return (
-                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-                    <p className="font-semibold text-sm mb-2">{data.dateLabel}</p>
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2">
+                    <p className="font-semibold text-xs mb-1">{data.dateLabel}</p>
                     <p className="text-xs text-blue-600">
-                      学習時間: {formatTime(data.studyTime)} ({data.problemsSolved}問)
+                      {formatTime(data.studyTime)} ({data.problemsSolved}問)
                     </p>
                     {data.accuracy !== null && data.accuracy !== undefined && (
                       <p className="text-xs text-green-600">
-                        正答率: {data.accuracy}%
+                        正答率 {data.accuracy}%
                       </p>
                     )}
                   </div>
@@ -270,15 +276,16 @@ export default function Stats() {
               }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 14 }}
+              wrapperStyle={{ fontSize: 12 }}
               iconType="line"
+              iconSize={10}
             />
             <Bar
               yAxisId="left"
               dataKey="studyTime"
               fill="#3b82f6"
               opacity={0.8}
-              name="学習時間(秒)"
+              name="学習時間"
               radius={[4, 4, 0, 0]}
             />
             <Line
@@ -286,10 +293,10 @@ export default function Stats() {
               type="monotone"
               dataKey="accuracy"
               stroke="#10b981"
-              strokeWidth={3}
-              dot={{ fill: '#10b981', strokeWidth: 2, r: 5, stroke: '#fff' }}
-              activeDot={{ r: 7 }}
-              name="正答率(%)"
+              strokeWidth={2}
+              dot={{ fill: '#10b981', strokeWidth: 2, r: 4, stroke: '#fff' }}
+              activeDot={{ r: 6 }}
+              name="正答率"
               connectNulls
             />
           </ComposedChart>
