@@ -94,8 +94,6 @@ export function useAutoSync() {
           // 最終的に失敗した場合
           setIsSyncing(false)
 
-          const errorMessage = error instanceof Error ? error.message : '不明なエラー'
-
           toast.error(
             'データ同期に失敗しました',
             `クラウドからのデータ取得に失敗しました。設定画面から手動で復元してください。`,
