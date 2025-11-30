@@ -227,6 +227,7 @@ export default function Stats() {
 
           {/* グラフエリア */}
           <div className="absolute left-12 right-12 top-0 bottom-8">
+            {/* 背景グリッド・棒グラフ・折れ線（引き伸ばし可） */}
             <svg className="w-full h-full" viewBox="0 0 700 200" preserveAspectRatio="none">
               {/* 背景グリッド */}
               {[0, 1, 2, 3, 4].map((i) => (
@@ -271,7 +272,7 @@ export default function Stats() {
                 })
               })()}
 
-              {/* 正答率の折れ線グラフ */}
+              {/* 正答率の折れ線 */}
               {(() => {
                 const validData = stats.weeklyData.map((day, i) => ({
                   index: i,
@@ -290,42 +291,46 @@ export default function Stats() {
                   return `${x},${y}`
                 }).join(' ')
 
-                return (
-                  <g>
-                    {/* 折れ線 */}
-                    {validData.length > 1 && (
-                      <polyline
-                        points={linePoints}
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="3"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-
-                    {/* ドット */}
-                    {validData.map((d) => {
-                      const x = (d.index + 0.5) * barWidth
-                      const y = 200 - ((d.accuracy || 0) / 100) * 200
-                      return (
-                        <circle
-                          key={`accuracy-${d.index}`}
-                          cx={x}
-                          cy={y}
-                          r="5"
-                          fill="#10b981"
-                          stroke="#fff"
-                          strokeWidth="2"
-                          vectorEffect="non-scaling-stroke"
-                        >
-                          <title>{d.accuracy}% ({d.problems}問)</title>
-                        </circle>
-                      )
-                    })}
-                  </g>
+                return validData.length > 1 && (
+                  <polyline
+                    points={linePoints}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
                 )
               })()}
             </svg>
+
+            {/* ドットだけ別レイヤー（歪み防止） */}
+            {(() => {
+              const validData = stats.weeklyData.map((day, i) => ({
+                index: i,
+                accuracy: day.accuracy,
+                problems: day.problemsSolved
+              })).filter(d => d.accuracy !== null && d.accuracy !== undefined)
+
+              if (validData.length === 0) return null
+
+              return validData.map((d) => {
+                const xPercent = ((d.index + 0.5) / stats.weeklyData.length) * 100
+                const yPercent = 100 - (d.accuracy || 0)
+
+                return (
+                  <div
+                    key={`dot-${d.index}`}
+                    className="absolute w-3 h-3 rounded-full bg-green-600 border-2 border-white cursor-pointer shadow-sm hover:scale-125 transition-transform"
+                    style={{
+                      left: `${xPercent}%`,
+                      top: `${yPercent}%`,
+                      transform: 'translate(-50%, -50%)'
+                    }}
+                    title={`${d.accuracy}% (${d.problems}問)`}
+                  />
+                )
+              })
+            })()}
           </div>
 
           {/* X軸ラベル（日付） */}
