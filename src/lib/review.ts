@@ -174,6 +174,7 @@ export async function calculateStudyStats() {
   for (let i = 6; i >= 0; i--) {
     const date = new Date(todayStart)
     date.setDate(todayStart.getDate() - i)
+    date.setHours(0, 0, 0, 0) // 時刻を00:00:00にリセット（getStudyDate()と同じ形式に）
     const dateStr = date.toISOString().split('T')[0]
 
     const dayRecords = allRecords.filter((r) => {
@@ -230,6 +231,7 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   for (let i = 6; i >= 0; i--) {
     const date = new Date(todayStart)
     date.setDate(todayStart.getDate() - i)
+    date.setHours(0, 0, 0, 0) // 時刻を00:00:00にリセット（getStudyDate()と同じ形式に）
     const dateStr = date.toISOString().split('T')[0]
 
     const dayRecords = allRecords.filter((r) => {
