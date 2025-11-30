@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Clock, BookOpen, TrendingUp, Award, Info, AlertCircle } from 'lucide-react'
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
 import Card from '@/components/Card'
 import { calculateStudyStatsByWorkbook } from '@/lib/review'
 import { getWorkbooks } from '@/lib/db'
@@ -195,7 +206,7 @@ export default function Stats() {
         </Card>
       </div>
 
-      {/* 週間グラフ - 折れ線グラフ */}
+      {/* 週間グラフ - Recharts */}
       <Card className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <h2 className="text-lg font-semibold">週間の推移</h2>
@@ -204,156 +215,85 @@ export default function Stats() {
           </span>
         </div>
 
-        <div className="relative h-64 mb-8">
-          {/* Y軸ラベル（学習時間） */}
-          <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-500 pr-2">
-            {(() => {
-              const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
-              const step = Math.ceil(maxTime / 4 / 300) * 300 // 5分刻み
-              return [4, 3, 2, 1, 0].map(i => (
-                <span key={i}>{formatTime(step * i)}</span>
-              ))
-            })()}
-          </div>
-
-          {/* Y軸ラベル（正答率） */}
-          <div className="absolute right-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-500 pl-2">
-            <span>100%</span>
-            <span>75%</span>
-            <span>50%</span>
-            <span>25%</span>
-            <span>0%</span>
-          </div>
-
-          {/* グラフエリア */}
-          <div className="absolute left-12 right-12 top-0 bottom-8">
-            <svg className="w-full h-full" viewBox="0 0 700 200" preserveAspectRatio="none">
-              {/* 背景グリッド */}
-              {[0, 1, 2, 3, 4].map((i) => (
-                <line
-                  key={`grid-${i}`}
-                  x1="0"
-                  y1={i * 50}
-                  x2="700"
-                  y2={i * 50}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-
-              {/* 学習時間の棒グラフ */}
-              {(() => {
-                const maxTime = Math.max(...stats.weeklyData.map(d => d.studyTime), 1)
-                const barWidth = 700 / stats.weeklyData.length
-                const barPadding = barWidth * 0.15
-
-                return stats.weeklyData.map((day, i) => {
-                  const height = (day.studyTime / maxTime) * 200
-                  const x = i * barWidth + barPadding
-                  const y = 200 - height
-                  const width = barWidth - barPadding * 2
-
-                  return (
-                    <rect
-                      key={`bar-${i}`}
-                      x={x}
-                      y={y}
-                      width={width}
-                      height={height}
-                      fill="#3b82f6"
-                      opacity="0.8"
-                      className="hover:opacity-100"
-                    >
-                      <title>{formatTime(day.studyTime)} ({day.problemsSolved}問)</title>
-                    </rect>
-                  )
-                })
-              })()}
-
-              {/* 正答率の折れ線グラフ */}
-              {(() => {
-                const validData = stats.weeklyData.map((day, i) => ({
-                  index: i,
-                  accuracy: day.accuracy,
-                  problems: day.problemsSolved
-                })).filter(d => d.accuracy !== null && d.accuracy !== undefined)
-
-                if (validData.length === 0) return null
-
-                const barWidth = 700 / stats.weeklyData.length
-
-                // 折れ線のパス
-                const linePoints = validData.map(d => {
-                  const x = (d.index + 0.5) * barWidth
-                  const y = 200 - ((d.accuracy || 0) / 100) * 200
-                  return `${x},${y}`
-                }).join(' ')
-
-                return (
-                  <g>
-                    {/* 折れ線 */}
-                    {validData.length > 1 && (
-                      <polyline
-                        points={linePoints}
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="3"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-
-                    {/* ドット */}
-                    {validData.map((d) => {
-                      const x = (d.index + 0.5) * barWidth
-                      const y = 200 - ((d.accuracy || 0) / 100) * 200
-                      return (
-                        <circle
-                          key={`accuracy-${d.index}`}
-                          cx={x}
-                          cy={y}
-                          r="5"
-                          fill="#10b981"
-                          stroke="#fff"
-                          strokeWidth="2"
-                          vectorEffect="non-scaling-stroke"
-                        >
-                          <title>{d.accuracy}% ({d.problems}問)</title>
-                        </circle>
-                      )
-                    })}
-                  </g>
-                )
-              })()}
-            </svg>
-          </div>
-
-          {/* X軸ラベル（日付） */}
-          <div className="absolute left-12 right-12 bottom-0 flex justify-between text-xs text-gray-500">
-            {stats.weeklyData.map((day) => {
-              const date = new Date(day.date)
-              const dayLabel = date.toLocaleDateString('ja-JP', {
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart
+            data={stats.weeklyData.map(day => ({
+              ...day,
+              dateLabel: new Date(day.date).toLocaleDateString('ja-JP', {
                 month: 'numeric',
                 day: 'numeric',
-              })
-              return (
-                <span key={day.date} className="text-center">{dayLabel}</span>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* 凡例 */}
-        <div className="flex items-center justify-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-3 bg-blue-600 opacity-80"></div>
-            <span className="text-gray-600">学習時間</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-green-600"></div>
-            <span className="text-gray-600">正答率</span>
-          </div>
-        </div>
+              }),
+              studyTimeMinutes: Math.round(day.studyTime / 60),
+            }))}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis
+              dataKey="dateLabel"
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+            />
+            <YAxis
+              yAxisId="left"
+              orientation="left"
+              stroke="#3b82f6"
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => `${Math.floor(value / 60)}:${(value % 60).toString().padStart(2, '0')}`}
+              label={{ value: '学習時間', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              stroke="#10b981"
+              tick={{ fontSize: 12 }}
+              domain={[0, 100]}
+              tickFormatter={(value) => `${value}%`}
+              label={{ value: '正答率', angle: 90, position: 'insideRight', style: { fontSize: 12 } }}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || payload.length === 0) return null
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                    <p className="font-semibold text-sm mb-2">{data.dateLabel}</p>
+                    <p className="text-xs text-blue-600">
+                      学習時間: {formatTime(data.studyTime)} ({data.problemsSolved}問)
+                    </p>
+                    {data.accuracy !== null && data.accuracy !== undefined && (
+                      <p className="text-xs text-green-600">
+                        正答率: {data.accuracy}%
+                      </p>
+                    )}
+                  </div>
+                )
+              }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 14 }}
+              iconType="line"
+            />
+            <Bar
+              yAxisId="left"
+              dataKey="studyTime"
+              fill="#3b82f6"
+              opacity={0.8}
+              name="学習時間(秒)"
+              radius={[4, 4, 0, 0]}
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="accuracy"
+              stroke="#10b981"
+              strokeWidth={3}
+              dot={{ fill: '#10b981', strokeWidth: 2, r: 5, stroke: '#fff' }}
+              activeDot={{ r: 7 }}
+              name="正答率(%)"
+              connectNulls
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
       </Card>
 
       {/* 総合情報 */}
