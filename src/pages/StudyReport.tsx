@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, XCircle, AlertCircle, Clock, TrendingUp, Play } from 'lucide-react'
+import { Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { getSession, clearSession, createStudySession } from '@/lib/studySession'
@@ -9,6 +9,22 @@ import type { StudySession } from '@/lib/studySession'
 import type { Problem, StudyRecord } from '@/types'
 
 type TabType = 'all' | 'initial' | 'review'
+
+interface SectionGroup {
+  sectionKey: string
+  sectionTitle: string
+  category: string
+  problems: {
+    problemId: string
+    problem: Problem
+    score: 'correct' | 'partial' | 'incorrect'
+    timeSpent: number
+  }[]
+  correctCount: number
+  partialCount: number
+  incorrectCount: number
+  totalCount: number
+}
 
 export default function StudyReport() {
   const navigate = useNavigate()
@@ -21,6 +37,7 @@ export default function StudyReport() {
   } | null>(null)
   const [studyRecordsMap, setStudyRecordsMap] = useState<Map<string, StudyRecord[]>>(new Map())
   const [activeTab, setActiveTab] = useState<TabType>('review')
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadData()
@@ -154,6 +171,85 @@ export default function StudyReport() {
     return previousRecords.length === 0
   }
 
+  // 時間のフォーマット
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins > 0) {
+      return `${mins}分${secs}秒`
+    }
+    return `${secs}秒`
+  }
+
+  // 結果アイコンを取得
+  const getResultIcon = (result: string) => {
+    switch (result) {
+      case 'correct':
+        return <span className="text-green-600 font-bold">◯</span>
+      case 'partial':
+        return <span className="text-yellow-600 font-bold">△</span>
+      case 'incorrect':
+        return <span className="text-red-600 font-bold">×</span>
+      default:
+        return <span className="text-gray-400">-</span>
+    }
+  }
+
+  // セクションの開閉トグル
+  const toggleSection = (sectionKey: string) => {
+    const newExpanded = new Set(expandedSections)
+    if (newExpanded.has(sectionKey)) {
+      newExpanded.delete(sectionKey)
+    } else {
+      newExpanded.add(sectionKey)
+    }
+    setExpandedSections(newExpanded)
+  }
+
+  // 問題をセクションごとにグループ化
+  const groupBySection = (filteredResults: Array<{ problemId: string; score: 'correct' | 'partial' | 'incorrect'; timeSpent: number }>): SectionGroup[] => {
+    const groups = new Map<string, SectionGroup>()
+
+    for (const result of filteredResults) {
+      const problem = problems.find((p) => p.id === result.problemId)
+      if (!problem) continue
+
+      const sectionKey = problem.sectionTitle || 'その他'
+      const category = problem.category || ''
+
+      if (!groups.has(sectionKey)) {
+        groups.set(sectionKey, {
+          sectionKey,
+          sectionTitle: sectionKey,
+          category,
+          problems: [],
+          correctCount: 0,
+          partialCount: 0,
+          incorrectCount: 0,
+          totalCount: 0,
+        })
+      }
+
+      const group = groups.get(sectionKey)!
+      group.problems.push({
+        problemId: result.problemId,
+        problem,
+        score: result.score,
+        timeSpent: result.timeSpent,
+      })
+      group.totalCount++
+      if (result.score === 'correct') {
+        group.correctCount++
+      } else if (result.score === 'partial') {
+        group.partialCount++
+      } else {
+        group.incorrectCount++
+      }
+    }
+
+    return Array.from(groups.values())
+  }
+
   // タブごとに問題をフィルタリング
   const getFilteredResults = (tab: TabType) => {
     if (!session) return []
@@ -246,156 +342,145 @@ export default function StudyReport() {
   ]
 
   return (
-    <div>
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold mb-2">学習レポート</h1>
-        <p className="text-lg font-medium text-primary mb-1">{studiedSectionTitle}</p>
-        <p className="text-gray-600">お疲れ様でした！</p>
+    <div className="max-w-2xl mx-auto">
+      <div className="mb-3">
+        <h1 className="text-lg font-bold mb-0.5">学習レポート</h1>
+        <p className="text-xs text-gray-600">{studiedSectionTitle} · お疲れ様でした！</p>
       </div>
 
       {/* タブナビゲーション */}
-      <div className="mb-8">
-        <div className="flex border-b border-gray-300">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`
-                flex-1 py-3 px-4 text-center font-medium transition-colors
-                ${activeTab === tab.key
-                  ? 'border-b-2 border-primary text-primary bg-blue-50'
-                  : 'text-gray-600 hover:text-primary hover:bg-gray-50'
-                }
-              `}
-            >
-              <div>
-                <span>{tab.label}</span>
-                <span className="ml-2 text-sm">({tab.stats.totalProblems}問)</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* タブコンテンツ */}
-        <div className="mt-6">
-          {/* サマリーカード */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <div className="text-center">
-                <Clock className="mx-auto mb-2 text-blue-600" size={32} />
-                <p className="text-sm text-gray-600">学習時間</p>
-                <p className="text-2xl font-bold">
-                  {Math.floor(currentStats.totalTime / 60)}分
-                </p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="text-center">
-                <CheckCircle className="mx-auto mb-2 text-green-600" size={32} />
-                <p className="text-sm text-gray-600">正解</p>
-                <p className="text-2xl font-bold text-green-600">{currentStats.correctCount}問</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="text-center">
-                <AlertCircle className="mx-auto mb-2 text-yellow-600" size={32} />
-                <p className="text-sm text-gray-600">部分正解</p>
-                <p className="text-2xl font-bold text-yellow-600">{currentStats.partialCount}問</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="text-center">
-                <XCircle className="mx-auto mb-2 text-red-600" size={32} />
-                <p className="text-sm text-gray-600">不正解</p>
-                <p className="text-2xl font-bold text-red-600">{currentStats.incorrectCount}問</p>
-              </div>
-            </Card>
-          </div>
-
-          {/* 正答率 */}
-          <Card className="mb-6">
-            <div className="flex items-center gap-4">
-              <TrendingUp className="text-primary" size={40} />
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 mb-1">正答率</p>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
-                    {currentStats.accuracyRate > 0 && (
-                      <div
-                        className="bg-primary h-4 rounded-full"
-                        style={{ width: `${currentStats.accuracyRate}%` }}
-                      />
-                    )}
-                  </div>
-                  <span className="text-2xl font-bold min-w-[60px] text-right">{currentStats.accuracyRate}%</span>
-                </div>
-              </div>
+      <div className="flex border-b border-gray-300 mb-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`
+              flex-1 py-2 px-3 text-center font-medium transition-colors text-sm
+              ${activeTab === tab.key
+                ? 'border-b-2 border-primary text-primary bg-blue-50'
+                : 'text-gray-600 hover:text-primary hover:bg-gray-50'
+              }
+            `}
+          >
+            <div>
+              <span>{tab.label}</span>
+              <span className="ml-1 text-xs">({tab.stats.totalProblems}問)</span>
             </div>
-          </Card>
+          </button>
+        ))}
+      </div>
 
-          {/* 詳細リスト */}
-          <div className="space-y-2">
-            {currentStats.filteredResults.map((result) => {
+      {/* コンパクトな統計 */}
+      <Card className="mb-3 p-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="text-center flex-1">
+            <p className="text-xs text-gray-500 mb-0.5">解答数</p>
+            <p className="text-lg md:text-2xl font-bold text-blue-600">{currentStats.totalProblems}問</p>
+          </div>
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-0.5">正解率</p>
+            <p className="text-lg md:text-2xl font-bold text-green-600">{currentStats.accuracyRate}%</p>
+          </div>
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-0.5">学習時間</p>
+            <p className="text-base md:text-lg font-bold text-purple-600">{formatTime(currentStats.totalTime)}</p>
+          </div>
+          <div className="text-center flex-1 border-l border-gray-200">
+            <p className="text-xs text-gray-500 mb-0.5">◯/△/×</p>
+            <p className="text-xs md:text-sm font-bold">
+              <span className="text-green-600">{currentStats.correctCount}</span>
+              {' / '}
+              <span className="text-yellow-600">{currentStats.partialCount}</span>
+              {' / '}
+              <span className="text-red-600">{currentStats.incorrectCount}</span>
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* 問題別詳細 */}
+      {currentStats.totalProblems <= 10 ? (
+        // 10問以下：全て表示（アコーディオンなし）
+        <Card className="mb-3 p-2">
+          <div className="mb-1.5">
+            <span className="font-medium text-xs">問題別の結果</span>
+            <span className="text-xs text-gray-500 ml-2">
+              {currentStats.totalProblems}問中{currentStats.correctCount}問正解（{currentStats.accuracyRate}%）
+            </span>
+          </div>
+          <div className="border-t pt-1.5 space-y-0.5">
+            {currentStats.filteredResults.map((result, index) => {
               const problem = problems.find((p) => p.id === result.problemId)
               if (!problem) return null
 
-              const ScoreIcon =
-                result.score === 'correct'
-                  ? CheckCircle
-                  : result.score === 'partial'
-                    ? AlertCircle
-                    : XCircle
-
-              const scoreColor =
-                result.score === 'correct'
-                  ? 'text-green-600'
-                  : result.score === 'partial'
-                    ? 'text-yellow-600'
-                    : 'text-red-600'
-
-              const scoreLabel =
-                result.score === 'correct'
-                  ? '◯'
-                  : result.score === 'partial'
-                    ? '△'
-                    : '×'
-
               return (
-                <Card
+                <div
                   key={result.problemId}
-                  className="flex items-center justify-between"
+                  className="flex items-center justify-between p-1.5 rounded text-xs hover:bg-gray-50"
                 >
-                  <div className="flex items-center gap-3">
-                    <ScoreIcon className={scoreColor} size={24} />
-                    <div>
-                      {problem.category && (
-                        <p className="text-xs text-gray-500">{problem.category}</p>
-                      )}
-                      <p className="font-medium">{getProblemDisplayTitle(problem)}</p>
-                      {problem.page && (
-                        <p className="text-xs text-gray-500">p.{problem.page}</p>
-                      )}
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{index + 1}. {getProblemDisplayTitle(problem)}</span>
+                    <span className="text-xs text-gray-500 ml-1">{formatTime(result.timeSpent)}</span>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${scoreColor}`}>
-                      {scoreLabel}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {Math.floor(result.timeSpent / 60)}分
-                      {Math.floor(result.timeSpent % 60)}秒
-                    </p>
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    {getResultIcon(result.score)}
                   </div>
-                </Card>
+                </div>
               )
             })}
           </div>
-        </div>
-      </div>
+        </Card>
+      ) : (
+        // 10問超え：セクション別にアコーディオン表示
+        <div className="space-y-1.5 mb-3">
+          <div className="px-2 mb-1.5">
+            <span className="font-medium text-xs">問題別の結果</span>
+            <span className="text-xs text-gray-500 ml-2">
+              {currentStats.totalProblems}問中{currentStats.correctCount}問正解（{currentStats.accuracyRate}%）
+            </span>
+          </div>
+          {groupBySection(currentStats.filteredResults).map((section) => {
+            const accuracy = Math.round((section.correctCount / section.totalCount) * 100)
+            return (
+              <Card key={section.sectionKey} className="p-0">
+                <button
+                  onClick={() => toggleSection(section.sectionKey)}
+                  className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors"
+                >
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="font-medium text-xs truncate">{section.sectionTitle}</span>
+                    <span className="text-xs text-gray-500">
+                      {section.totalCount}問中{section.correctCount}問正解 · {accuracy}%
+                    </span>
+                  </div>
+                  {expandedSections.has(section.sectionKey) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
 
+                {expandedSections.has(section.sectionKey) && (
+                  <div className="border-t mt-1 pt-1.5 space-y-0.5 px-2 pb-2">
+                    {section.problems.map((item) => (
+                      <div
+                        key={item.problemId}
+                        className="flex items-center justify-between p-1.5 rounded text-xs hover:bg-gray-50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{getProblemDisplayTitle(item.problem)}</span>
+                          <span className="text-xs text-gray-500 ml-1">{formatTime(item.timeSpent)}</span>
+                        </div>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          {getResultIcon(item.score)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ボタン */}
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         {nextSection && (
           <Button onClick={handleStudyNextSection} size="lg">
