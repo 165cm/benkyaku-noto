@@ -37,9 +37,21 @@ export function saveOpenAIApiKey(apiKey: string): void {
   localStorage.setItem(STORAGE_KEYS.OPENAI_API_KEY, apiKey)
 }
 
-// OpenAI APIキーの取得
+// OpenAI APIキーの取得（環境変数 > localStorage の優先順位）
 export function getOpenAIApiKey(): string | null {
+  // 1. 環境変数をチェック（自分専用モード）
+  const envApiKey = import.meta.env.VITE_OPENAI_API_KEY
+  if (envApiKey) {
+    return envApiKey
+  }
+
+  // 2. localStorageをチェック（他人に公開モード）
   return localStorage.getItem(STORAGE_KEYS.OPENAI_API_KEY)
+}
+
+// 環境変数でAPIキーが設定されているか確認
+export function isUsingEnvApiKey(): boolean {
+  return !!import.meta.env.VITE_OPENAI_API_KEY
 }
 
 // OpenAI APIキーの削除
