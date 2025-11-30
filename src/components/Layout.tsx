@@ -1,8 +1,10 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Home, Calendar, BarChart3, Settings, PanelLeftClose, PanelLeft, LogOut, User as UserIcon } from 'lucide-react'
+import { BookOpen, Home, Calendar, BarChart3, Settings, PanelLeftClose, PanelLeft, LogOut, User as UserIcon, Cloud } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '@/store/authStore'
+import { useAutoSync } from '@/hooks/useAutoSync'
+import ToastContainer from './Toast'
 
 interface LayoutProps {
   children: ReactNode
@@ -11,6 +13,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { user, signOut } = useAuthStore()
+  const { isSyncing } = useAutoSync()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed')
     return saved === 'true'
@@ -51,6 +54,14 @@ export default function Layout({ children }: LayoutProps) {
               {isSidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
             </button>
             <h1 className="text-xl font-bold">弱点克服ノート</h1>
+
+            {/* 同期状態インジケーター */}
+            {isSyncing && (
+              <div className="flex items-center gap-1 text-xs text-gray-500 ml-2" title="クラウドから同期中">
+                <Cloud size={14} className="animate-pulse" />
+                <span className="hidden sm:inline">同期中...</span>
+              </div>
+            )}
           </div>
 
           {/* User Menu */}
@@ -151,6 +162,9 @@ export default function Layout({ children }: LayoutProps) {
           })}
         </div>
       </nav>
+
+      {/* Toast Notifications */}
+      <ToastContainer />
     </div>
   )
 }
