@@ -6,19 +6,56 @@ import Button from '@/components/Button'
 import { getTodayReviewList } from '@/lib/review'
 import type { ReviewSchedule } from '@/types'
 
+// 復習タイミングのカテゴリ
+type TimingCategory = 'today' | 'tomorrow' | 'thisWeek' | 'later'
+
+interface ReviewWithTiming extends ReviewSchedule {
+  timingCategory: TimingCategory
+  timingLabel: string
+  timingColor: string
+  timingBgColor: string
+}
+
 export default function Review() {
   const navigate = useNavigate()
-  const [reviewList, setReviewList] = useState<ReviewSchedule[]>([])
+  const [reviewList, setReviewList] = useState<ReviewWithTiming[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState<TimingCategory | 'all'>('all')
 
   useEffect(() => {
     loadReviewList()
   }, [])
 
+  const getTimingCategory = (daysSince: number): { category: TimingCategory, label: string, color: string, bgColor: string } => {
+    if (daysSince >= 1 && daysSince <= 3) {
+      return { category: 'today', label: '今日復習', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200' }
+    } else if (daysSince >= 4 && daysSince <= 7) {
+      return { category: 'tomorrow', label: '明日復習', color: 'text-orange-700', bgColor: 'bg-orange-50 border-orange-200' }
+    } else if (daysSince >= 8 && daysSince <= 14) {
+      return { category: 'thisWeek', label: '今週復習', color: 'text-yellow-700', bgColor: 'bg-yellow-50 border-yellow-200' }
+    } else {
+      return { category: 'later', label: '早めに復習', color: 'text-purple-700', bgColor: 'bg-purple-50 border-purple-200' }
+    }
+  }
+
   const loadReviewList = async () => {
     setLoading(true)
     const list = await getTodayReviewList()
-    setReviewList(list)
+
+    // 各レビューにタイミング情報を追加
+    const listWithTiming: ReviewWithTiming[] = list.map(review => {
+      const daysSince = getDaysSinceLastStudy(review.lastStudiedAt)
+      const timing = getTimingCategory(daysSince)
+      return {
+        ...review,
+        timingCategory: timing.category,
+        timingLabel: timing.label,
+        timingColor: timing.color,
+        timingBgColor: timing.bgColor,
+      }
+    })
+
+    setReviewList(listWithTiming)
     setLoading(false)
   }
 
@@ -49,6 +86,17 @@ export default function Review() {
     return review.problemNumber
   }
 
+  // フィルター後のリスト
+  const filteredList = selectedCategory === 'all'
+    ? reviewList
+    : reviewList.filter(r => r.timingCategory === selectedCategory)
+
+  // カテゴリ別カウント
+  const todayCount = reviewList.filter(r => r.timingCategory === 'today').length
+  const tomorrowCount = reviewList.filter(r => r.timingCategory === 'tomorrow').length
+  const thisWeekCount = reviewList.filter(r => r.timingCategory === 'thisWeek').length
+  const laterCount = reviewList.filter(r => r.timingCategory === 'later').length
+
   if (loading) {
     return <div>読み込み中...</div>
   }
@@ -59,12 +107,76 @@ export default function Review() {
         <div>
           <h1 className="text-2xl font-bold">復習リスト</h1>
           <p className="text-gray-600 mt-1">
-            復習が推奨される問題を優先度順に表示しています
+            復習が推奨される問題を優先度順に表示しています（全{reviewList.length}問）
           </p>
         </div>
       </div>
 
-      {reviewList.length === 0 ? (
+      {reviewList.length > 0 && (
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-3">📅 復習タイミングで絞り込み</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === 'all'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              すべて ({reviewList.length})
+            </button>
+            <button
+              onClick={() => setSelectedCategory('today')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === 'today'
+                  ? 'bg-red-600 text-white shadow-md'
+                  : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+              }`}
+            >
+              🔴 今日復習 ({todayCount})
+            </button>
+            <button
+              onClick={() => setSelectedCategory('tomorrow')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === 'tomorrow'
+                  ? 'bg-orange-600 text-white shadow-md'
+                  : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
+              }`}
+            >
+              🟠 明日復習 ({tomorrowCount})
+            </button>
+            <button
+              onClick={() => setSelectedCategory('thisWeek')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === 'thisWeek'
+                  ? 'bg-yellow-600 text-white shadow-md'
+                  : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200'
+              }`}
+            >
+              🟡 今週復習 ({thisWeekCount})
+            </button>
+            <button
+              onClick={() => setSelectedCategory('later')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === 'later'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+              }`}
+            >
+              🟣 早めに復習 ({laterCount})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {filteredList.length === 0 && reviewList.length > 0 ? (
+        <div className="text-center py-12">
+          <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-gray-500 mb-2">このカテゴリの復習問題はありません</p>
+          <Button onClick={() => setSelectedCategory('all')}>すべて表示</Button>
+        </div>
+      ) : reviewList.length === 0 ? (
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500 mb-2">復習する問題がありません</p>
@@ -74,22 +186,24 @@ export default function Review() {
         </div>
       ) : (
         <div className="space-y-3">
-          {reviewList.map((review) => {
+          {filteredList.map((review) => {
             const daysSince = getDaysSinceLastStudy(review.lastStudiedAt)
 
             return (
               <Card
                 key={review.problemId}
-                className="flex items-center justify-between"
+                className={`flex items-center justify-between border-2 ${review.timingBgColor}`}
               >
                 <div className="flex-1">
-                  {review.category && (
-                    <p className="text-xs text-gray-500 mb-1">{review.category}</p>
-                  )}
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium">
-                      {getReviewDisplayTitle(review)}
-                    </h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-full ${review.timingColor} bg-white border-2`}
+                    >
+                      {review.timingLabel}
+                    </span>
+                    {review.category && (
+                      <span className="text-xs text-gray-500">{review.category}</span>
+                    )}
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded ${getPriorityColor(
                         review.priorityScore
@@ -97,6 +211,11 @@ export default function Review() {
                     >
                       {getPriorityLabel(review.priorityScore)}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-medium text-lg">
+                      {getReviewDisplayTitle(review)}
+                    </h3>
                   </div>
 
                   <p className="text-sm text-gray-600 mb-2">
