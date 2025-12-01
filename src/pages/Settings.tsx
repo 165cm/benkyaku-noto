@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight, Cloud, CloudUpload, CloudDownload, Target } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight, Cloud, CloudUpload, CloudDownload, Target, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Card from '@/components/Card'
@@ -15,7 +15,10 @@ import {
   getExcludedSections,
   saveExcludedSections,
   getLastBackupTime,
-  getLastRestoreTime
+  getLastRestoreTime,
+  getWeekStartDay,
+  saveWeekStartDay,
+  type WeekStartDay
 } from '@/lib/storage'
 import {
   getWeeklyGoals,
@@ -73,6 +76,10 @@ export default function Settings() {
   // 学習時間目標
   const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoals>(getWeeklyGoals())
   const [goalsSaved, setGoalsSaved] = useState(false)
+
+  // 週設定
+  const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>(getWeekStartDay())
+  const [weekSettingsSaved, setWeekSettingsSaved] = useState(false)
 
   useEffect(() => {
     // 環境変数チェック
@@ -295,6 +302,13 @@ export default function Settings() {
     setWeeklyGoals(prev => ({ ...prev, [day]: minutes }))
   }
 
+  // 週設定を保存
+  const handleSaveWeekSettings = () => {
+    saveWeekStartDay(weekStartDay)
+    setWeekSettingsSaved(true)
+    setTimeout(() => setWeekSettingsSaved(false), 2000)
+  }
+
   const maskedApiKey = apiKey ? `${apiKey.slice(0, 7)}...${apiKey.slice(-4)}` : ''
 
   return (
@@ -349,6 +363,49 @@ export default function Settings() {
                 💾 保存
               </Button>
               {goalsSaved && (
+                <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* 週表示設定 */}
+      <Card className="mb-4">
+        <div className="flex items-start gap-2">
+          <Calendar className="text-primary mt-0.5 flex-shrink-0" size={20} />
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-semibold mb-1">週表示設定</h2>
+            <p className="text-xs text-gray-600 mb-3">
+              週間グラフの開始曜日を設定
+            </p>
+
+            {/* 開始曜日選択 */}
+            <div className="mb-3">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                週の開始曜日
+              </label>
+              <select
+                value={weekStartDay}
+                onChange={(e) => setWeekStartDay(Number(e.target.value) as WeekStartDay)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value={0}>日曜日</option>
+                <option value={1}>月曜日</option>
+                <option value={2}>火曜日</option>
+                <option value={3}>水曜日</option>
+                <option value={4}>木曜日</option>
+                <option value={5}>金曜日</option>
+                <option value={6}>土曜日</option>
+              </select>
+            </div>
+
+            {/* 保存ボタン */}
+            <div className="flex items-center gap-2">
+              <Button onClick={handleSaveWeekSettings} size="sm" className="flex-1">
+                💾 保存
+              </Button>
+              {weekSettingsSaved && (
                 <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
               )}
             </div>
