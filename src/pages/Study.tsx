@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Triangle, X, Pause, Play, Edit2, Trash2, LogOut, Star, BookOpen, Image, Camera } from 'lucide-react'
+import { ArrowLeft, Circle, Triangle, X, Edit2, Trash2, LogOut, Star, BookOpen, Image, Camera } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
@@ -43,10 +43,11 @@ export default function Study() {
   const [timeExpired, setTimeExpired] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
-  // 一時停止機能
-  const [isPaused, setIsPaused] = useState(false)
-  const [pausedTime, setPausedTime] = useState(0) // 累計一時停止時間（秒）
-  const [pauseStartTime, setPauseStartTime] = useState<number | null>(null) // 一時停止開始時刻（ミリ秒）
+  // タイマー機能（3モード対応）
+  const [timerMode, setTimerMode] = useState<'solving' | 'explanation' | 'paused'>('solving')
+  const [explanationTime, setExplanationTime] = useState(0) // 解説を読んだ時間（秒）
+  const [pausedTime, setPausedTime] = useState(0) // 休憩時間（秒）
+  const [modeStartTime, setModeStartTime] = useState(Date.now()) // 現在のモードが始まった時刻
 
   // 編集機能
   const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null)
@@ -93,11 +94,13 @@ export default function Study() {
 
       loadData()
       // 問題が変わったらタイマーとフェーズをリセット
-      setStartTime(Date.now())
+      const now = Date.now()
+      setStartTime(now)
+      setModeStartTime(now)
       setElapsedTime(0)
+      setExplanationTime(0)
       setPausedTime(0)
-      setPauseStartTime(null)
-      setIsPaused(false)
+      setTimerMode('solving')
       setMemo('')
       setShowHistory(false)
       setPhase('problem')
@@ -131,22 +134,26 @@ export default function Study() {
   }, [id])
 
   useEffect(() => {
-    if (isPaused) return // 一時停止中は何もしない
-
     const timer = setInterval(async () => {
-      // 一時停止中でない場合のみ時間を更新
-      const rawElapsed = Math.floor((Date.now() - startTime) / 1000)
-      const actualElapsed = rawElapsed - pausedTime
-      setElapsedTime(actualElapsed)
+      const now = Date.now()
+
+      // 現在のモードに応じて時間を更新
+      if (timerMode === 'solving') {
+        setElapsedTime(prev => prev + 1)
+      } else if (timerMode === 'explanation') {
+        setExplanationTime(prev => prev + 1)
+      } else if (timerMode === 'paused') {
+        setPausedTime(prev => prev + 1)
+      }
 
       // セッション全体の経過時間を計算
       const session = getSession()
       if (session) {
-        const sessionElapsed = Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000)
+        const sessionElapsed = Math.floor((now - new Date(session.startTime).getTime()) / 1000)
         setSessionElapsedTime(sessionElapsed)
 
         // 制限時間をチェック
-        if (!timeExpired) {
+        if (!timeExpired && timerMode === 'solving') {
           const targetSeconds = session.targetMinutes * 60
           if (sessionElapsed >= targetSeconds) {
             setTimeExpired(true)
@@ -154,13 +161,13 @@ export default function Study() {
         }
       }
 
-      // 1日の学習時間を更新（現在の問題の経過時間を含める）
+      // 1日の学習時間を更新（問題時間 + 解説時間、休憩は含めない）
       const baseTodayTime = await getTodayStudyTime()
-      setTodayStudyTime(baseTodayTime + actualElapsed)
+      setTodayStudyTime(baseTodayTime + elapsedTime + explanationTime)
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [startTime, timeExpired, isPaused, pausedTime])
+  }, [timerMode, modeStartTime, startTime, timeExpired, elapsedTime, explanationTime])
 
   // キーボードショートカット
   useEffect(() => {
@@ -244,23 +251,6 @@ export default function Study() {
     }
   }
 
-  // 一時停止/再開のハンドラー
-  const togglePause = () => {
-    if (isPaused) {
-      // 再開
-      if (pauseStartTime !== null) {
-        const pauseDuration = Math.floor((Date.now() - pauseStartTime) / 1000)
-        setPausedTime((prev) => prev + pauseDuration)
-        setPauseStartTime(null)
-      }
-      setIsPaused(false)
-    } else {
-      // 一時停止
-      setPauseStartTime(Date.now())
-      setIsPaused(true)
-    }
-  }
-
   // 編集モーダルを開く
   const openEditModal = (record: StudyRecord) => {
     setEditingRecord(record)
@@ -316,6 +306,34 @@ export default function Study() {
     const newValue = !autoAdvanceEnabled
     setAutoAdvanceEnabled(newValue)
     localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // タイマーモード切り替え：解説モードへ
+  const handleStartExplanation = () => {
+    if (timerMode !== 'solving') return
+    setTimerMode('explanation')
+    setModeStartTime(Date.now())
+  }
+
+  // タイマーモード切り替え：問題に戻る（解説モードから）
+  const handleBackToProblem = () => {
+    if (timerMode !== 'explanation') return
+    setTimerMode('solving')
+    setModeStartTime(Date.now())
+  }
+
+  // タイマーモード切り替え：休憩モードへ
+  const handleStartPause = () => {
+    if (timerMode === 'paused') return
+    setTimerMode('paused')
+    setModeStartTime(Date.now())
+  }
+
+  // タイマーモード切り替え：休憩から復帰
+  const handleResume = () => {
+    if (timerMode !== 'paused') return
+    setTimerMode('solving')
+    setModeStartTime(Date.now())
   }
 
   // 記録画面で結果を変更
@@ -615,37 +633,8 @@ export default function Study() {
               <span className="hidden sm:inline">終了</span>
             </button>
           )}
-          <button
-            onClick={togglePause}
-            className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
-              isPaused
-                ? 'bg-green-50 hover:bg-green-100 text-green-700'
-                : 'bg-orange-50 hover:bg-orange-100 text-orange-700'
-            }`}
-            title={isPaused ? 'タイマーを再開' : 'タイマーを一時停止'}
-          >
-            {isPaused ? (
-              <>
-                <Play size={16} />
-                <span className="hidden sm:inline">再開</span>
-              </>
-            ) : (
-              <>
-                <Pause size={16} />
-                <span className="hidden sm:inline">一時停止</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
-
-      {/* 一時停止中のメッセージ */}
-      {isPaused && (
-        <div className="mb-3 p-3 bg-orange-50 border border-orange-400 rounded-lg">
-          <p className="text-sm font-bold text-orange-900">⏸ タイマーが一時停止中です</p>
-          <p className="text-xs text-orange-700 mt-1">再開ボタンを押すと、タイマーが動き出します</p>
-        </div>
-      )}
 
       {/* 時間終了メッセージ */}
       {timeExpired && (
@@ -759,19 +748,55 @@ export default function Study() {
             </p>
           </div>
 
-          {/* サブ情報 */}
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>この問題: {isPaused && '⏸ '}{formatTime(elapsedTime)}</span>
+          {/* タイマー表示（3モード対応） */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-gray-700 font-medium">
+                ⏱️ 問題: {formatTime(elapsedTime)}
+              </span>
+              <span className="text-blue-600 font-medium">
+                📖 解説: {formatTime(explanationTime)}
+              </span>
+            </div>
             {getSession() && (
-              <span>セッション: {formatTime(sessionElapsedTime)}</span>
+              <span className="text-gray-500">
+                セッション: {formatTime(sessionElapsedTime)}
+              </span>
             )}
           </div>
+          {timerMode === 'explanation' && (
+            <p className="text-xs text-blue-600 mt-1">
+              ⏺️ 解説時間が増えています...
+            </p>
+          )}
+          {timerMode === 'paused' && (
+            <p className="text-xs text-gray-500 mt-1">
+              ⏸️ 休憩中（{formatTime(pausedTime)}）
+            </p>
+          )}
         </div>
       </Card>
 
       {/* フェーズ1: 問題表示 */}
-      {phase === 'problem' && (
+      {phase === 'problem' && timerMode === 'solving' && (
         <>
+          {/* タイマー操作ボタン */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <Button
+              onClick={handleStartExplanation}
+              className="bg-blue-600 hover:bg-blue-700 text-white h-12"
+            >
+              📖 解説を見る
+            </Button>
+            <Button
+              onClick={handleStartPause}
+              variant="secondary"
+              className="h-12"
+            >
+              ⏸️ 休憩
+            </Button>
+          </div>
+
           {/* 解答ボタン */}
           <div className="space-y-3 mb-4">
             {/* 正解・不正解ボタン（大きめ、横並び） */}
@@ -843,6 +868,82 @@ export default function Study() {
               </button>
             )}
           </div>
+        </>
+      )}
+
+      {/* 解説モード画面 */}
+      {phase === 'problem' && timerMode === 'explanation' && (
+        <>
+          <Card className="mb-4 bg-gradient-to-r from-blue-50 to-sky-50 border-blue-200">
+            <div className="p-6 text-center">
+              <div className="text-4xl mb-3">📖</div>
+              <p className="text-xl font-bold text-blue-900 mb-2">解説を読んでいます...</p>
+              <p className="text-sm text-blue-700 mb-4">
+                解説時間: {formatTime(explanationTime)}
+              </p>
+              <p className="text-xs text-gray-600">
+                💡 解説時間も学習時間にカウントされます
+              </p>
+            </div>
+          </Card>
+
+          {/* AI解説・画像解説へのリンク */}
+          <div className="space-y-3 mb-4">
+            {hasExplanation && explanationId && (
+              <Button
+                onClick={() => navigate(`/explanations/${explanationId}`)}
+                className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                📚 AI解説を見る
+              </Button>
+            )}
+            {imageExplanations.length > 0 && (
+              <Button
+                onClick={() => setShowImageExplanations(!showImageExplanations)}
+                className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                📷 画像解説を見る ({imageExplanations.length}枚)
+              </Button>
+            )}
+          </div>
+
+          {/* 問題に戻るボタン */}
+          <Button
+            onClick={handleBackToProblem}
+            className="w-full h-16 bg-green-600 hover:bg-green-700 text-white text-lg font-bold"
+          >
+            ✅ 問題に戻る
+            <span className="text-sm ml-2 opacity-90">(解説時間: {formatTime(explanationTime)})</span>
+          </Button>
+        </>
+      )}
+
+      {/* 休憩モード画面 */}
+      {phase === 'problem' && timerMode === 'paused' && (
+        <>
+          <Card className="mb-4 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300">
+            <div className="p-8 text-center">
+              <div className="text-6xl mb-4">😌</div>
+              <p className="text-2xl font-bold text-gray-800 mb-4">一息ついてください</p>
+              <p className="text-3xl font-mono font-bold text-gray-700 mb-4">
+                {formatTime(pausedTime)}
+              </p>
+              <p className="text-sm text-gray-600 mb-2">
+                💡 長時間の集中の後は休憩が大切です
+              </p>
+              <p className="text-xs text-gray-500">
+                ※ 休憩時間は学習時間にカウントされません
+              </p>
+            </div>
+          </Card>
+
+          {/* 学習再開ボタン */}
+          <Button
+            onClick={handleResume}
+            className="w-full h-20 bg-green-600 hover:bg-green-700 text-white text-xl font-bold shadow-lg"
+          >
+            ▶️ 学習を再開する
+          </Button>
         </>
       )}
 
