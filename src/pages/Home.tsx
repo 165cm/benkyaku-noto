@@ -287,22 +287,22 @@ export default function Home() {
               const barHeight = (weeklyData[i] / maxTime) * 100
               const goalLineHeight = goalInSeconds > 0 ? (goalInSeconds / maxTime) * 100 : 0
 
-              // 目標達成度に応じた色（今週モードのみ）
+              // 目標達成度に応じた色（統計ページと統一）
               const isAchieved = displayMode === 'current-week' && goalInSeconds > 0 && weeklyData[i] >= goalInSeconds
-              const barColor = isAchieved ? 'bg-green-500' : 'bg-blue-600'
+              const barColor = isAchieved ? '#10b981' : '#3b82f6' // 統計ページと同じ色
 
               return (
                 <div key={`${label}-${i}`} className="text-center">
-                  <p className={`text-xs text-gray-500 mb-1 ${displayMode === 'last-14-days' ? 'text-[10px]' : ''}`}>
+                  <p className={`text-xs text-gray-600 mb-1.5 ${displayMode === 'last-14-days' ? 'text-[10px]' : ''}`}>
                     {label}
                   </p>
-                  <div className={`bg-gray-100 rounded flex items-end justify-center relative ${
+                  <div className={`bg-gray-50 border border-gray-100 rounded-sm flex items-end justify-center relative ${
                     displayMode === 'last-14-days' ? 'h-16' : 'h-20'
                   }`}>
                     {/* 目標線（今週モードのみ） */}
                     {displayMode === 'current-week' && goalInMinutes > 0 && (
                       <div
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-orange-400"
+                        className="absolute left-0 right-0 border-t border-dashed border-gray-300"
                         style={{
                           bottom: `${goalLineHeight}%`,
                         }}
@@ -310,17 +310,19 @@ export default function Home() {
                     )}
                     {/* 実績バー */}
                     <div
-                      className={`${barColor} w-full rounded transition-all duration-500`}
+                      className="w-full rounded-t-sm transition-all duration-500"
                       style={{
                         height: `${barHeight}%`,
                         minHeight: weeklyData[i] > 0 ? '4px' : '0',
+                        backgroundColor: barColor,
+                        opacity: 0.8,
                       }}
                     />
                   </div>
-                  <p className={`font-medium mt-1 ${displayMode === 'last-14-days' ? 'text-[10px]' : 'text-xs'}`}>
+                  <p className={`text-gray-700 mt-1.5 ${displayMode === 'last-14-days' ? 'text-[10px]' : 'text-xs'}`}>
                     {timeInMinutes > 0 ? timeInMinutes : '-'}
                     {displayMode === 'current-week' && goalInMinutes > 0 && (
-                      <span className="text-gray-400">/{goalInMinutes}</span>
+                      <span className="text-gray-400 font-normal">/{goalInMinutes}</span>
                     )}
                   </p>
                 </div>

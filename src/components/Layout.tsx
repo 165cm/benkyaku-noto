@@ -107,7 +107,7 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex">
         {/* Sidebar */}
         {!isSidebarCollapsed && (
-          <aside className="w-64 bg-white border-r border-border hidden md:block">
+          <aside className="w-64 bg-white border-r border-border hidden md:block sticky top-[52px] h-[calc(100vh-52px)] overflow-y-auto">
             <nav className="p-4 space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon
