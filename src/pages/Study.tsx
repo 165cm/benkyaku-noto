@@ -206,51 +206,55 @@ export default function Study() {
       const workbookData = await getWorkbook(problemData.workbookId)
       setWorkbook(workbookData || null)
 
-      // PDF URLを動的に取得（期限切れ対策）
-      if (workbookData?.pdfFileName) {
-        try {
-          const url = await getPDFUrl(problemData.workbookId, workbookData.pdfFileName)
-          setPdfUrl(url)
-        } catch (error) {
-          console.error('PDF URL取得エラー:', error)
-          setPdfUrl(null)
-        }
-      } else if (workbookData?.pdfUrl) {
-        // 後方互換: pdfFileNameがない場合はpdfUrlから抽出して再取得
-        try {
-          const urlParts = decodeURIComponent(workbookData.pdfUrl).match(/\/([^/?]+)\?/)
-          if (urlParts && urlParts[1]) {
-            const fileName = urlParts[1]
-            const url = await getPDFUrl(problemData.workbookId, fileName)
+      // 並列化: PDF URL取得と他のデータ取得を同時実行
+      const pdfPromise = (async () => {
+        // PDF URLを動的に取得（期限切れ対策）
+        if (workbookData?.pdfFileName) {
+          try {
+            const url = await getPDFUrl(problemData.workbookId, workbookData.pdfFileName)
             setPdfUrl(url)
-          } else {
+          } catch (error) {
+            console.error('PDF URL取得エラー:', error)
             setPdfUrl(null)
           }
-        } catch (error) {
-          console.error('PDF URL取得エラー:', error)
+        } else if (workbookData?.pdfUrl) {
+          // 後方互換: pdfFileNameがない場合はpdfUrlから抽出して再取得
+          try {
+            const urlParts = decodeURIComponent(workbookData.pdfUrl).match(/\/([^/?]+)\?/)
+            if (urlParts && urlParts[1]) {
+              const fileName = urlParts[1]
+              const url = await getPDFUrl(problemData.workbookId, fileName)
+              setPdfUrl(url)
+            } else {
+              setPdfUrl(null)
+            }
+          } catch (error) {
+            console.error('PDF URL取得エラー:', error)
+            setPdfUrl(null)
+          }
+        } else {
           setPdfUrl(null)
         }
-      } else {
-        setPdfUrl(null)
-      }
+      })()
 
-      const records = await getStudyRecords(id)
+      // 並列化: 独立したデータ取得を同時実行
+      const [records, explanation, imgExplanations] = await Promise.all([
+        getStudyRecords(id),
+        // AI解説の存在チェック
+        problemData.category && problemData.sectionTitle
+          ? getExplanationBySectionKey(`${problemData.category}-${problemData.sectionTitle}`)
+          : Promise.resolve(null),
+        // 画像ベース解説の存在チェック
+        getImageBasedExplanationsByProblemId(id),
+      ])
+
       setStudyRecords(records)
-
-      // AI解説の存在チェック
-      if (problemData.category && problemData.sectionTitle) {
-        const sectionKey = `${problemData.category}-${problemData.sectionTitle}`
-        const explanation = await getExplanationBySectionKey(sectionKey)
-        setHasExplanation(!!explanation)
-        setExplanationId(explanation?.id || null)
-      } else {
-        setHasExplanation(false)
-        setExplanationId(null)
-      }
-
-      // 画像ベース解説の存在チェック
-      const imgExplanations = await getImageBasedExplanationsByProblemId(id)
+      setHasExplanation(!!explanation)
+      setExplanationId(explanation?.id || null)
       setImageExplanations(imgExplanations)
+
+      // PDF取得も完了を待つ（UIには影響しない）
+      await pdfPromise
     }
   }
 
@@ -806,7 +810,7 @@ export default function Study() {
               )}
 
               {/* 画像ベース解説ボタン */}
-              {imageExplanations.length > 0 ? (
+              {imageExplanations.length > 0 && (
                 <button
                   onClick={() => setShowImageExplanations(!showImageExplanations)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 shadow-sm"
@@ -815,11 +819,14 @@ export default function Study() {
                   <Image size={16} />
                   <span>画像解説 ({imageExplanations.length})</span>
                 </button>
-              ) : (
+              )}
+
+              {/* 画像解説作成ボタン - 記録画面でのみ表示 */}
+              {imageExplanations.length === 0 && phase === 'record' && (
                 <button
                   onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-gray-50 text-gray-600 hover:bg-gray-100 active:bg-gray-200 shadow-sm"
-                  title="画像から解説を作成"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-purple-50 text-purple-700 hover:bg-purple-100 active:bg-purple-200 shadow-sm"
+                  title="画像から解説を作成（答え合わせ後におすすめ）"
                 >
                   <Camera size={16} />
                   <span>画像で解説を作る</span>
