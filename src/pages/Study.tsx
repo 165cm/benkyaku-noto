@@ -60,7 +60,14 @@ export default function Study() {
   // 2段階フェーズ管理
   const [phase, setPhase] = useState<'problem' | 'record'>('problem')
   const [lastResult, setLastResult] = useState<StudyResult | null>(null)
+  const [lastRecordId, setLastRecordId] = useState<string | null>(null) // 最新の記録ID（訂正用）
   const [autoTransitionTimeout, setAutoTransitionTimeout] = useState<number | null>(null)
+
+  // 自動遷移の設定（localStorage）
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(() => {
+    const saved = localStorage.getItem('autoAdvanceEnabled')
+    return saved === 'true'
+  })
 
   // よく使うタグのプリセット（明確な分類）
   const COMMON_TAGS = [
@@ -304,6 +311,40 @@ export default function Study() {
     await loadData()
   }
 
+  // 自動遷移設定をトグル
+  const toggleAutoAdvance = () => {
+    const newValue = !autoAdvanceEnabled
+    setAutoAdvanceEnabled(newValue)
+    localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // 記録画面で結果を変更
+  const handleChangeResult = async (newResult: StudyResult) => {
+    if (!lastRecordId || !problem) return
+
+    // 自動遷移タイマーをクリア
+    if (autoTransitionTimeout) {
+      clearTimeout(autoTransitionTimeout)
+      setAutoTransitionTimeout(null)
+    }
+
+    // 結果を更新
+    setLastResult(newResult)
+    await updateStudyRecord(lastRecordId, { result: newResult })
+
+    // 苦手克服モードの場合、セッションデータも更新が必要
+    // （簡易的に再読み込みで対応）
+    await loadData()
+
+    // 自動遷移が有効な場合は再度タイマーをセット
+    if (autoAdvanceEnabled) {
+      const timeout = setTimeout(() => {
+        navigateToNextProblem()
+      }, 3000)
+      setAutoTransitionTimeout(timeout)
+    }
+  }
+
 
   // 学習記録を削除
   const handleDeleteRecord = async (recordId: string) => {
@@ -466,7 +507,7 @@ export default function Study() {
       }
 
       // 学習記録を保存
-      await addStudyRecord({
+      const recordId = await addStudyRecord({
         problemId: currentProblemId,
         workbookId: currentWorkbookId,
         result,
@@ -487,13 +528,16 @@ export default function Study() {
 
       // 結果を保存してフェーズ2へ移行
       setLastResult(result)
+      setLastRecordId(recordId)
       setPhase('record')
 
-      // 3秒後に自動遷移
-      const timeout = setTimeout(() => {
-        navigateToNextProblem()
-      }, 3000)
-      setAutoTransitionTimeout(timeout)
+      // 自動遷移が有効な場合のみ3秒後に自動遷移
+      if (autoAdvanceEnabled) {
+        const timeout = setTimeout(() => {
+          navigateToNextProblem()
+        }, 3000)
+        setAutoTransitionTimeout(timeout)
+      }
     } finally {
       setIsProcessing(false)
     }
@@ -821,15 +865,70 @@ export default function Study() {
               <p className="text-sm text-gray-600 mb-4">
                 学習時間: {formatTime(elapsedTime)}
               </p>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full transition-all"
-                  style={{ width: '100%' }}
-                />
+
+              {/* 結果変更ボタン */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2">間違えて入力した場合は変更できます</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleChangeResult('correct')}
+                    className={`p-3 rounded-lg transition-all ${
+                      lastResult === 'correct'
+                        ? 'bg-green-600 text-white shadow-lg'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <Circle size={20} />
+                      <span className="text-xs font-medium">正解</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleChangeResult('partial')}
+                    className={`p-3 rounded-lg transition-all ${
+                      lastResult === 'partial'
+                        ? 'bg-yellow-500 text-white shadow-lg'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <Triangle size={20} />
+                      <span className="text-xs font-medium">部分正解</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleChangeResult('incorrect')}
+                    className={`p-3 rounded-lg transition-all ${
+                      lastResult === 'incorrect'
+                        ? 'bg-red-600 text-white shadow-lg'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <X size={20} />
+                      <span className="text-xs font-medium">不正解</span>
+                    </div>
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-gray-600">
-                3秒後に次の問題へ...
-              </p>
+
+              {/* 自動遷移の設定 */}
+              <div className="border-t border-gray-200 pt-4">
+                <label className="flex items-center justify-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoAdvanceEnabled}
+                    onChange={toggleAutoAdvance}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">次回から自動で進む（3秒後）</span>
+                </label>
+                {autoAdvanceEnabled && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    3秒後に次の問題へ...
+                  </p>
+                )}
+              </div>
             </div>
           </Card>
 
