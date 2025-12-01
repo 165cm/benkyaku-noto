@@ -9,6 +9,7 @@ import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/stud
 import { getWeakModeSession } from '@/lib/weakModeSession'
 import { calculateStreak } from '@/lib/streak'
 import { getWeeklyStudyTime, getWeekDayLabels } from '@/lib/weeklyStats'
+import { getTodayGoal, getWeeklyGoals, calculateWeeklyTotal } from '@/lib/studyGoals'
 import type { StudyStats, ReviewSchedule } from '@/types'
 
 export default function Home() {
@@ -144,10 +145,22 @@ export default function Home() {
   }
 
   const recommendedMode = getRecommendedMode()
-  const targetStudyTime = 3600 // 目標1時間（秒）
+  const targetStudyTime = getTodayGoal() * 60 // 曜日別目標時間（分→秒）
   const todayStudyTime = stats?.todayStudyTime || 0
   const studyProgress = Math.min((todayStudyTime / targetStudyTime) * 100, 100)
   const weekDayLabels = getWeekDayLabels()
+  const weeklyGoals = getWeeklyGoals()
+
+  // 曜日の順序を[月,火,水,木,金,土,日]に対応させる
+  const goalsByWeekDay = [
+    weeklyGoals.monday,
+    weeklyGoals.tuesday,
+    weeklyGoals.wednesday,
+    weeklyGoals.thursday,
+    weeklyGoals.friday,
+    weeklyGoals.saturday,
+    weeklyGoals.sunday,
+  ]
 
   return (
     <div>
@@ -199,15 +212,34 @@ export default function Home() {
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDayLabels.map((day, i) => {
               const timeInMinutes = Math.round(weeklyData[i] / 60)
-              const maxTime = Math.max(...weeklyData, 1)
+              const goalInMinutes = goalsByWeekDay[i]
+              const goalInSeconds = goalInMinutes * 60
+
+              // グラフの最大値を、実際の学習時間と目標時間の大きい方に設定
+              const maxTime = Math.max(...weeklyData, ...goalsByWeekDay.map(g => g * 60), 1)
               const barHeight = (weeklyData[i] / maxTime) * 100
+              const goalLineHeight = (goalInSeconds / maxTime) * 100
+
+              // 目標達成度に応じた色
+              const isAchieved = weeklyData[i] >= goalInSeconds
+              const barColor = isAchieved ? 'bg-green-500' : 'bg-blue-600'
 
               return (
                 <div key={day} className="text-center">
                   <p className="text-xs text-gray-500 mb-1">{day}</p>
-                  <div className="h-20 bg-gray-100 rounded flex items-end justify-center">
+                  <div className="h-20 bg-gray-100 rounded flex items-end justify-center relative">
+                    {/* 目標線 */}
+                    {goalInMinutes > 0 && (
+                      <div
+                        className="absolute left-0 right-0 border-t-2 border-dashed border-orange-400"
+                        style={{
+                          bottom: `${goalLineHeight}%`,
+                        }}
+                      />
+                    )}
+                    {/* 実績バー */}
                     <div
-                      className="bg-blue-600 w-full rounded transition-all duration-500"
+                      className={`${barColor} w-full rounded transition-all duration-500`}
                       style={{
                         height: `${barHeight}%`,
                         minHeight: weeklyData[i] > 0 ? '4px' : '0',
@@ -216,14 +248,19 @@ export default function Home() {
                   </div>
                   <p className="text-xs font-medium mt-1">
                     {timeInMinutes > 0 ? timeInMinutes : '-'}
+                    {goalInMinutes > 0 && (
+                      <span className="text-gray-400">/{goalInMinutes}</span>
+                    )}
                   </p>
                 </div>
               )
             })}
           </div>
-          <p className="text-sm text-gray-600 text-center">
-            今週の合計: {formatTime(weeklyData.reduce((a, b) => a + b, 0))}
-          </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+            <span>今週の合計: {formatTime(weeklyData.reduce((a, b) => a + b, 0))}</span>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-500">目標 {formatTime(calculateWeeklyTotal(weeklyGoals) * 60)}</span>
+          </div>
         </div>
       </Card>
 
