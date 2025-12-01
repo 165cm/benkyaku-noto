@@ -511,21 +511,14 @@ export default function Study() {
     // セッション管理の確認
     const session = getSession()
     if (session) {
-      // 更新後のセッションを再取得
-      const updatedSession = getSession()
-      if (!updatedSession) {
-        navigate('/study-report')
-        return
-      }
-
       // セッションが完了したかチェック
-      if (isSessionComplete(updatedSession)) {
+      if (isSessionComplete(session)) {
         navigate('/study-report')
         return
       }
 
       // 次の問題へ
-      const nextProblemId = getNextProblemId(updatedSession)
+      const nextProblemId = getNextProblemId(session)
       if (nextProblemId) {
         navigate(`/study/${nextProblemId}`)
         return
