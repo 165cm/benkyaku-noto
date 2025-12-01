@@ -70,6 +70,9 @@ export default function Study() {
     return saved === 'true'
   })
 
+  // 次の問題の情報（ページ数表示用）
+  const [nextProblemInfo, setNextProblemInfo] = useState<{ problemNumber: string; page?: number } | null>(null)
+
   // よく使うタグのプリセット（明確な分類）
   const COMMON_TAGS = [
     { name: '解法を知らない', emoji: '🎓', help: '解き方を全く知らない、初めて見た問題 → 解説・教科書を読む' },
@@ -306,6 +309,99 @@ export default function Study() {
     const newValue = !autoAdvanceEnabled
     setAutoAdvanceEnabled(newValue)
     localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // 次の問題の情報を取得（ページ数表示用）
+  const getNextProblemInfo = async (): Promise<{ problemNumber: string; page?: number } | null> => {
+    if (!problem) return null
+
+    const currentProblemId = problem.id
+    const currentWorkbookId = problem.workbookId
+
+    // 苦手克服モードの場合は次の優先度の高い問題を取得
+    if (isWeakMode) {
+      const nextProblem = await getNextWeakProblem(currentProblemId)
+      if (nextProblem) {
+        return { problemNumber: nextProblem.problemNumber, page: nextProblem.page }
+      }
+      return null
+    }
+
+    // セッション管理の確認
+    const session = getSession()
+    if (session) {
+      const nextProblemId = getNextProblemId(session)
+      if (nextProblemId) {
+        const nextProblem = await db.problems.get(nextProblemId)
+        if (nextProblem) {
+          return { problemNumber: nextProblem.problemNumber, page: nextProblem.page }
+        }
+      }
+      return null
+    }
+
+    // セッションがない場合は次の未学習問題を探す
+    const allProblems = await db.problems
+      .where('workbookId')
+      .equals(currentWorkbookId)
+      .toArray()
+
+    const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+    // ページ番号と問題番号でソート
+    activeProblems.sort((a, b) => {
+      if (a.page !== undefined && b.page !== undefined) {
+        if (a.page !== b.page) {
+          return a.page - b.page
+        }
+      }
+      if (a.page !== undefined && b.page === undefined) return -1
+      if (a.page === undefined && b.page !== undefined) return 1
+
+      const partsA = a.problemNumber.split('-')
+      const partsB = b.problemNumber.split('-')
+
+      const maxLength = Math.max(partsA.length, partsB.length)
+      for (let i = 0; i < maxLength; i++) {
+        const partA = partsA[i] || ''
+        const partB = partsB[i] || ''
+
+        const numA = parseInt(partA)
+        const numB = parseInt(partB)
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          if (numA !== numB) {
+            return numA - numB
+          }
+        } else {
+          const cmp = partA.localeCompare(partB)
+          if (cmp !== 0) {
+            return cmp
+          }
+        }
+      }
+
+      return 0
+    })
+
+    // 次の未学習問題を探す
+    for (const p of activeProblems) {
+      const hasSubProblems = await isParentProblem(p.id)
+      if (hasSubProblems) {
+        continue
+      }
+
+      const records = await db.studyRecords
+        .where('problemId')
+        .equals(p.id)
+        .toArray()
+
+      if (records.length === 0) {
+        return { problemNumber: p.problemNumber, page: p.page }
+      }
+    }
+
+    return null
   }
 
   // タイマーモード切り替え：解説モードへ
@@ -549,6 +645,14 @@ export default function Study() {
       setLastRecordId(recordId)
       setPhase('record')
 
+      // 記録画面ではタイマーを一時停止
+      setTimerMode('paused')
+      setModeStartTime(Date.now())
+
+      // 次の問題の情報を取得
+      const nextInfo = await getNextProblemInfo()
+      setNextProblemInfo(nextInfo)
+
       // 自動遷移が有効な場合のみ3秒後に自動遷移
       if (autoAdvanceEnabled) {
         const timeout = setTimeout(() => {
@@ -790,8 +894,7 @@ export default function Study() {
             </Button>
             <Button
               onClick={handleStartPause}
-              variant="secondary"
-              className="h-12"
+              className="bg-orange-500 hover:bg-orange-600 text-white h-12"
             >
               ⏸️ 休憩
             </Button>
@@ -950,6 +1053,51 @@ export default function Study() {
       {/* フェーズ2: 記録画面 */}
       {phase === 'record' && lastResult && (
         <>
+          {/* アクションボタン */}
+          <div className="mb-4">
+            {/* 次の問題情報 */}
+            {nextProblemInfo && (
+              <p className="text-sm text-gray-600 mb-2 text-center">
+                次の問題: {nextProblemInfo.problemNumber}
+                {nextProblemInfo.page && ` (p.${nextProblemInfo.page})`}
+              </p>
+            )}
+
+            {/* ボタングリッド */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* 解説を読むボタン */}
+              {hasExplanation && explanationId ? (
+                <Button
+                  onClick={() => navigate(`/explanations/${explanationId}`)}
+                  className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700"
+                >
+                  📖 解説を読む
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    if (problem?.page) {
+                      setTimerMode('explanation')
+                      setModeStartTime(Date.now())
+                    }
+                  }}
+                  disabled={!problem?.page}
+                  className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                >
+                  📖 解説を読む
+                </Button>
+              )}
+
+              {/* 次の問題へ進むボタン */}
+              <Button
+                onClick={navigateToNextProblem}
+                className="h-14 text-base font-bold bg-blue-600 hover:bg-blue-700"
+              >
+                ⏩ 次の問題へ
+              </Button>
+            </div>
+          </div>
+
           {/* フィードバック表示 */}
           <Card className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
             <div className="p-6 text-center">
@@ -1048,7 +1196,7 @@ export default function Study() {
               {/* タグ選択（よく使うもののみ） */}
               <p className="text-sm font-medium text-gray-700 mb-2">🏷️ タグをつける</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {COMMON_TAGS.slice(0, 3).map(tag => {
+                {COMMON_TAGS.slice(0, 5).map(tag => {
                   const isActive = problem?.tags?.includes(tag.name)
                   return (
                     <button
@@ -1069,16 +1217,6 @@ export default function Study() {
               </div>
             </div>
           </Card>
-
-          {/* アクションボタン */}
-          <div className="space-y-3 mb-4">
-            <Button
-              onClick={navigateToNextProblem}
-              className="w-full h-16 text-lg font-bold bg-blue-600 hover:bg-blue-700"
-            >
-              ⏩ 次の問題へ進む
-            </Button>
-          </div>
         </>
       )}
 
