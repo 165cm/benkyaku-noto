@@ -549,6 +549,10 @@ export default function Study() {
       setLastRecordId(recordId)
       setPhase('record')
 
+      // 記録画面ではタイマーを一時停止
+      setTimerMode('paused')
+      setModeStartTime(Date.now())
+
       // 自動遷移が有効な場合のみ3秒後に自動遷移
       if (autoAdvanceEnabled) {
         const timeout = setTimeout(() => {
@@ -790,8 +794,7 @@ export default function Study() {
             </Button>
             <Button
               onClick={handleStartPause}
-              variant="secondary"
-              className="h-12"
+              className="bg-orange-500 hover:bg-orange-600 text-white h-12"
             >
               ⏸️ 休憩
             </Button>
@@ -1048,7 +1051,7 @@ export default function Study() {
               {/* タグ選択（よく使うもののみ） */}
               <p className="text-sm font-medium text-gray-700 mb-2">🏷️ タグをつける</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {COMMON_TAGS.slice(0, 3).map(tag => {
+                {COMMON_TAGS.slice(0, 5).map(tag => {
                   const isActive = problem?.tags?.includes(tag.name)
                   return (
                     <button

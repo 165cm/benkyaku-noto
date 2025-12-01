@@ -158,13 +158,13 @@ export default function Home() {
       {/* ストリーク表示 */}
       {streak > 0 && (
         <Card className="mb-4 bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
-          <div className="flex items-center gap-3 p-4">
-            <span className="text-4xl">🔥</span>
+          <div className="flex items-center gap-2 p-3">
+            <span className="text-2xl">🔥</span>
             <div className="flex-1">
-              <p className="text-2xl font-bold text-orange-700">
+              <p className="text-lg font-bold text-orange-700">
                 {streak}日連続で学習中！
               </p>
-              <p className="text-sm text-orange-600">このまま続けよう！</p>
+              <p className="text-xs text-orange-600">このまま続けよう！</p>
             </div>
           </div>
         </Card>
@@ -194,7 +194,7 @@ export default function Home() {
 
       {/* 週間グラフ */}
       <Card className="mb-4">
-        <div className="p-4">
+        <div className="p-4 max-w-2xl mx-auto">
           <h2 className="text-lg font-semibold mb-3">📈 今週の学習記録</h2>
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDayLabels.map((day, i) => {
