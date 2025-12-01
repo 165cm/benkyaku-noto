@@ -8,7 +8,15 @@ const STORAGE_KEYS = {
   EXCLUDED_SECTIONS: 'benkyaku-excluded-sections',
   LAST_BACKUP_TIME: 'benkyaku-last-backup-time',
   LAST_RESTORE_TIME: 'benkyaku-last-restore-time',
+  WEEK_START_DAY: 'benkyaku-week-start-day',
+  WEEK_DISPLAY_MODE: 'benkyaku-week-display-mode',
 } as const
+
+// 週の開始曜日タイプ
+export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0=日曜, 1=月曜, ...
+
+// 週の表示モード
+export type WeekDisplayMode = 'current-week' | 'last-7-days' | 'last-14-days'
 
 // 除外カテゴリの保存
 export function saveExcludedCategories(categories: string[]): void {
@@ -142,4 +150,36 @@ export async function deletePDF(workbookId: string, fileName: string): Promise<v
 export async function getPDFUrl(workbookId: string, fileName: string): Promise<string> {
   const storageRef = ref(storage, `workbooks/${workbookId}/${fileName}`)
   return await getDownloadURL(storageRef)
+}
+
+// ========== 週設定 ==========
+
+/**
+ * 週の開始曜日を保存
+ */
+export function saveWeekStartDay(day: WeekStartDay): void {
+  localStorage.setItem(STORAGE_KEYS.WEEK_START_DAY, String(day))
+}
+
+/**
+ * 週の開始曜日を取得（デフォルトは月曜日=1）
+ */
+export function getWeekStartDay(): WeekStartDay {
+  const stored = localStorage.getItem(STORAGE_KEYS.WEEK_START_DAY)
+  return stored ? (Number(stored) as WeekStartDay) : 1
+}
+
+/**
+ * 週の表示モードを保存
+ */
+export function saveWeekDisplayMode(mode: WeekDisplayMode): void {
+  localStorage.setItem(STORAGE_KEYS.WEEK_DISPLAY_MODE, mode)
+}
+
+/**
+ * 週の表示モードを取得（デフォルトは今週）
+ */
+export function getWeekDisplayMode(): WeekDisplayMode {
+  const stored = localStorage.getItem(STORAGE_KEYS.WEEK_DISPLAY_MODE)
+  return (stored as WeekDisplayMode) || 'current-week'
 }

@@ -8,7 +8,9 @@ import { getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
 import { getWeakModeSession } from '@/lib/weakModeSession'
 import { calculateStreak } from '@/lib/streak'
-import { getWeeklyStudyTime, getWeekDayLabels } from '@/lib/weeklyStats'
+import { getWeeklyStudyTimeWithSettings } from '@/lib/weeklyStats'
+import { getTodayGoal, getWeeklyGoals, calculateWeeklyTotal } from '@/lib/studyGoals'
+import { getWeekDisplayMode, saveWeekDisplayMode, type WeekDisplayMode } from '@/lib/storage'
 import type { StudyStats, ReviewSchedule } from '@/types'
 
 export default function Home() {
@@ -23,22 +25,24 @@ export default function Home() {
   const [hasTodayReport, setHasTodayReport] = useState(false)
   const [streak, setStreak] = useState(0)
   const [weeklyData, setWeeklyData] = useState<number[]>([])
+  const [weeklyLabels, setWeeklyLabels] = useState<string[]>([])
+  const [displayMode, setDisplayMode] = useState<WeekDisplayMode>(getWeekDisplayMode())
   const [showOtherModes, setShowOtherModes] = useState(false)
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [displayMode]) // 表示モード変更時も再読み込み
 
   const loadData = async () => {
     setLoading(true)
-    const [statsData, reviewData, unstudiedCount, sectionStats, explanations, streakData, weeklyTimeData] = await Promise.all([
+    const [statsData, reviewData, unstudiedCount, sectionStats, explanations, streakData, weeklyResult] = await Promise.all([
       calculateStudyStats(),
       getTodayReviewList(),
       getUnstudiedProblemsCount(),
       calculateSectionStats(),
       getExplanations(),
       calculateStreak(),
-      getWeeklyStudyTime(),
+      getWeeklyStudyTimeWithSettings(),
     ])
 
     // 今日のレポートがあるかチェック
@@ -51,7 +55,8 @@ export default function Home() {
     setWeakSections(sectionStats.slice(0, 5)) // 苦手セクション上位5件
     setExplanationCount(explanations.length)
     setStreak(streakData)
-    setWeeklyData(weeklyTimeData)
+    setWeeklyData(weeklyResult.data)
+    setWeeklyLabels(weeklyResult.labels)
     setLoading(false)
   }
 
@@ -144,10 +149,28 @@ export default function Home() {
   }
 
   const recommendedMode = getRecommendedMode()
-  const targetStudyTime = 3600 // 目標1時間（秒）
+  const targetStudyTime = getTodayGoal() * 60 // 曜日別目標時間（分→秒）
   const todayStudyTime = stats?.todayStudyTime || 0
   const studyProgress = Math.min((todayStudyTime / targetStudyTime) * 100, 100)
-  const weekDayLabels = getWeekDayLabels()
+  const weeklyGoals = getWeeklyGoals()
+
+  // 表示モードに応じたタイトル
+  const getGraphTitle = () => {
+    switch (displayMode) {
+      case 'last-7-days':
+        return '📈 直近7日間の学習記録'
+      case 'last-14-days':
+        return '📈 直近14日間の学習記録'
+      default:
+        return '📈 今週の学習記録'
+    }
+  }
+
+  // 表示モード切り替えハンドラー
+  const handleDisplayModeChange = (mode: WeekDisplayMode) => {
+    setDisplayMode(mode)
+    saveWeekDisplayMode(mode)
+  }
 
   return (
     <div>
@@ -195,35 +218,125 @@ export default function Home() {
       {/* 週間グラフ */}
       <Card className="mb-4">
         <div className="p-4 max-w-2xl mx-auto">
-          <h2 className="text-lg font-semibold mb-3">📈 今週の学習記録</h2>
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {weekDayLabels.map((day, i) => {
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">{getGraphTitle()}</h2>
+            {/* 表示期間切り替えボタン */}
+            <div className="flex gap-1 text-xs">
+              <button
+                onClick={() => handleDisplayModeChange('current-week')}
+                className={`px-2 py-1 rounded ${
+                  displayMode === 'current-week'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                今週
+              </button>
+              <button
+                onClick={() => handleDisplayModeChange('last-7-days')}
+                className={`px-2 py-1 rounded ${
+                  displayMode === 'last-7-days'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                7日
+              </button>
+              <button
+                onClick={() => handleDisplayModeChange('last-14-days')}
+                className={`px-2 py-1 rounded ${
+                  displayMode === 'last-14-days'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                14日
+              </button>
+            </div>
+          </div>
+
+          <div className={`grid gap-1 mb-2 ${
+            displayMode === 'last-14-days' ? 'grid-cols-14' : 'grid-cols-7'
+          }`}>
+            {weeklyLabels.map((label, i) => {
               const timeInMinutes = Math.round(weeklyData[i] / 60)
-              const maxTime = Math.max(...weeklyData, 1)
+
+              // 「今週」モードの場合のみ目標を取得
+              let goalInMinutes = 0
+              let goalInSeconds = 0
+              if (displayMode === 'current-week') {
+                // ラベルから曜日インデックスを取得
+                const dayIndex = ['日', '月', '火', '水', '木', '金', '土'].indexOf(label)
+                const dayKeys: (keyof typeof weeklyGoals)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                if (dayIndex >= 0) {
+                  goalInMinutes = weeklyGoals[dayKeys[dayIndex]]
+                  goalInSeconds = goalInMinutes * 60
+                }
+              }
+
+              // グラフの最大値を計算
+              const maxTime = displayMode === 'current-week'
+                ? Math.max(...weeklyData, ...[0, 1, 2, 3, 4, 5, 6].map(idx => {
+                    const dayKeys: (keyof typeof weeklyGoals)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                    const dayLabel = weeklyLabels[idx]
+                    const dayIdx = ['日', '月', '火', '水', '木', '金', '土'].indexOf(dayLabel)
+                    return dayIdx >= 0 ? weeklyGoals[dayKeys[dayIdx]] * 60 : 0
+                  }), 1)
+                : Math.max(...weeklyData, 1)
+
               const barHeight = (weeklyData[i] / maxTime) * 100
+              const goalLineHeight = goalInSeconds > 0 ? (goalInSeconds / maxTime) * 100 : 0
+
+              // 目標達成度に応じた色（今週モードのみ）
+              const isAchieved = displayMode === 'current-week' && goalInSeconds > 0 && weeklyData[i] >= goalInSeconds
+              const barColor = isAchieved ? 'bg-green-500' : 'bg-blue-600'
 
               return (
-                <div key={day} className="text-center">
-                  <p className="text-xs text-gray-500 mb-1">{day}</p>
-                  <div className="h-20 bg-gray-100 rounded flex items-end justify-center">
+                <div key={`${label}-${i}`} className="text-center">
+                  <p className={`text-xs text-gray-500 mb-1 ${displayMode === 'last-14-days' ? 'text-[10px]' : ''}`}>
+                    {label}
+                  </p>
+                  <div className={`bg-gray-100 rounded flex items-end justify-center relative ${
+                    displayMode === 'last-14-days' ? 'h-16' : 'h-20'
+                  }`}>
+                    {/* 目標線（今週モードのみ） */}
+                    {displayMode === 'current-week' && goalInMinutes > 0 && (
+                      <div
+                        className="absolute left-0 right-0 border-t-2 border-dashed border-orange-400"
+                        style={{
+                          bottom: `${goalLineHeight}%`,
+                        }}
+                      />
+                    )}
+                    {/* 実績バー */}
                     <div
-                      className="bg-blue-600 w-full rounded transition-all duration-500"
+                      className={`${barColor} w-full rounded transition-all duration-500`}
                       style={{
                         height: `${barHeight}%`,
                         minHeight: weeklyData[i] > 0 ? '4px' : '0',
                       }}
                     />
                   </div>
-                  <p className="text-xs font-medium mt-1">
+                  <p className={`font-medium mt-1 ${displayMode === 'last-14-days' ? 'text-[10px]' : 'text-xs'}`}>
                     {timeInMinutes > 0 ? timeInMinutes : '-'}
+                    {displayMode === 'current-week' && goalInMinutes > 0 && (
+                      <span className="text-gray-400">/{goalInMinutes}</span>
+                    )}
                   </p>
                 </div>
               )
             })}
           </div>
-          <p className="text-sm text-gray-600 text-center">
-            今週の合計: {formatTime(weeklyData.reduce((a, b) => a + b, 0))}
-          </p>
+
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+            <span>合計: {formatTime(weeklyData.reduce((a, b) => a + b, 0))}</span>
+            {displayMode === 'current-week' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="text-gray-500">目標 {formatTime(calculateWeeklyTotal(weeklyGoals) * 60)}</span>
+              </>
+            )}
+          </div>
         </div>
       </Card>
 
