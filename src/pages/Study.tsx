@@ -1029,7 +1029,7 @@ export default function Study() {
       )}
 
       {/* 休憩モード画面 */}
-      {phase === 'problem' && timerMode === 'paused' && (
+      {phase === 'problem' && timerMode === 'paused' && !isProcessing && (
         <>
           <Card className="mb-4 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300">
             <div className="p-8 text-center">
