@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
@@ -321,11 +322,33 @@ export default function ImageExplanation() {
     }
   }
 
+  // 戻る処理
+  const handleGoBack = () => {
+    // Study画面から遷移した場合は元の問題に戻る
+    if (linkedProblemId) {
+      navigate(`/study/${linkedProblemId}`)
+    } else {
+      // それ以外は解説一覧へ
+      navigate('/explanations')
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">📷 画像から解説を生成</h1>
-        <p className="text-gray-600">問題の写真をアップロードして、あなたのレベルに合わせた解説を作成</p>
+      {/* ヘッダー */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleGoBack}
+          title="戻る"
+        >
+          <ArrowLeft size={16} />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold mb-1">📷 画像から解説を生成</h1>
+          <p className="text-gray-600 text-sm">問題の写真をアップロードして、あなたのレベルに合わせた解説を作成</p>
+        </div>
       </div>
         {/* エラー表示 */}
         {error && (

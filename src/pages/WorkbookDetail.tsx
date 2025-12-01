@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2, Star, Tag } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -92,6 +92,10 @@ export default function WorkbookDetail() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+
+  // フィルタリング用state
+  const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
+  const [showTaggedOnly, setShowTaggedOnly] = useState(false)
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
@@ -402,6 +406,41 @@ export default function WorkbookDetail() {
   }
 
   const problemHierarchy = useMemo(() => groupProblemsByHierarchy(), [problems])
+
+  // フィルタリングされた問題階層
+  const filteredProblemHierarchy = useMemo(() => {
+    if (!showBookmarkedOnly && !showTaggedOnly) {
+      return problemHierarchy
+    }
+
+    const filtered: typeof problemHierarchy = {}
+
+    for (const [category, titles] of Object.entries(problemHierarchy)) {
+      const filteredTitles: typeof titles = {}
+
+      for (const [title, titleProblems] of Object.entries(titles)) {
+        const filteredProblems = titleProblems.filter(problem => {
+          if (showBookmarkedOnly && !problem.isBookmarked) {
+            return false
+          }
+          if (showTaggedOnly && (!problem.tags || problem.tags.length === 0)) {
+            return false
+          }
+          return true
+        })
+
+        if (filteredProblems.length > 0) {
+          filteredTitles[title] = filteredProblems
+        }
+      }
+
+      if (Object.keys(filteredTitles).length > 0) {
+        filtered[category] = filteredTitles
+      }
+    }
+
+    return filtered
+  }, [problemHierarchy, showBookmarkedOnly, showTaggedOnly])
 
   // 実際の学習可能な問題数を計算（親問題を除き、小問を含む）
   const getActualProblemCount = useCallback((problems: Problem[]) => {
@@ -803,6 +842,26 @@ export default function WorkbookDetail() {
             */}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+            {/* フィルタボタン */}
+            <Button
+              variant={showBookmarkedOnly ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
+              title={showBookmarkedOnly ? 'すべての問題を表示' : 'ブックマークのみ表示'}
+            >
+              <Star size={16} fill={showBookmarkedOnly ? 'currentColor' : 'none'} />
+              <span className="hidden sm:inline ml-1">ブックマーク</span>
+            </Button>
+            <Button
+              variant={showTaggedOnly ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setShowTaggedOnly(!showTaggedOnly)}
+              title={showTaggedOnly ? 'すべての問題を表示' : 'タグ付き問題のみ表示'}
+            >
+              <Tag size={16} />
+              <span className="hidden sm:inline ml-1">タグ付き</span>
+            </Button>
+
             {/* PDF関連ボタン - 一時的に無効化
             {workbook.pdfUrl && (
               <Button
@@ -919,7 +978,7 @@ export default function WorkbookDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          {Object.entries(problemHierarchy).map(([category, titles]) => {
+          {Object.entries(filteredProblemHierarchy).map(([category, titles]) => {
             const isCategoryExpanded = expandedCategories.has(category)
             const totalProblems = Object.values(titles).reduce(
               (sum, problems) => sum + getActualProblemCount(problems),

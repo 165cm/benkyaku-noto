@@ -721,11 +721,18 @@ export default function Study() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => navigate(`/workbooks/${problem.workbookId}`)}
+          onClick={() => {
+            if (problem?.workbookId) {
+              navigate(`/workbooks/${problem.workbookId}`)
+            } else {
+              navigate('/workbooks')
+            }
+          }}
+          title="問題集に戻る"
         >
           <ArrowLeft size={16} />
         </Button>
-        <p className="text-sm text-gray-600 truncate mx-2 flex-1 text-center">{workbook.title}</p>
+        <p className="text-sm text-gray-600 truncate mx-2 flex-1 text-center">{workbook?.title || ''}</p>
         <div className="flex items-center gap-2">
           {isWeakMode && (
             <button
