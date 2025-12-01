@@ -76,10 +76,12 @@ export default function Settings() {
   // 学習時間目標
   const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoals>(getWeeklyGoals())
   const [goalsSaved, setGoalsSaved] = useState(false)
+  const [showGoalsSettings, setShowGoalsSettings] = useState(false)
 
   // 週設定
   const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>(getWeekStartDay())
   const [weekSettingsSaved, setWeekSettingsSaved] = useState(false)
+  const [showWeekSettings, setShowWeekSettings] = useState(false)
 
   useEffect(() => {
     // 環境変数チェック
@@ -320,52 +322,64 @@ export default function Settings() {
         <div className="flex items-start gap-2">
           <Target className="text-primary mt-0.5 flex-shrink-0" size={20} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold mb-1">学習時間目標</h2>
-            <p className="text-xs text-gray-600 mb-3">
-              各曜日の目標学習時間を設定
-            </p>
-
-            {/* 週合計 */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-md p-3 mb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">週合計</span>
-                <span className="text-2xl font-bold text-blue-600">
-                  {Math.floor(calculateWeeklyTotal(weeklyGoals) / 60)}時間
-                  {calculateWeeklyTotal(weeklyGoals) % 60 > 0 && (
-                    <span className="text-lg">{calculateWeeklyTotal(weeklyGoals) % 60}分</span>
-                  )}
-                </span>
+            <button
+              onClick={() => setShowGoalsSettings(!showGoalsSettings)}
+              className="w-full flex items-center justify-between group"
+            >
+              <div>
+                <h2 className="text-base font-semibold text-left">学習時間目標</h2>
+                <p className="text-xs text-gray-600 text-left">
+                  各曜日の目標学習時間を設定
+                </p>
               </div>
-            </div>
+              {showGoalsSettings ? <ChevronDown size={20} className="text-gray-400 group-hover:text-gray-600" /> : <ChevronRight size={20} className="text-gray-400 group-hover:text-gray-600" />}
+            </button>
 
-            {/* 曜日別入力 */}
-            <div className="grid grid-cols-1 gap-2 mb-3">
-              {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayOfWeek[]).map(day => (
-                <div key={day} className="flex items-center gap-3 bg-gray-50 rounded-md p-2">
-                  <span className="text-sm font-medium text-gray-700 w-8">{getDayLabel(day)}曜</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="1440"
-                    step="15"
-                    value={weeklyGoals[day]}
-                    onChange={(e) => updateGoal(day, Math.max(0, parseInt(e.target.value) || 0))}
-                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <span className="text-xs text-gray-500 w-8">分</span>
+            {showGoalsSettings && (
+              <div className="mt-3">
+                {/* 週合計 */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-md p-3 mb-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">週合計</span>
+                    <span className="text-2xl font-bold text-blue-600">
+                      {Math.floor(calculateWeeklyTotal(weeklyGoals) / 60)}時間
+                      {calculateWeeklyTotal(weeklyGoals) % 60 > 0 && (
+                        <span className="text-lg">{calculateWeeklyTotal(weeklyGoals) % 60}分</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            {/* 保存ボタン */}
-            <div className="flex items-center gap-2">
-              <Button onClick={handleSaveGoals} size="sm" className="flex-1">
-                💾 保存
-              </Button>
-              {goalsSaved && (
-                <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
-              )}
-            </div>
+                {/* 曜日別入力 */}
+                <div className="grid grid-cols-1 gap-2 mb-3">
+                  {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayOfWeek[]).map(day => (
+                    <div key={day} className="flex items-center gap-3 bg-gray-50 rounded-md p-2">
+                      <span className="text-sm font-medium text-gray-700 w-8">{getDayLabel(day)}曜</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1440"
+                        step="15"
+                        value={weeklyGoals[day]}
+                        onChange={(e) => updateGoal(day, Math.max(0, parseInt(e.target.value) || 0))}
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <span className="text-xs text-gray-500 w-8">分</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 保存ボタン */}
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleSaveGoals} size="sm" className="flex-1">
+                    💾 保存
+                  </Button>
+                  {goalsSaved && (
+                    <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -375,40 +389,52 @@ export default function Settings() {
         <div className="flex items-start gap-2">
           <Calendar className="text-primary mt-0.5 flex-shrink-0" size={20} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold mb-1">週表示設定</h2>
-            <p className="text-xs text-gray-600 mb-3">
-              週間グラフの開始曜日を設定
-            </p>
+            <button
+              onClick={() => setShowWeekSettings(!showWeekSettings)}
+              className="w-full flex items-center justify-between group"
+            >
+              <div>
+                <h2 className="text-base font-semibold text-left">週表示設定</h2>
+                <p className="text-xs text-gray-600 text-left">
+                  週間グラフの開始曜日を設定
+                </p>
+              </div>
+              {showWeekSettings ? <ChevronDown size={20} className="text-gray-400 group-hover:text-gray-600" /> : <ChevronRight size={20} className="text-gray-400 group-hover:text-gray-600" />}
+            </button>
 
-            {/* 開始曜日選択 */}
-            <div className="mb-3">
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
-                週の開始曜日
-              </label>
-              <select
-                value={weekStartDay}
-                onChange={(e) => setWeekStartDay(Number(e.target.value) as WeekStartDay)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value={0}>日曜日</option>
-                <option value={1}>月曜日</option>
-                <option value={2}>火曜日</option>
-                <option value={3}>水曜日</option>
-                <option value={4}>木曜日</option>
-                <option value={5}>金曜日</option>
-                <option value={6}>土曜日</option>
-              </select>
-            </div>
+            {showWeekSettings && (
+              <div className="mt-3">
+                {/* 開始曜日選択 */}
+                <div className="mb-3">
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    週の開始曜日
+                  </label>
+                  <select
+                    value={weekStartDay}
+                    onChange={(e) => setWeekStartDay(Number(e.target.value) as WeekStartDay)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value={0}>日曜日</option>
+                    <option value={1}>月曜日</option>
+                    <option value={2}>火曜日</option>
+                    <option value={3}>水曜日</option>
+                    <option value={4}>木曜日</option>
+                    <option value={5}>金曜日</option>
+                    <option value={6}>土曜日</option>
+                  </select>
+                </div>
 
-            {/* 保存ボタン */}
-            <div className="flex items-center gap-2">
-              <Button onClick={handleSaveWeekSettings} size="sm" className="flex-1">
-                💾 保存
-              </Button>
-              {weekSettingsSaved && (
-                <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
-              )}
-            </div>
+                {/* 保存ボタン */}
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleSaveWeekSettings} size="sm" className="flex-1">
+                    💾 保存
+                  </Button>
+                  {weekSettingsSaved && (
+                    <span className="text-xs text-green-600 font-medium">✓ 保存しました</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
