@@ -604,7 +604,11 @@ export default function Study() {
 
     setIsProcessing(true)
     try {
+      // ★修正: ボタンを押した瞬間にタイマーを停止して時間を確定
       const studyTime = elapsedTime
+      setTimerMode('paused')
+      setModeStartTime(Date.now())
+
       const currentProblemId = problem.id
       const currentWorkbookId = problem.workbookId
       const currentMemo = memo
@@ -644,10 +648,6 @@ export default function Study() {
       setLastResult(result)
       setLastRecordId(recordId)
       setPhase('record')
-
-      // 記録画面ではタイマーを一時停止
-      setTimerMode('paused')
-      setModeStartTime(Date.now())
 
       // 次の問題の情報を取得
       const nextInfo = await getNextProblemInfo()
