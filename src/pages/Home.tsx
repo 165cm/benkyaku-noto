@@ -227,42 +227,6 @@ export default function Home() {
         </div>
       </Card>
 
-      {/* 今日の復習 */}
-      {reviewList.length > 0 && (
-        <Card className="mb-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-lg font-semibold text-purple-900">📚 今日の復習</h2>
-                <p className="text-sm text-purple-700">復習が推奨される問題があります</p>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-purple-900">{reviewList.length}</div>
-                <p className="text-xs text-purple-600">問</p>
-              </div>
-            </div>
-
-            {/* 優先度別の内訳 */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {reviewList.slice(0, 4).map((review) => (
-                <div key={review.problemId} className="bg-white bg-opacity-70 rounded p-2 text-xs">
-                  <p className="font-medium truncate">{review.sectionTitle || review.problemNumber}</p>
-                  <p className="text-gray-600">正答率: {Math.round(review.averageScore)}%</p>
-                </div>
-              ))}
-            </div>
-
-            {/* 復習ページへのリンク */}
-            <Button
-              onClick={() => navigate('/review')}
-              className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold"
-            >
-              復習リストを見る →
-            </Button>
-          </div>
-        </Card>
-      )}
-
       {/* 今日のおすすめ */}
       {recommendedMode && (
         <Card className="mb-4">
@@ -320,6 +284,42 @@ export default function Home() {
                   今すぐ開始 💪
                 </>
               )}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* 今日の復習 */}
+      {reviewList.length > 0 && (
+        <Card className="mb-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-semibold text-purple-900">📚 今日の復習</h2>
+                <p className="text-sm text-purple-700">復習が推奨される問題があります</p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-purple-900">{reviewList.length}</div>
+                <p className="text-xs text-purple-600">問</p>
+              </div>
+            </div>
+
+            {/* 優先度別の内訳 */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {reviewList.slice(0, 4).map((review) => (
+                <div key={review.problemId} className="bg-white bg-opacity-70 rounded p-2 text-xs">
+                  <p className="font-medium truncate">{review.sectionTitle || review.problemNumber}</p>
+                  <p className="text-gray-600">正答率: {Math.round(review.averageScore)}%</p>
+                </div>
+              ))}
+            </div>
+
+            {/* 復習ページへのリンク */}
+            <Button
+              onClick={() => navigate('/review')}
+              className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold"
+            >
+              復習リストを見る →
             </Button>
           </div>
         </Card>
