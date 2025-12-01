@@ -1091,6 +1091,12 @@ export default function Study() {
                 <Button
                   onClick={() => {
                     if (problem?.page) {
+                      // 自動遷移タイマーをクリア
+                      if (autoTransitionTimeout) {
+                        clearTimeout(autoTransitionTimeout)
+                        setAutoTransitionTimeout(null)
+                      }
+                      // 解説モードに切り替え
                       setTimerMode('explanation')
                       setModeStartTime(Date.now())
                     }
