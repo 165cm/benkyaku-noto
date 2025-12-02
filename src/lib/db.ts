@@ -6,7 +6,10 @@ import { auth } from './firebase'
 import {
   syncWorkbookToFirestore,
   syncProblemToFirestore,
-  syncStudyRecordToFirestore
+  syncStudyRecordToFirestore,
+  deleteWorkbookFromFirestore,
+  deleteProblemFromFirestore,
+  deleteStudyRecordFromFirestore
 } from './firestore'
 
 export class BenkyakuDB extends Dexie {
@@ -284,13 +287,37 @@ export async function getStudyRecords(problemId: string) {
 }
 
 export async function deleteWorkbook(id: string) {
-  // 問題集に紐づく問題と学習記録も削除
+  // 削除前にデータを取得（Firestore削除用）
   const problems = await db.problems.where('workbookId').equals(id).toArray()
   const problemIds = problems.map(p => p.id)
+  const studyRecords = await db.studyRecords.where('problemId').anyOf(problemIds).toArray()
 
+  // ローカルDBから削除
   await db.studyRecords.where('problemId').anyOf(problemIds).delete()
   await db.problems.where('workbookId').equals(id).delete()
   await db.workbooks.delete(id)
+
+  // Firestoreからも削除（ログイン中の場合のみ）
+  const user = auth.currentUser
+  if (user) {
+    try {
+      // 学習記録を削除
+      for (const record of studyRecords) {
+        await deleteStudyRecordFromFirestore(user.uid, record.id)
+      }
+
+      // 問題を削除
+      for (const problem of problems) {
+        await deleteProblemFromFirestore(user.uid, problem.id)
+      }
+
+      // 問題集を削除
+      await deleteWorkbookFromFirestore(user.uid, id)
+      console.log('Auto-backup: Workbook and related data deleted from cloud')
+    } catch (error) {
+      console.error('Auto-backup: Failed to delete workbook from cloud', error)
+    }
+  }
 }
 
 export async function deleteProblem(id: string) {
