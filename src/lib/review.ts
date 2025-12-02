@@ -393,6 +393,68 @@ export async function getNextWeakProblem(excludeProblemId?: string): Promise<Pro
   return problem || null
 }
 
+// 問題集のセクション一覧を取得（正答率付き）
+export async function getWorkbookSections(workbookId: string): Promise<SectionStats[]> {
+  const allProblems = await db.problems
+    .where('workbookId')
+    .equals(workbookId)
+    .toArray()
+
+  // 削除された問題を除外
+  const activeProblems = allProblems.filter(p => !p.deletedAt)
+
+  // 問題をセクション（カテゴリ×タイトル）でグルーピング
+  const sectionMap = new Map<string, Problem[]>()
+
+  activeProblems.forEach((problem) => {
+    const category = problem.category || '未分類'
+    const title = problem.sectionTitle || '問題'
+
+    const sectionKey = `${category}-${title}`
+    const existing = sectionMap.get(sectionKey) || []
+    existing.push(problem)
+    sectionMap.set(sectionKey, existing)
+  })
+
+  // 各セクションの統計を計算
+  const sectionStats: SectionStats[] = []
+
+  for (const [sectionKey, problems] of sectionMap.entries()) {
+    const [category, ...titleParts] = sectionKey.split('-')
+    const title = titleParts.join('-')
+
+    // このセクションの正解率を計算
+    const accuracy = await calculateRecentAccuracyForProblems(problems)
+
+    // 学習済みの問題数をカウント
+    let studiedCount = 0
+    for (const problem of problems) {
+      const records = await db.studyRecords
+        .where('problemId')
+        .equals(problem.id)
+        .count()
+      if (records > 0) studiedCount++
+    }
+
+    sectionStats.push({
+      sectionKey,
+      category,
+      title,
+      problems,
+      accuracy,
+      studiedCount,
+    })
+  }
+
+  // 正解率の低い順にソート（nullは最後）
+  return sectionStats.sort((a, b) => {
+    if (a.accuracy === null && b.accuracy === null) return 0
+    if (a.accuracy === null) return 1
+    if (b.accuracy === null) return -1
+    return a.accuracy - b.accuracy
+  })
+}
+
 // 旧関数（後方互換性のため残す）
 export async function getWeakSectionProblem(): Promise<Problem | null> {
   return getNextWeakProblem()

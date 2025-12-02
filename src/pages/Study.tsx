@@ -6,7 +6,7 @@ import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId, updateProblem } from '@/lib/db'
-import { getPDFUrl } from '@/lib/storage'
+import { getPDFUrl, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
   createWeakModeSession,
@@ -21,16 +21,6 @@ import {
   clearSession,
 } from '@/lib/studySession'
 import type { Problem, Workbook, StudyRecord, StudyResult, ImageBasedExplanation } from '@/types'
-
-// セクション標準時間の管理（localStorage）
-const getSectionStandardTime = (sectionKey: string): number | null => {
-  const saved = localStorage.getItem(`sectionStandardTime_${sectionKey}`)
-  return saved ? parseInt(saved, 10) : null
-}
-
-const setSectionStandardTime = (sectionKey: string, time: number) => {
-  localStorage.setItem(`sectionStandardTime_${sectionKey}`, String(time))
-}
 
 export default function Study() {
   const { id } = useParams<{ id: string }>()

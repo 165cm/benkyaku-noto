@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   LAST_RESTORE_TIME: 'benkyaku-last-restore-time',
   WEEK_START_DAY: 'benkyaku-week-start-day',
   WEEK_DISPLAY_MODE: 'benkyaku-week-display-mode',
+  SECTION_STANDARD_TIME_PREFIX: 'sectionStandardTime_',
 } as const
 
 // 週の開始曜日タイプ
@@ -38,6 +39,17 @@ export function saveExcludedSections(sections: string[]): void {
 export function getExcludedSections(): string[] {
   const stored = localStorage.getItem(STORAGE_KEYS.EXCLUDED_SECTIONS)
   return stored ? JSON.parse(stored) : []
+}
+
+// セクション標準時間の取得
+export function getSectionStandardTime(sectionKey: string): number | null {
+  const saved = localStorage.getItem(`${STORAGE_KEYS.SECTION_STANDARD_TIME_PREFIX}${sectionKey}`)
+  return saved ? parseInt(saved, 10) : null
+}
+
+// セクション標準時間の保存
+export function setSectionStandardTime(sectionKey: string, time: number): void {
+  localStorage.setItem(`${STORAGE_KEYS.SECTION_STANDARD_TIME_PREFIX}${sectionKey}`, String(time))
 }
 
 // OpenAI APIキーの保存
