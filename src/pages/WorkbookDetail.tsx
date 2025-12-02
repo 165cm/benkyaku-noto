@@ -991,68 +991,72 @@ export default function WorkbookDetail() {
       {/* ダッシュボード */}
       {statistics && problems.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* 未学習問題の見積もり */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-gray-800">📚 初回回答完了までの見積もり</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-blue-700">
+          {/* 未学習問題 or 1サイクル見積もり */}
+          {statistics.unstudiedProblems > 0 ? (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-gray-800">📚 初回完了</h3>
+              </div>
+              <div className="flex items-baseline gap-3 mb-3">
+                <span className="text-4xl font-bold text-blue-700">
                   {statistics.unstudiedProblems}
                 </span>
-                <span className="text-sm text-gray-600">問</span>
-              </div>
-              <div className="text-xs text-gray-600">
-                未学習の問題があります
-              </div>
-              <div className="mt-3 pt-3 border-t border-blue-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600">見積もり時間</span>
-                  <span className="text-lg font-bold text-blue-700">
-                    {Math.floor(statistics.estimatedTimeToComplete / 3600)}時間
-                    {Math.floor((statistics.estimatedTimeToComplete % 3600) / 60)}分
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  平均 {Math.floor(statistics.averageStudyTime / 60)}分{statistics.averageStudyTime % 60}秒/問
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 正解率80%達成までの見積もり */}
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-gray-800">🎯 正解率80%達成までの見積もり</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-orange-700">
-                  {statistics.problemsBelow80}
+                <span className="text-lg text-gray-600">問</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  {Math.floor(statistics.estimatedTimeToComplete / 3600)}h
+                  {Math.floor((statistics.estimatedTimeToComplete % 3600) / 60)}m
                 </span>
-                <span className="text-sm text-gray-600">問</span>
               </div>
-              <div className="text-xs text-gray-600">
-                正解率80%未満の問題があります
+              <div className="text-xs text-gray-500">
+                {Math.floor(statistics.averageStudyTime / 60)}:{(statistics.averageStudyTime % 60).toString().padStart(2, '0')}/問
               </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-gray-800">🔄 1サイクル</h3>
+              </div>
+              <div className="flex items-baseline gap-3 mb-3">
+                <span className="text-4xl font-bold text-blue-700">
+                  {statistics.totalProblems}
+                </span>
+                <span className="text-lg text-gray-600">問</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  {Math.floor(statistics.oneCycleTime / 3600)}h
+                  {Math.floor((statistics.oneCycleTime % 3600) / 60)}m
+                </span>
+              </div>
+              <div className="text-xs text-gray-500">
+                {Math.floor(statistics.oneCycleTime / statistics.totalProblems / 60)}:{Math.round((statistics.oneCycleTime / statistics.totalProblems) % 60).toString().padStart(2, '0')}/問
+              </div>
+            </div>
+          )}
+
+          {/* 正解率80%達成 */}
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-800">🎯 80%達成</h3>
               {statistics.currentAccuracy !== null && (
-                <div className="text-xs text-gray-600">
-                  現在の正解率: <span className="font-semibold">{statistics.currentAccuracy}%</span>
-                </div>
+                <span className="text-xs font-semibold text-orange-700">
+                  現在 {statistics.currentAccuracy}%
+                </span>
               )}
-              <div className="mt-3 pt-3 border-t border-orange-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600">見積もり時間</span>
-                  <span className="text-lg font-bold text-orange-700">
-                    {Math.floor(statistics.estimatedTimeTo80 / 3600)}時間
-                    {Math.floor((statistics.estimatedTimeTo80 % 3600) / 60)}分
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  平均 {Math.floor(statistics.averageReviewTime / 60)}分{statistics.averageReviewTime % 60}秒/問 × 3回復習
-                </div>
-              </div>
+            </div>
+            <div className="flex items-baseline gap-3 mb-3">
+              <span className="text-4xl font-bold text-orange-700">
+                {statistics.problemsBelow80}
+              </span>
+              <span className="text-lg text-gray-600">問</span>
+              <span className="text-gray-400">→</span>
+              <span className="text-2xl font-bold text-orange-600">
+                {Math.floor(statistics.estimatedTimeTo80 / 3600)}h
+                {Math.floor((statistics.estimatedTimeTo80 % 3600) / 60)}m
+              </span>
+            </div>
+            <div className="text-xs text-gray-500">
+              {Math.floor(statistics.averageReviewTime / 60)}:{(statistics.averageReviewTime % 60).toString().padStart(2, '0')}/問 × 3回
             </div>
           </div>
         </div>

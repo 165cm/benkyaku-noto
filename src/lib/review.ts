@@ -474,14 +474,49 @@ export async function getTodayStudyTime(): Promise<number> {
   return todayRecords.reduce((sum, record) => sum + record.studyTime, 0)
 }
 
+// 外れ値を除外する（IQR法）
+function removeOutliers(values: number[]): number[] {
+  if (values.length < 4) return values // データが少ない場合はそのまま
+
+  const sorted = [...values].sort((a, b) => a - b)
+  const q1Index = Math.floor(sorted.length * 0.25)
+  const q3Index = Math.floor(sorted.length * 0.75)
+  const q1 = sorted[q1Index]
+  const q3 = sorted[q3Index]
+  const iqr = q3 - q1
+  const lowerBound = q1 - 1.5 * iqr
+  const upperBound = q3 + 1.5 * iqr
+
+  return values.filter(v => v >= lowerBound && v <= upperBound)
+}
+
+// ベイズ更新を考慮した重み付き平均（最新のデータを重視）
+function calculateWeightedMean(values: number[]): number {
+  if (values.length === 0) return 0
+
+  // 最新のデータほど重みを大きくする（指数的減衰）
+  let weightedSum = 0
+  let totalWeight = 0
+
+  for (let i = 0; i < values.length; i++) {
+    // 最新（末尾）ほど重みが大きい
+    const weight = Math.exp(-(values.length - 1 - i) * 0.1)
+    weightedSum += values[i] * weight
+    totalWeight += weight
+  }
+
+  return Math.round(weightedSum / totalWeight)
+}
+
 // 問題集の統計情報を取得
 export interface WorkbookStatistics {
   totalProblems: number              // 総問題数（除外・削除を除く）
   unstudiedProblems: number          // 未学習問題数
-  averageStudyTime: number           // 1問あたりの平均学習時間（秒）
+  averageStudyTime: number           // 1問あたりの平均学習時間（秒、整数）
   estimatedTimeToComplete: number    // 未学習完了までの見積もり時間（秒）
+  oneCycleTime: number               // 1サイクル完了までの見積もり時間（秒）
   problemsBelow80: number            // 正解率80%未満の問題数
-  averageReviewTime: number          // 1問あたりの平均復習時間（秒）
+  averageReviewTime: number          // 1問あたりの平均復習時間（秒、整数）
   estimatedTimeTo80: number          // 正解率80%達成までの見積もり時間（秒）
   currentAccuracy: number | null     // 現在の正解率
 }
@@ -516,22 +551,43 @@ export async function getWorkbookStatistics(workbookId: string): Promise<Workboo
     p => !recordsByProblem.has(p.id) || recordsByProblem.get(p.id)!.length === 0
   ).length
 
-  // 平均学習時間を計算（初回回答のみ）
-  let totalFirstStudyTime = 0
-  let firstStudyCount = 0
+  // 平均学習時間を計算（初回回答のみ、外れ値除外）
+  const firstStudyTimes: number[] = []
   for (const [, records] of recordsByProblem) {
     if (records.length > 0) {
       const sortedRecords = [...records].sort((a, b) =>
         a.studiedAt.getTime() - b.studiedAt.getTime()
       )
-      totalFirstStudyTime += sortedRecords[0].studyTime
-      firstStudyCount++
+      firstStudyTimes.push(sortedRecords[0].studyTime)
     }
   }
-  const averageStudyTime = firstStudyCount > 0 ? totalFirstStudyTime / firstStudyCount : 180 // デフォルト3分
+
+  const cleanedFirstTimes = removeOutliers(firstStudyTimes)
+  const averageStudyTime = cleanedFirstTimes.length > 0
+    ? calculateWeightedMean(cleanedFirstTimes)
+    : 180 // デフォルト3分
 
   // 未学習完了までの見積もり時間
   const estimatedTimeToComplete = unstudiedProblems * averageStudyTime
+
+  // 最新の回答時間をベースに1サイクル見積もりを計算
+  const allStudyTimes: number[] = []
+  for (const [, records] of recordsByProblem) {
+    if (records.length > 0) {
+      // 各問題の最新回答時間を取得
+      const sortedRecords = [...records].sort((a, b) =>
+        b.studiedAt.getTime() - a.studiedAt.getTime()
+      )
+      allStudyTimes.push(sortedRecords[0].studyTime)
+    }
+  }
+
+  const cleanedAllTimes = removeOutliers(allStudyTimes)
+  const averageLatestTime = cleanedAllTimes.length > 0
+    ? calculateWeightedMean(cleanedAllTimes)
+    : averageStudyTime
+
+  const oneCycleTime = activeProblems.length * averageLatestTime
 
   // 正解率80%未満の問題数を計算
   let problemsBelow80 = 0
@@ -545,25 +601,26 @@ export async function getWorkbookStatistics(workbookId: string): Promise<Workboo
     }
   }
 
-  // 平均復習時間を計算（2回目以降の回答）
-  let totalReviewTime = 0
-  let reviewCount = 0
+  // 平均復習時間を計算（2回目以降の回答、外れ値除外）
+  const reviewTimes: number[] = []
   for (const [, records] of recordsByProblem) {
     if (records.length > 1) {
       const sortedRecords = [...records].sort((a, b) =>
         a.studiedAt.getTime() - b.studiedAt.getTime()
       )
-      // 2回目以降の平均を計算
+      // 2回目以降を収集
       for (let i = 1; i < sortedRecords.length; i++) {
-        totalReviewTime += sortedRecords[i].studyTime
-        reviewCount++
+        reviewTimes.push(sortedRecords[i].studyTime)
       }
     }
   }
-  const averageReviewTime = reviewCount > 0 ? totalReviewTime / reviewCount : averageStudyTime
 
-  // 80%達成までの見積もり時間
-  // 仮定：正解率80%未満の問題は平均3回の復習が必要
+  const cleanedReviewTimes = removeOutliers(reviewTimes)
+  const averageReviewTime = cleanedReviewTimes.length > 0
+    ? calculateWeightedMean(cleanedReviewTimes)
+    : averageStudyTime
+
+  // 80%達成までの見積もり時間（平均3回の復習が必要と仮定）
   const estimatedTimeTo80 = problemsBelow80 * averageReviewTime * 3
 
   // 現在の正解率を計算
@@ -574,6 +631,7 @@ export async function getWorkbookStatistics(workbookId: string): Promise<Workboo
     unstudiedProblems,
     averageStudyTime,
     estimatedTimeToComplete,
+    oneCycleTime,
     problemsBelow80,
     averageReviewTime,
     estimatedTimeTo80,
