@@ -473,3 +473,110 @@ export async function getTodayStudyTime(): Promise<number> {
   // 合計学習時間を計算
   return todayRecords.reduce((sum, record) => sum + record.studyTime, 0)
 }
+
+// 問題集の統計情報を取得
+export interface WorkbookStatistics {
+  totalProblems: number              // 総問題数（除外・削除を除く）
+  unstudiedProblems: number          // 未学習問題数
+  averageStudyTime: number           // 1問あたりの平均学習時間（秒）
+  estimatedTimeToComplete: number    // 未学習完了までの見積もり時間（秒）
+  problemsBelow80: number            // 正解率80%未満の問題数
+  averageReviewTime: number          // 1問あたりの平均復習時間（秒）
+  estimatedTimeTo80: number          // 正解率80%達成までの見積もり時間（秒）
+  currentAccuracy: number | null     // 現在の正解率
+}
+
+export async function getWorkbookStatistics(workbookId: string): Promise<WorkbookStatistics> {
+  // 問題集の全問題を取得（削除・除外を除く）
+  const allProblems = await db.problems
+    .where('workbookId')
+    .equals(workbookId)
+    .toArray()
+
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
+
+  // 全学習記録を取得
+  const allRecords = await db.studyRecords.toArray()
+  const problemIds = activeProblems.map(p => p.id)
+  const workbookRecords = allRecords.filter(r => problemIds.includes(r.problemId))
+
+  // 問題ごとの学習記録をグループ化
+  const recordsByProblem = new Map<string, StudyRecord[]>()
+  for (const record of workbookRecords) {
+    if (!recordsByProblem.has(record.problemId)) {
+      recordsByProblem.set(record.problemId, [])
+    }
+    recordsByProblem.get(record.problemId)!.push(record)
+  }
+
+  // 未学習問題数を計算
+  const unstudiedProblems = activeProblems.filter(
+    p => !recordsByProblem.has(p.id) || recordsByProblem.get(p.id)!.length === 0
+  ).length
+
+  // 平均学習時間を計算（初回回答のみ）
+  let totalFirstStudyTime = 0
+  let firstStudyCount = 0
+  for (const [, records] of recordsByProblem) {
+    if (records.length > 0) {
+      const sortedRecords = [...records].sort((a, b) =>
+        a.studiedAt.getTime() - b.studiedAt.getTime()
+      )
+      totalFirstStudyTime += sortedRecords[0].studyTime
+      firstStudyCount++
+    }
+  }
+  const averageStudyTime = firstStudyCount > 0 ? totalFirstStudyTime / firstStudyCount : 180 // デフォルト3分
+
+  // 未学習完了までの見積もり時間
+  const estimatedTimeToComplete = unstudiedProblems * averageStudyTime
+
+  // 正解率80%未満の問題数を計算
+  let problemsBelow80 = 0
+  for (const problem of activeProblems) {
+    const records = recordsByProblem.get(problem.id) || []
+    if (records.length > 0) {
+      const accuracy = calculateAverageScore(records)
+      if (accuracy < 80) {
+        problemsBelow80++
+      }
+    }
+  }
+
+  // 平均復習時間を計算（2回目以降の回答）
+  let totalReviewTime = 0
+  let reviewCount = 0
+  for (const [, records] of recordsByProblem) {
+    if (records.length > 1) {
+      const sortedRecords = [...records].sort((a, b) =>
+        a.studiedAt.getTime() - b.studiedAt.getTime()
+      )
+      // 2回目以降の平均を計算
+      for (let i = 1; i < sortedRecords.length; i++) {
+        totalReviewTime += sortedRecords[i].studyTime
+        reviewCount++
+      }
+    }
+  }
+  const averageReviewTime = reviewCount > 0 ? totalReviewTime / reviewCount : averageStudyTime
+
+  // 80%達成までの見積もり時間
+  // 仮定：正解率80%未満の問題は平均3回の復習が必要
+  const estimatedTimeTo80 = problemsBelow80 * averageReviewTime * 3
+
+  // 現在の正解率を計算
+  const currentAccuracy = await calculateRecentAccuracyForProblems(activeProblems)
+
+  return {
+    totalProblems: activeProblems.length,
+    unstudiedProblems,
+    averageStudyTime,
+    estimatedTimeToComplete,
+    problemsBelow80,
+    averageReviewTime,
+    estimatedTimeTo80,
+    currentAccuracy
+  }
+}
