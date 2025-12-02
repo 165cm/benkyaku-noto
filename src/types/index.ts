@@ -6,6 +6,7 @@ export interface Workbook {
   totalProblems: number
   pdfUrl?: string // Firebase StorageのPDF URL
   pdfFileName?: string // PDFファイル名
+  standardTime?: number // 問題集全体の標準時間（秒）- スパルタモード用
   createdAt: Date
   updatedAt: Date
 }
@@ -23,6 +24,7 @@ export interface Problem {
   memo?: string
   isBookmarked?: boolean // ブックマーク（苦手な問題マーク）
   tags?: string[] // タグ（例: ["要復習", "時間がかかる"]）
+  standardTime?: number // この問題の標準時間（秒）- スパルタモード用
   createdAt: Date
   deletedAt?: Date // 論理削除用
 }

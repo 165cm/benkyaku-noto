@@ -287,6 +287,21 @@ export async function permanentlyDeleteProblem(id: string) {
   await db.problems.delete(id)
 }
 
+export async function updateProblem(
+  id: string,
+  updates: Partial<Omit<Problem, 'id' | 'createdAt'>>
+) {
+  await db.problems.update(id, updates)
+
+  // Firestoreに同期
+  if (auth.currentUser) {
+    const problem = await db.problems.get(id)
+    if (problem) {
+      await syncProblemToFirestore(problem)
+    }
+  }
+}
+
 export async function updateStudyRecord(
   id: string,
   updates: Partial<Pick<StudyRecord, 'result' | 'studyTime' | 'memo'>>

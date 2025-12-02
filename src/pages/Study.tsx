@@ -5,7 +5,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
-import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId } from '@/lib/db'
+import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId, updateProblem } from '@/lib/db'
 import { getPDFUrl } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
@@ -21,6 +21,16 @@ import {
   clearSession,
 } from '@/lib/studySession'
 import type { Problem, Workbook, StudyRecord, StudyResult, ImageBasedExplanation } from '@/types'
+
+// セクション標準時間の管理（localStorage）
+const getSectionStandardTime = (sectionKey: string): number | null => {
+  const saved = localStorage.getItem(`sectionStandardTime_${sectionKey}`)
+  return saved ? parseInt(saved, 10) : null
+}
+
+const setSectionStandardTime = (sectionKey: string, time: number) => {
+  localStorage.setItem(`sectionStandardTime_${sectionKey}`, String(time))
+}
 
 export default function Study() {
   const { id } = useParams<{ id: string }>()
@@ -70,6 +80,25 @@ export default function Study() {
     const saved = localStorage.getItem('autoAdvanceEnabled')
     return saved === 'true'
   })
+
+  // スパルタモードの設定（localStorage）
+  const [spartaModeEnabled, setSpartaModeEnabled] = useState(() => {
+    const saved = localStorage.getItem('spartaModeEnabled')
+    return saved === 'true'
+  })
+
+  // スパルタモードのタイプ（localStorage）
+  const [spartaModeType, setSpartaModeType] = useState<'personal' | 'standard'>(() => {
+    const saved = localStorage.getItem('spartaModeType')
+    return (saved as 'personal' | 'standard') || 'standard'
+  })
+
+  // スパルタモードの目標時間（秒）
+  const [targetTime, setTargetTime] = useState<number | null>(null)
+
+  // 標準時間の設定UI表示フラグ
+  const [showStandardTimeInput, setShowStandardTimeInput] = useState(false)
+  const [standardTimeInput, setStandardTimeInput] = useState('')
 
   // 次の問題の情報（ページ数表示用）
   const [nextProblemInfo, setNextProblemInfo] = useState<{ problemNumber: string; page?: number } | null>(null)
@@ -263,6 +292,47 @@ export default function Study() {
       setExplanationId(explanation?.id || null)
       setImageExplanations(imgExplanations)
 
+      // スパルタモード用：目標時間を算出
+      if (spartaModeEnabled) {
+        if (spartaModeType === 'personal' && records.length > 0) {
+          // 個人記録モード：過去の学習記録から目標時間を算出
+          const correctRecords = records.filter(r => r.result === 'correct')
+          if (correctRecords.length > 0) {
+            const fastestTime = Math.min(...correctRecords.map(r => r.studyTime))
+            setTargetTime(fastestTime)
+          } else {
+            // 正解記録がない場合は全記録の平均時間を目標に
+            const avgTime = Math.floor(records.reduce((sum, r) => sum + r.studyTime, 0) / records.length)
+            setTargetTime(avgTime)
+          }
+        } else if (spartaModeType === 'standard') {
+          // 標準時間モード：優先順位は 問題 > セクション > 問題集
+          let standardTime: number | null = null
+
+          // 1. 問題の標準時間
+          if (problemData.standardTime) {
+            standardTime = problemData.standardTime
+          }
+
+          // 2. セクションの標準時間
+          if (!standardTime && problemData.category && problemData.sectionTitle) {
+            const sectionKey = `${problemData.category}-${problemData.sectionTitle}`
+            standardTime = getSectionStandardTime(sectionKey)
+          }
+
+          // 3. 問題集の標準時間
+          if (!standardTime && workbookData?.standardTime) {
+            standardTime = workbookData.standardTime
+          }
+
+          setTargetTime(standardTime)
+        } else {
+          setTargetTime(null)
+        }
+      } else {
+        setTargetTime(null)
+      }
+
       // PDF取得も完了を待つ（UIには影響しない）
       await pdfPromise
     }
@@ -323,6 +393,57 @@ export default function Study() {
     const newValue = !autoAdvanceEnabled
     setAutoAdvanceEnabled(newValue)
     localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // スパルタモード設定をトグル
+  const toggleSpartaMode = async () => {
+    const newValue = !spartaModeEnabled
+    setSpartaModeEnabled(newValue)
+    localStorage.setItem('spartaModeEnabled', String(newValue))
+
+    // データを再読み込みして目標時間を再計算
+    if (newValue) {
+      await loadData()
+    } else {
+      setTargetTime(null)
+    }
+  }
+
+  // スパルタモードタイプを変更
+  const changeSpartaModeType = async (type: 'personal' | 'standard') => {
+    setSpartaModeType(type)
+    localStorage.setItem('spartaModeType', type)
+
+    // データを再読み込みして目標時間を再計算
+    await loadData()
+  }
+
+  // 標準時間を設定
+  const handleSetStandardTime = async () => {
+    if (!problem || !standardTimeInput) return
+
+    const [mins, secs] = standardTimeInput.split(':').map(s => parseInt(s.trim(), 10) || 0)
+    const timeInSeconds = mins * 60 + secs
+
+    if (timeInSeconds <= 0) {
+      alert('有効な時間を入力してください')
+      return
+    }
+
+    // 優先順位に応じて保存
+    if (problem.category && problem.sectionTitle) {
+      // セクション単位で保存
+      const sectionKey = `${problem.category}-${problem.sectionTitle}`
+      setSectionStandardTime(sectionKey, timeInSeconds)
+    } else {
+      // 問題単位で保存
+      await updateProblem(problem.id, { standardTime: timeInSeconds })
+    }
+
+    // UI更新
+    setShowStandardTimeInput(false)
+    setStandardTimeInput('')
+    await loadData()
   }
 
   // 次の問題の情報を取得（ページ数表示用）
@@ -849,30 +970,59 @@ export default function Study() {
         {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
         <div className="mt-4 pt-4 border-t border-border">
           {/* メインタイマー：現在の問題を解く時間 */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
-            <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
-            <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
-              {formatTime(elapsedTime)}
-            </p>
-            {timerMode === 'solving' && (
-              <p className="text-xs text-white/80">
-                💡 集中して取り組みましょう
+          {spartaModeEnabled && targetTime !== null ? (
+            // スパルタモード：カウントダウン形式
+            <div className={`rounded-xl p-6 mb-3 text-center shadow-lg transition-all ${
+              elapsedTime > targetTime
+                ? 'bg-gradient-to-r from-red-600 to-orange-600 animate-pulse'
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+            }`}>
+              <p className="text-sm text-white/90 mb-2 font-medium">
+                🔥 スパルタモード：目標時間まで
               </p>
-            )}
-            {timerMode === 'explanation' && (
-              <p className="text-xs text-white/80">
-                📖 解説を読んでいます...（{formatTime(explanationTime)}）
+              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+                {formatTime(targetTime - elapsedTime)}
               </p>
-            )}
-            {timerMode === 'paused' && (
-              <p className="text-xs text-white/80">
-                ⏸️ 休憩中（{formatTime(pausedTime)}）
+              {elapsedTime > targetTime ? (
+                <p className="text-xs text-white/90 font-bold">
+                  ⚠️ 目標時間を超過しています！
+                </p>
+              ) : (
+                <p className="text-xs text-white/80">
+                  {spartaModeType === 'personal'
+                    ? '💪 自己ベストを目指しましょう！'
+                    : '📏 標準時間内で解きましょう！'
+                  }（目標: {formatTime(targetTime)}）
+                </p>
+              )}
+            </div>
+          ) : (
+            // 通常モード：カウントアップ形式
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
+              <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
+              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+                {formatTime(elapsedTime)}
               </p>
-            )}
-          </div>
+              {timerMode === 'solving' && (
+                <p className="text-xs text-white/80">
+                  💡 集中して取り組みましょう
+                </p>
+              )}
+              {timerMode === 'explanation' && (
+                <p className="text-xs text-white/80">
+                  📖 解説を読んでいます...（{formatTime(explanationTime)}）
+                </p>
+              )}
+              {timerMode === 'paused' && (
+                <p className="text-xs text-white/80">
+                  ⏸️ 休憩中（{formatTime(pausedTime)}）
+                </p>
+              )}
+            </div>
+          )}
 
           {/* サブ情報：今日の累計・解説時間・セッション時間 */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-gray-600 mb-1">📊 今日の累計</p>
               <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
@@ -889,6 +1039,115 @@ export default function Study() {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* スパルタモード設定 */}
+          <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+            <label className="flex items-center justify-between cursor-pointer mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔥</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">スパルタモード</p>
+                  <p className="text-xs text-gray-600">
+                    {spartaModeEnabled
+                      ? targetTime !== null
+                        ? `目標時間: ${formatTime(targetTime)}`
+                        : '目標時間未設定'
+                      : 'カウントダウン形式で時間制限'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={spartaModeEnabled}
+                onChange={toggleSpartaMode}
+                className="w-5 h-5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+              />
+            </label>
+
+            {spartaModeEnabled && (
+              <div className="space-y-2 border-t border-orange-200 pt-3">
+                {/* モード選択 */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => changeSpartaModeType('standard')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      spartaModeType === 'standard'
+                        ? 'bg-orange-600 text-white shadow-md'
+                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    📏 標準タイム
+                  </button>
+                  <button
+                    onClick={() => changeSpartaModeType('personal')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      spartaModeType === 'personal'
+                        ? 'bg-orange-600 text-white shadow-md'
+                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    ⚡ 自己ベスト
+                  </button>
+                </div>
+
+                {/* 標準タイムモードの説明と設定 */}
+                {spartaModeType === 'standard' && (
+                  <div className="text-xs text-gray-600 space-y-2">
+                    <p>教材やセクション単位で標準時間を設定できます（推奨）</p>
+                    {targetTime === null && (
+                      <div className="bg-white rounded-lg p-2 border border-orange-300">
+                        <p className="text-orange-800 font-medium mb-2">
+                          ⚠️ 標準時間が未設定です
+                        </p>
+                        {!showStandardTimeInput ? (
+                          <button
+                            onClick={() => setShowStandardTimeInput(true)}
+                            className="text-xs bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700"
+                          >
+                            標準時間を設定
+                          </button>
+                        ) : (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={standardTimeInput}
+                              onChange={(e) => setStandardTimeInput(e.target.value)}
+                              placeholder="例: 3:00"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleSetStandardTime}
+                                className="flex-1 text-xs bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700"
+                              >
+                                保存
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowStandardTimeInput(false)
+                                  setStandardTimeInput('')
+                                }}
+                                className="flex-1 text-xs bg-gray-300 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-400"
+                              >
+                                キャンセル
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 個人記録モードの説明 */}
+                {spartaModeType === 'personal' && (
+                  <p className="text-xs text-gray-600">
+                    あなたの過去の最速記録を目標にします（上級者向け）
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </Card>
