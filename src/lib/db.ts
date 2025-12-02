@@ -316,10 +316,11 @@ export async function updateProblem(
   await db.problems.update(id, updates)
 
   // Firestoreに同期
-  if (auth.currentUser) {
+  const user = auth.currentUser
+  if (user) {
     const problem = await db.problems.get(id)
     if (problem) {
-      await syncProblemToFirestore(problem)
+      await syncProblemToFirestore(user.uid, problem)
     }
   }
 }
