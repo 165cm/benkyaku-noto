@@ -71,6 +71,15 @@ export default function Study() {
     return saved === 'true'
   })
 
+  // スパルタモードの設定（localStorage）
+  const [spartaModeEnabled, setSpartaModeEnabled] = useState(() => {
+    const saved = localStorage.getItem('spartaModeEnabled')
+    return saved === 'true'
+  })
+
+  // スパルタモードの目標時間（秒）
+  const [targetTime, setTargetTime] = useState<number | null>(null)
+
   // 次の問題の情報（ページ数表示用）
   const [nextProblemInfo, setNextProblemInfo] = useState<{ problemNumber: string; page?: number } | null>(null)
 
@@ -263,6 +272,22 @@ export default function Study() {
       setExplanationId(explanation?.id || null)
       setImageExplanations(imgExplanations)
 
+      // スパルタモード用：過去の学習記録から目標時間を算出
+      if (spartaModeEnabled && records.length > 0) {
+        // 正解した記録のみを対象に最速時間を取得
+        const correctRecords = records.filter(r => r.result === 'correct')
+        if (correctRecords.length > 0) {
+          const fastestTime = Math.min(...correctRecords.map(r => r.studyTime))
+          setTargetTime(fastestTime)
+        } else {
+          // 正解記録がない場合は全記録の平均時間を目標に
+          const avgTime = Math.floor(records.reduce((sum, r) => sum + r.studyTime, 0) / records.length)
+          setTargetTime(avgTime)
+        }
+      } else {
+        setTargetTime(null)
+      }
+
       // PDF取得も完了を待つ（UIには影響しない）
       await pdfPromise
     }
@@ -323,6 +348,27 @@ export default function Study() {
     const newValue = !autoAdvanceEnabled
     setAutoAdvanceEnabled(newValue)
     localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // スパルタモード設定をトグル
+  const toggleSpartaMode = async () => {
+    const newValue = !spartaModeEnabled
+    setSpartaModeEnabled(newValue)
+    localStorage.setItem('spartaModeEnabled', String(newValue))
+
+    // 設定変更後、目標時間を再計算
+    if (newValue && studyRecords.length > 0) {
+      const correctRecords = studyRecords.filter(r => r.result === 'correct')
+      if (correctRecords.length > 0) {
+        const fastestTime = Math.min(...correctRecords.map(r => r.studyTime))
+        setTargetTime(fastestTime)
+      } else {
+        const avgTime = Math.floor(studyRecords.reduce((sum, r) => sum + r.studyTime, 0) / studyRecords.length)
+        setTargetTime(avgTime)
+      }
+    } else {
+      setTargetTime(null)
+    }
   }
 
   // 次の問題の情報を取得（ページ数表示用）
@@ -849,30 +895,56 @@ export default function Study() {
         {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
         <div className="mt-4 pt-4 border-t border-border">
           {/* メインタイマー：現在の問題を解く時間 */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
-            <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
-            <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
-              {formatTime(elapsedTime)}
-            </p>
-            {timerMode === 'solving' && (
-              <p className="text-xs text-white/80">
-                💡 集中して取り組みましょう
+          {spartaModeEnabled && targetTime !== null ? (
+            // スパルタモード：カウントダウン形式
+            <div className={`rounded-xl p-6 mb-3 text-center shadow-lg transition-all ${
+              elapsedTime > targetTime
+                ? 'bg-gradient-to-r from-red-600 to-orange-600 animate-pulse'
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+            }`}>
+              <p className="text-sm text-white/90 mb-2 font-medium">
+                🔥 スパルタモード：目標時間まで
               </p>
-            )}
-            {timerMode === 'explanation' && (
-              <p className="text-xs text-white/80">
-                📖 解説を読んでいます...（{formatTime(explanationTime)}）
+              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+                {formatTime(targetTime - elapsedTime)}
               </p>
-            )}
-            {timerMode === 'paused' && (
-              <p className="text-xs text-white/80">
-                ⏸️ 休憩中（{formatTime(pausedTime)}）
+              {elapsedTime > targetTime ? (
+                <p className="text-xs text-white/90 font-bold">
+                  ⚠️ 目標時間を超過しています！
+                </p>
+              ) : (
+                <p className="text-xs text-white/80">
+                  💪 前回より早く解きましょう！（目標: {formatTime(targetTime)}）
+                </p>
+              )}
+            </div>
+          ) : (
+            // 通常モード：カウントアップ形式
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
+              <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
+              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+                {formatTime(elapsedTime)}
               </p>
-            )}
-          </div>
+              {timerMode === 'solving' && (
+                <p className="text-xs text-white/80">
+                  💡 集中して取り組みましょう
+                </p>
+              )}
+              {timerMode === 'explanation' && (
+                <p className="text-xs text-white/80">
+                  📖 解説を読んでいます...（{formatTime(explanationTime)}）
+                </p>
+              )}
+              {timerMode === 'paused' && (
+                <p className="text-xs text-white/80">
+                  ⏸️ 休憩中（{formatTime(pausedTime)}）
+                </p>
+              )}
+            </div>
+          )}
 
           {/* サブ情報：今日の累計・解説時間・セッション時間 */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-gray-600 mb-1">📊 今日の累計</p>
               <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
@@ -889,6 +961,31 @@ export default function Study() {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* スパルタモード設定 */}
+          <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔥</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">スパルタモード</p>
+                  <p className="text-xs text-gray-600">
+                    {spartaModeEnabled
+                      ? targetTime !== null
+                        ? `目標時間: ${formatTime(targetTime)}`
+                        : '履歴がないため通常モード'
+                      : '前回の記録から目標時間を設定'}
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={spartaModeEnabled}
+                onChange={toggleSpartaMode}
+                className="w-5 h-5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+              />
+            </label>
           </div>
         </div>
       </Card>
