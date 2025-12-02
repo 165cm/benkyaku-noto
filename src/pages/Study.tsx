@@ -39,6 +39,7 @@ export default function Study() {
   const [elapsedTime, setElapsedTime] = useState(0)
   const [sessionElapsedTime, setSessionElapsedTime] = useState(0)
   const [todayStudyTime, setTodayStudyTime] = useState(0) // 1日の学習時間（3時リセット）
+  const [baseTodayStudyTime, setBaseTodayStudyTime] = useState(0) // 過去の学習時間（初回のみ取得）
   const [memo, setMemo] = useState('')
   const [timeExpired, setTimeExpired] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -114,8 +115,11 @@ export default function Study() {
         setAutoTransitionTimeout(null)
       }
 
-      // 1日の学習時間を初回ロード
-      getTodayStudyTime().then(setTodayStudyTime)
+      // 1日の学習時間を初回ロード（過去の学習時間）
+      getTodayStudyTime().then(time => {
+        setBaseTodayStudyTime(time)
+        setTodayStudyTime(time)
+      })
 
       // 苦手克服モードの場合、セッションがなければ作成
       if (isWeakMode && !getWeakModeSession()) {
@@ -137,14 +141,24 @@ export default function Study() {
   }, [id])
 
   useEffect(() => {
-    const timer = setInterval(async () => {
+    const timer = setInterval(() => {
       const now = Date.now()
 
       // 現在のモードに応じて時間を更新
       if (timerMode === 'solving') {
-        setElapsedTime(prev => prev + 1)
+        setElapsedTime(prev => {
+          const newElapsed = prev + 1
+          // 1日の学習時間を更新（過去の学習時間 + 現在の問題時間 + 解説時間）
+          setTodayStudyTime(baseTodayStudyTime + newElapsed + explanationTime)
+          return newElapsed
+        })
       } else if (timerMode === 'explanation') {
-        setExplanationTime(prev => prev + 1)
+        setExplanationTime(prev => {
+          const newExplanation = prev + 1
+          // 1日の学習時間を更新（過去の学習時間 + 問題時間 + 解説時間）
+          setTodayStudyTime(baseTodayStudyTime + elapsedTime + newExplanation)
+          return newExplanation
+        })
       } else if (timerMode === 'paused') {
         setPausedTime(prev => prev + 1)
       }
@@ -163,14 +177,10 @@ export default function Study() {
           }
         }
       }
-
-      // 1日の学習時間を更新（問題時間 + 解説時間、休憩は含めない）
-      const baseTodayTime = await getTodayStudyTime()
-      setTodayStudyTime(baseTodayTime + elapsedTime + explanationTime)
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timerMode, modeStartTime, startTime, timeExpired, elapsedTime, explanationTime])
+  }, [timerMode, modeStartTime, startTime, timeExpired, baseTodayStudyTime, elapsedTime, explanationTime])
 
   // キーボードショートカット
   useEffect(() => {
@@ -836,55 +846,50 @@ export default function Study() {
           )}
         </div>
 
-        {/* 時間表示 - 今日の学習時間を強調 */}
+        {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
         <div className="mt-4 pt-4 border-t border-border">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-3">
-            <p className="text-xs text-gray-600 mb-1">📊 今日の学習時間</p>
-            <p className="text-4xl font-bold text-blue-700 mb-2">
-              {formatTime(todayStudyTime)}
+          {/* メインタイマー：現在の問題を解く時間 */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
+            <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
+            <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+              {formatTime(elapsedTime)}
             </p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min((todayStudyTime / 3600) * 100, 100)}%`,
-                }}
-              />
-            </div>
-            <p className="text-xs text-gray-600">
-              目標1時間まで
-              {todayStudyTime < 3600
-                ? `あと${formatTime(3600 - todayStudyTime)}`
-                : '達成！🎉'}
-            </p>
-          </div>
-
-          {/* タイマー表示（3モード対応） */}
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-gray-700 font-medium">
-                ⏱️ 問題: {formatTime(elapsedTime)}
-              </span>
-              <span className="text-blue-600 font-medium">
-                📖 解説: {formatTime(explanationTime)}
-              </span>
-            </div>
-            {getSession() && (
-              <span className="text-gray-500">
-                セッション: {formatTime(sessionElapsedTime)}
-              </span>
+            {timerMode === 'solving' && (
+              <p className="text-xs text-white/80">
+                💡 集中して取り組みましょう
+              </p>
+            )}
+            {timerMode === 'explanation' && (
+              <p className="text-xs text-white/80">
+                📖 解説を読んでいます...（{formatTime(explanationTime)}）
+              </p>
+            )}
+            {timerMode === 'paused' && (
+              <p className="text-xs text-white/80">
+                ⏸️ 休憩中（{formatTime(pausedTime)}）
+              </p>
             )}
           </div>
-          {timerMode === 'explanation' && (
-            <p className="text-xs text-blue-600 mt-1">
-              ⏺️ 解説時間が増えています...
-            </p>
-          )}
-          {timerMode === 'paused' && (
-            <p className="text-xs text-gray-500 mt-1">
-              ⏸️ 休憩中（{formatTime(pausedTime)}）
-            </p>
-          )}
+
+          {/* サブ情報：今日の累計・解説時間・セッション時間 */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-600 mb-1">📊 今日の累計</p>
+              <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                目標1h {todayStudyTime < 3600 ? `残り${formatTime(3600 - todayStudyTime)}` : '達成🎉'}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-600 mb-1">📖 解説時間</p>
+              <p className="text-lg font-bold text-blue-700">{formatTime(explanationTime)}</p>
+              {getSession() && (
+                <p className="text-[10px] text-gray-500 mt-1">
+                  セッション: {formatTime(sessionElapsedTime)}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </Card>
 
