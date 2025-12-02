@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, BookOpen, Trash2, Image } from 'lucide-react'
+import { Plus, BookOpen, Trash2, Image, Settings } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
-import { getWorkbooks, addWorkbook, deleteWorkbook, getProblems } from '@/lib/db'
-import { calculateRecentAccuracyForProblems } from '@/lib/review'
+import { getWorkbooks, addWorkbook, deleteWorkbook, getProblems, updateWorkbook } from '@/lib/db'
+import { calculateRecentAccuracyForProblems, getWorkbookSections, type SectionStats } from '@/lib/review'
+import { getExcludedSections, saveExcludedSections, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
 import type { Workbook } from '@/types'
 
 export default function Workbooks() {
@@ -16,6 +17,14 @@ export default function Workbooks() {
     subject: '',
   })
   const [workbookAccuracies, setWorkbookAccuracies] = useState<Map<string, number | null>>(new Map())
+
+  // 設定モーダル
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
+  const [settingsWorkbook, setSettingsWorkbook] = useState<Workbook | null>(null)
+  const [sections, setSections] = useState<SectionStats[]>([])
+  const [excludedSections, setExcludedSections] = useState<string[]>([])
+  const [workbookStandardTimeInput, setWorkbookStandardTimeInput] = useState('')
+  const [sectionStandardTimeInputs, setSectionStandardTimeInputs] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     loadWorkbooks()
@@ -70,6 +79,98 @@ export default function Workbooks() {
       await deleteWorkbook(id)
       loadWorkbooks()
     }
+  }
+
+  // 設定モーダルを開く
+  const openSettingsModal = async (workbook: Workbook) => {
+    setSettingsWorkbook(workbook)
+    setIsSettingsModalOpen(true)
+
+    // セクション一覧を取得
+    const sectionList = await getWorkbookSections(workbook.id)
+    setSections(sectionList)
+
+    // 除外設定を読み込み
+    setExcludedSections(getExcludedSections())
+
+    // 問題集の標準時間を読み込み
+    if (workbook.standardTime) {
+      const mins = Math.floor(workbook.standardTime / 60)
+      const secs = workbook.standardTime % 60
+      setWorkbookStandardTimeInput(`${mins}:${secs.toString().padStart(2, '0')}`)
+    } else {
+      setWorkbookStandardTimeInput('')
+    }
+
+    // 各セクションの標準時間を読み込み
+    const sectionInputs = new Map<string, string>()
+    for (const section of sectionList) {
+      const time = getSectionStandardTime(section.sectionKey)
+      if (time) {
+        const mins = Math.floor(time / 60)
+        const secs = time % 60
+        sectionInputs.set(section.sectionKey, `${mins}:${secs.toString().padStart(2, '0')}`)
+      }
+    }
+    setSectionStandardTimeInputs(sectionInputs)
+  }
+
+  // 設定を保存
+  const handleSaveSettings = async () => {
+    if (!settingsWorkbook) return
+
+    // 問題集の標準時間を保存
+    if (workbookStandardTimeInput) {
+      const [mins, secs] = workbookStandardTimeInput.split(':').map(s => parseInt(s.trim(), 10) || 0)
+      const timeInSeconds = mins * 60 + secs
+      if (timeInSeconds > 0) {
+        await updateWorkbook(settingsWorkbook.id, { standardTime: timeInSeconds })
+      }
+    }
+
+    // 各セクションの標準時間を保存
+    for (const [sectionKey, input] of sectionStandardTimeInputs.entries()) {
+      if (input) {
+        const [mins, secs] = input.split(':').map(s => parseInt(s.trim(), 10) || 0)
+        const timeInSeconds = mins * 60 + secs
+        if (timeInSeconds > 0) {
+          setSectionStandardTime(sectionKey, timeInSeconds)
+        }
+      }
+    }
+
+    // 除外設定を保存
+    saveExcludedSections(excludedSections)
+
+    // モーダルを閉じる
+    setIsSettingsModalOpen(false)
+    setSettingsWorkbook(null)
+
+    // 問題集一覧を再読み込み
+    loadWorkbooks()
+  }
+
+  // セクション除外をトグル
+  const toggleSectionExclusion = (sectionKey: string) => {
+    if (excludedSections.includes(sectionKey)) {
+      setExcludedSections(excludedSections.filter(s => s !== sectionKey))
+    } else {
+      setExcludedSections([...excludedSections, sectionKey])
+    }
+  }
+
+  // セクション標準時間の入力を更新
+  const updateSectionStandardTimeInput = (sectionKey: string, value: string) => {
+    const newInputs = new Map(sectionStandardTimeInputs)
+    newInputs.set(sectionKey, value)
+    setSectionStandardTimeInputs(newInputs)
+  }
+
+  // 時間フォーマット関数
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   return (
@@ -141,6 +242,18 @@ export default function Workbooks() {
                     {workbook.totalProblems}問
                   </span>
 
+                  {/* 設定ボタン */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openSettingsModal(workbook)
+                    }}
+                    className="p-2 hover:bg-blue-100 rounded transition-colors"
+                    title="設定"
+                  >
+                    <Settings size={16} className="text-primary" />
+                  </button>
+
                   {/* 削除ボタン */}
                   <button
                     onClick={(e) => {
@@ -208,6 +321,119 @@ export default function Workbooks() {
           </div>
         </form>
       </Modal>
+
+      {/* 設定モーダル */}
+      {settingsWorkbook && (
+        <Modal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          title={`📚 ${settingsWorkbook.title} の設定`}
+        >
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* 問題集全体の標準タイム */}
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+              <h3 className="text-sm font-bold text-gray-800 mb-2">🎯 問題集全体の標準タイム</h3>
+              <p className="text-xs text-gray-600 mb-3">
+                セクション別に設定がない場合、この時間が使用されます
+              </p>
+              <input
+                type="text"
+                value={workbookStandardTimeInput}
+                onChange={(e) => setWorkbookStandardTimeInput(e.target.value)}
+                placeholder="例: 3:00"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+              />
+            </div>
+
+            {/* セクション別設定 */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">📂 セクション別設定</h3>
+              {sections.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  セクションがありません
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {sections.map((section) => (
+                    <div
+                      key={section.sectionKey}
+                      className="bg-white border border-gray-200 rounded-lg p-3"
+                    >
+                      {/* セクション名と正答率 */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-800">
+                            {section.category} - {section.title}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {section.problems.length}問 / 学習済み {section.studiedCount}問
+                          </p>
+                        </div>
+                        {section.accuracy !== null && (
+                          <span
+                            className={`text-xs px-2 py-1 rounded font-medium ${
+                              section.accuracy >= 80
+                                ? 'bg-green-100 text-green-700'
+                                : section.accuracy >= 50
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {section.accuracy}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 標準時間入力と復習除外 */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-600 block mb-1">
+                            📏 標準タイム
+                          </label>
+                          <input
+                            type="text"
+                            value={sectionStandardTimeInputs.get(section.sectionKey) || ''}
+                            onChange={(e) =>
+                              updateSectionStandardTimeInput(section.sectionKey, e.target.value)
+                            }
+                            placeholder="例: 2:30"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={excludedSections.includes(section.sectionKey)}
+                              onChange={() => toggleSectionExclusion(section.sectionKey)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-xs text-gray-700">復習から除外</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 保存ボタン */}
+            <div className="flex gap-3 justify-end pt-4 border-t">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsSettingsModalOpen(false)}
+              >
+                キャンセル
+              </Button>
+              <Button type="button" onClick={handleSaveSettings}>
+                保存
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

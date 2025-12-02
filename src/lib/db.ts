@@ -110,6 +110,28 @@ export class BenkyakuDB extends Dexie {
 export const db = new BenkyakuDB()
 
 // ユーティリティ関数
+export async function updateWorkbook(
+  id: string,
+  updates: Partial<Omit<Workbook, 'id' | 'createdAt'>>
+) {
+  const now = new Date()
+  await db.workbooks.update(id, { ...updates, updatedAt: now })
+
+  // Firestoreに同期
+  const user = auth.currentUser
+  if (user) {
+    const workbook = await db.workbooks.get(id)
+    if (workbook) {
+      try {
+        await syncWorkbookToFirestore(user.uid, workbook)
+        console.log('Auto-backup: Workbook updated and synced to cloud')
+      } catch (error) {
+        console.error('Auto-backup: Failed to sync workbook', error)
+      }
+    }
+  }
+}
+
 export async function addWorkbook(workbook: Omit<Workbook, 'id' | 'createdAt' | 'updatedAt'>) {
   // バリデーション
   await validateWorkbook(workbook)
