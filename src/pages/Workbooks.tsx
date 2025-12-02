@@ -23,8 +23,8 @@ export default function Workbooks() {
   const [settingsWorkbook, setSettingsWorkbook] = useState<Workbook | null>(null)
   const [sections, setSections] = useState<SectionStats[]>([])
   const [excludedSections, setExcludedSections] = useState<string[]>([])
-  const [workbookStandardTimeInput, setWorkbookStandardTimeInput] = useState('')
-  const [sectionStandardTimeInputs, setSectionStandardTimeInputs] = useState<Map<string, string>>(new Map())
+  const [workbookStandardTime, setWorkbookStandardTime] = useState(180) // 初期値3分（180秒）
+  const [sectionStandardTimes, setSectionStandardTimes] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     loadWorkbooks()
@@ -93,26 +93,21 @@ export default function Workbooks() {
     // 除外設定を読み込み
     setExcludedSections(getExcludedSections())
 
-    // 問題集の標準時間を読み込み
-    if (workbook.standardTime) {
-      const mins = Math.floor(workbook.standardTime / 60)
-      const secs = workbook.standardTime % 60
-      setWorkbookStandardTimeInput(`${mins}:${secs.toString().padStart(2, '0')}`)
-    } else {
-      setWorkbookStandardTimeInput('')
-    }
+    // 問題集の標準時間を読み込み（デフォルトは3分=180秒）
+    setWorkbookStandardTime(workbook.standardTime || 180)
 
     // 各セクションの標準時間を読み込み
-    const sectionInputs = new Map<string, string>()
+    const sectionTimes = new Map<string, number>()
     for (const section of sectionList) {
       const time = getSectionStandardTime(section.sectionKey)
       if (time) {
-        const mins = Math.floor(time / 60)
-        const secs = time % 60
-        sectionInputs.set(section.sectionKey, `${mins}:${secs.toString().padStart(2, '0')}`)
+        sectionTimes.set(section.sectionKey, time)
+      } else {
+        // デフォルト値は設定しない（workbookのstandardTimeを使用）
+        sectionTimes.set(section.sectionKey, 0)
       }
     }
-    setSectionStandardTimeInputs(sectionInputs)
+    setSectionStandardTimes(sectionTimes)
   }
 
   // 設定を保存
@@ -120,22 +115,14 @@ export default function Workbooks() {
     if (!settingsWorkbook) return
 
     // 問題集の標準時間を保存
-    if (workbookStandardTimeInput) {
-      const [mins, secs] = workbookStandardTimeInput.split(':').map(s => parseInt(s.trim(), 10) || 0)
-      const timeInSeconds = mins * 60 + secs
-      if (timeInSeconds > 0) {
-        await updateWorkbook(settingsWorkbook.id, { standardTime: timeInSeconds })
-      }
+    if (workbookStandardTime > 0) {
+      await updateWorkbook(settingsWorkbook.id, { standardTime: workbookStandardTime })
     }
 
     // 各セクションの標準時間を保存
-    for (const [sectionKey, input] of sectionStandardTimeInputs.entries()) {
-      if (input) {
-        const [mins, secs] = input.split(':').map(s => parseInt(s.trim(), 10) || 0)
-        const timeInSeconds = mins * 60 + secs
-        if (timeInSeconds > 0) {
-          setSectionStandardTime(sectionKey, timeInSeconds)
-        }
+    for (const [sectionKey, time] of sectionStandardTimes.entries()) {
+      if (time > 0) {
+        setSectionStandardTime(sectionKey, time)
       }
     }
 
@@ -159,11 +146,18 @@ export default function Workbooks() {
     }
   }
 
-  // セクション標準時間の入力を更新
-  const updateSectionStandardTimeInput = (sectionKey: string, value: string) => {
-    const newInputs = new Map(sectionStandardTimeInputs)
-    newInputs.set(sectionKey, value)
-    setSectionStandardTimeInputs(newInputs)
+  // セクション標準時間を更新
+  const updateSectionStandardTime = (sectionKey: string, time: number) => {
+    const newTimes = new Map(sectionStandardTimes)
+    newTimes.set(sectionKey, Math.max(0, time)) // 0秒未満にならないように
+    setSectionStandardTimes(newTimes)
+  }
+
+  // 時間フォーマット関数（秒 → M:SS形式）
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   return (
@@ -229,6 +223,13 @@ export default function Workbooks() {
                     }
                     return null
                   })()}
+
+                  {/* 標準タイム */}
+                  {workbook.standardTime && (
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded whitespace-nowrap">
+                      📏 {Math.floor(workbook.standardTime / 60)}:{(workbook.standardTime % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
 
                   {/* 問題数 */}
                   <span className="text-sm text-gray-500 whitespace-nowrap">
@@ -329,13 +330,39 @@ export default function Workbooks() {
               <p className="text-xs text-gray-600 mb-3">
                 セクション別に設定がない場合、この時間が使用されます
               </p>
-              <input
-                type="text"
-                value={workbookStandardTimeInput}
-                onChange={(e) => setWorkbookStandardTimeInput(e.target.value)}
-                placeholder="例: 3:00"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-              />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWorkbookStandardTime(Math.max(0, workbookStandardTime - 30))}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                >
+                  -30秒
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkbookStandardTime(Math.max(0, workbookStandardTime - 10))}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                >
+                  -10秒
+                </button>
+                <div className="flex-1 text-center">
+                  <span className="text-2xl font-bold text-orange-700">{formatTime(workbookStandardTime)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWorkbookStandardTime(workbookStandardTime + 10)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                >
+                  +10秒
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkbookStandardTime(workbookStandardTime + 30)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                >
+                  +30秒
+                </button>
+              </div>
             </div>
 
             {/* セクション別設定 */}
@@ -378,22 +405,40 @@ export default function Workbooks() {
                       </div>
 
                       {/* 標準時間入力と復習除外 */}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
                         <div>
                           <label className="text-xs text-gray-600 block mb-1">
                             📏 標準タイム
                           </label>
-                          <input
-                            type="text"
-                            value={sectionStandardTimeInputs.get(section.sectionKey) || ''}
-                            onChange={(e) =>
-                              updateSectionStandardTimeInput(section.sectionKey, e.target.value)
-                            }
-                            placeholder="例: 2:30"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                updateSectionStandardTime(section.sectionKey, currentTime - 10)
+                              }}
+                              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                              -10秒
+                            </button>
+                            <div className="flex-1 text-center">
+                              <span className="text-sm font-semibold text-gray-700">
+                                {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                updateSectionStandardTime(section.sectionKey, currentTime + 10)
+                              }}
+                              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                              +10秒
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-end">
+                        <div>
                           <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <input
                               type="checkbox"

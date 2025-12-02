@@ -14,6 +14,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems } from '@/lib/review'
+import { getExcludedSections } from '@/lib/storage'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
@@ -98,6 +99,12 @@ export default function WorkbookDetail() {
   const [showTaggedOnly, setShowTaggedOnly] = useState(false)
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
+  const [excludedSections, setExcludedSections] = useState<string[]>([])
+
+  // 除外設定を読み込む
+  useEffect(() => {
+    setExcludedSections(getExcludedSections())
+  }, [])
   const [draggedProblem, setDraggedProblem] = useState<Problem | null>(null)
   const [lastDragOperation, setLastDragOperation] = useState<{
     problemId: string
@@ -985,21 +992,32 @@ export default function WorkbookDetail() {
               0
             )
 
+            // カテゴリ全体が除外されているか判定（全セクションが除外されている場合）
+            const allSectionsExcluded = Object.keys(titles).every((title) => {
+              const titleKey = `${category}-${title}`
+              return excludedSections.includes(titleKey)
+            })
+
             return (
               <div key={category}>
                 {/* 親カテゴリヘッダー */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className={`flex items-center justify-between p-4 rounded-lg transition-colors ${allSectionsExcluded ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
                   <div
                     className="flex items-center gap-3 flex-1 cursor-pointer"
                     onClick={() => toggleCategory(category)}
                   >
                     {isCategoryExpanded ? (
-                      <ChevronDown size={20} className="text-gray-600" />
+                      <ChevronDown size={20} className={allSectionsExcluded ? "text-gray-400" : "text-gray-600"} />
                     ) : (
-                      <ChevronRight size={20} className="text-gray-600" />
+                      <ChevronRight size={20} className={allSectionsExcluded ? "text-gray-400" : "text-gray-600"} />
                     )}
-                    <h2 className="text-xl font-bold">{category}</h2>
-                    <span className="text-sm text-gray-500">
+                    <h2 className={`text-xl font-bold ${allSectionsExcluded ? 'text-gray-400' : ''}`}>{category}</h2>
+                    {allSectionsExcluded && (
+                      <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap">
+                        復習から除外
+                      </span>
+                    )}
+                    <span className={`text-sm ${allSectionsExcluded ? 'text-gray-400' : 'text-gray-500'}`}>
                       {Object.keys(titles).length}セクション · {totalProblems}問
                     </span>
                     {(() => {
@@ -1043,27 +1061,34 @@ export default function WorkbookDetail() {
                         (p) => p.page !== undefined
                       )
 
+                      const isExcluded = excludedSections.includes(titleKey)
+
                       return (
                         <div key={titleKey}>
                           {/* 目次タイトルヘッダー */}
-                          <div className="bg-white border border-border rounded-lg">
+                          <div className={`border border-border rounded-lg ${isExcluded ? 'bg-gray-100' : 'bg-white'}`}>
                             <div
-                              className="flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
+                              className={`flex items-center justify-between p-3 transition-colors ${isExcluded ? 'hover:bg-gray-200' : 'hover:bg-secondary/50'}`}
                             >
                               {/* 左側：展開アイコン、タイトル */}
                               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleTitle(titleKey)}>
                                 {isTitleExpanded ? (
-                                  <ChevronDown size={16} className="text-gray-600" />
+                                  <ChevronDown size={16} className={isExcluded ? "text-gray-400" : "text-gray-600"} />
                                 ) : (
-                                  <ChevronRight size={16} className="text-gray-600" />
+                                  <ChevronRight size={16} className={isExcluded ? "text-gray-400" : "text-gray-600"} />
                                 )}
-                                <h3 className="font-semibold">{title}</h3>
+                                <h3 className={`font-semibold ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
                               </div>
                               {/* 右側：ラベル群とボタン（固定位置） */}
                               <div
                                 className="flex items-center gap-2"
                                 onClick={(e) => e.stopPropagation()}
                               >
+                                {isExcluded && (
+                                  <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap">
+                                    復習から除外
+                                  </span>
+                                )}
                                 {firstProblemWithPage?.page && (
                                   <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded whitespace-nowrap">
                                     p.{firstProblemWithPage.page}
