@@ -323,42 +323,42 @@ export default function Workbooks() {
           onClose={() => setIsSettingsModalOpen(false)}
           title={`📚 ${settingsWorkbook.title} の設定`}
         >
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto">
             {/* 問題集全体の標準タイム */}
-            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-              <h3 className="text-sm font-bold text-gray-800 mb-2">🎯 問題集全体の標準タイム</h3>
-              <p className="text-xs text-gray-600 mb-3">
+            <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+              <h3 className="text-xs font-bold text-gray-800 mb-1">🎯 問題集全体の標準タイム</h3>
+              <p className="text-[10px] text-gray-600 mb-2">
                 セクション別に設定がない場合、この時間が使用されます
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setWorkbookStandardTime(Math.max(0, workbookStandardTime - 30))}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                  className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold"
                 >
                   -30秒
                 </button>
                 <button
                   type="button"
                   onClick={() => setWorkbookStandardTime(Math.max(0, workbookStandardTime - 10))}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                  className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold"
                 >
                   -10秒
                 </button>
                 <div className="flex-1 text-center">
-                  <span className="text-2xl font-bold text-orange-700">{formatTime(workbookStandardTime)}</span>
+                  <span className="text-lg font-bold text-orange-700">{formatTime(workbookStandardTime)}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setWorkbookStandardTime(workbookStandardTime + 10)}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                  className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold"
                 >
                   +10秒
                 </button>
                 <button
                   type="button"
                   onClick={() => setWorkbookStandardTime(workbookStandardTime + 30)}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-bold"
+                  className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold"
                 >
                   +30秒
                 </button>
@@ -367,13 +367,13 @@ export default function Workbooks() {
 
             {/* セクション別設定 */}
             <div>
-              <h3 className="text-sm font-bold text-gray-800 mb-3">📂 セクション別設定</h3>
+              <h3 className="text-xs font-bold text-gray-800 mb-2">📂 セクション別設定</h3>
               {sections.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
                   セクションがありません
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {/* カテゴリごとにグループ化 */}
                   {(() => {
                     // カテゴリでグループ化
@@ -430,29 +430,32 @@ export default function Workbooks() {
                       })
 
                       return (
-                        <div key={category} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                          <h4 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-300">
+                        <div key={category} className="border border-gray-200 rounded p-1.5 bg-gray-50">
+                          <h4 className="text-xs font-bold text-gray-700 mb-1 pb-1 border-b border-gray-300">
                             {category}
                           </h4>
-                          <div className="space-y-2">
+                          <div className="space-y-1 mt-1">
                             {sortedSections.map((section) => (
                               <div
                                 key={section.sectionKey}
-                                className="bg-white border border-gray-200 rounded-lg p-3"
+                                className="bg-white border border-gray-200 rounded p-2"
                               >
-                                {/* セクション名と正答率 */}
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-800">
+                                {/* 1行目: セクション名・正答率・標準タイム・除外 */}
+                                <div className="flex items-center gap-2">
+                                  {/* セクション情報 */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-gray-800 truncate">
                                       {section.title}
                                     </p>
-                                    <p className="text-xs text-gray-500">
-                                      {section.problems.length}問 / 学習済み {section.studiedCount}問
+                                    <p className="text-[10px] text-gray-500">
+                                      {section.problems.length}問 / 済{section.studiedCount}
                                     </p>
                                   </div>
+
+                                  {/* 正答率 */}
                                   {section.accuracy !== null && (
                                     <span
-                                      className={`text-xs px-2 py-1 rounded font-medium ${
+                                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
                                         section.accuracy >= 80
                                           ? 'bg-green-100 text-green-700'
                                           : section.accuracy >= 50
@@ -463,53 +466,44 @@ export default function Workbooks() {
                                       {section.accuracy}%
                                     </span>
                                   )}
-                                </div>
 
-                                {/* 標準時間入力と復習除外 */}
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600 block mb-1">
-                                      📏 標準タイム
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                          updateSectionStandardTime(section.sectionKey, currentTime - 10)
-                                        }}
-                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                                      >
-                                        -10秒
-                                      </button>
-                                      <div className="flex-1 text-center">
-                                        <span className="text-sm font-semibold text-gray-700">
-                                          {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                          updateSectionStandardTime(section.sectionKey, currentTime + 10)
-                                        }}
-                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                                      >
-                                        +10秒
-                                      </button>
-                                    </div>
+                                  {/* 標準タイム調整 */}
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                        updateSectionStandardTime(section.sectionKey, currentTime - 10)
+                                      }}
+                                      className="px-1.5 py-0.5 text-[10px] bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                    >
+                                      -10
+                                    </button>
+                                    <span className="text-xs font-semibold text-gray-700 min-w-[2.5rem] text-center">
+                                      {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                        updateSectionStandardTime(section.sectionKey, currentTime + 10)
+                                      }}
+                                      className="px-1.5 py-0.5 text-[10px] bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                    >
+                                      +10
+                                    </button>
                                   </div>
-                                  <div>
-                                    <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                      <input
-                                        type="checkbox"
-                                        checked={excludedSections.includes(section.sectionKey)}
-                                        onChange={() => toggleSectionExclusion(section.sectionKey)}
-                                        className="w-4 h-4"
-                                      />
-                                      <span className="text-xs text-gray-700">復習から除外</span>
-                                    </label>
-                                  </div>
+
+                                  {/* 除外チェックボックス */}
+                                  <label className="flex items-center gap-1 cursor-pointer px-2 py-1 bg-gray-50 rounded hover:bg-gray-100 transition-colors whitespace-nowrap">
+                                    <input
+                                      type="checkbox"
+                                      checked={excludedSections.includes(section.sectionKey)}
+                                      onChange={() => toggleSectionExclusion(section.sectionKey)}
+                                      className="w-3 h-3"
+                                    />
+                                    <span className="text-[10px] text-gray-700">除外</span>
+                                  </label>
                                 </div>
                               </div>
                             ))}
@@ -523,15 +517,16 @@ export default function Workbooks() {
             </div>
 
             {/* 保存ボタン */}
-            <div className="flex gap-3 justify-end pt-4 border-t">
+            <div className="flex gap-2 justify-end pt-2 border-t">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => setIsSettingsModalOpen(false)}
+                size="sm"
               >
                 キャンセル
               </Button>
-              <Button type="button" onClick={handleSaveSettings}>
+              <Button type="button" onClick={handleSaveSettings} size="sm">
                 保存
               </Button>
             </div>
