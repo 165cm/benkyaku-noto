@@ -93,6 +93,9 @@ export default function Study() {
   // 次の問題の情報（ページ数表示用）
   const [nextProblemInfo, setNextProblemInfo] = useState<{ problemNumber: string; page?: number } | null>(null)
 
+  // 次の問題のプリフェッチ用state
+  const [nextProblemId, setNextProblemId] = useState<string | null>(null)
+
   // よく使うタグのプリセット（明確な分類）
   const COMMON_TAGS = [
     { name: '解法を知らない', emoji: '🎓', help: '解き方を全く知らない、初めて見た問題 → 解説・教科書を読む' },
@@ -158,6 +161,37 @@ export default function Study() {
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [id])
+
+  // 次の問題を事前読み込み（画面遷移をスムーズにする）
+  useEffect(() => {
+    if (phase === 'record' && nextProblemId) {
+      // 次の問題のデータをプリフェッチ
+      const prefetchNextProblem = async () => {
+        try {
+          const nextProblem = await getProblem(nextProblemId)
+          if (nextProblem) {
+            const nextWorkbook = await getWorkbook(nextProblem.workbookId)
+            // PDF URLも事前取得
+            if (nextWorkbook?.pdfFileName) {
+              await getPDFUrl(nextProblem.workbookId, nextWorkbook.pdfFileName)
+            }
+            // 学習記録も事前取得
+            await getStudyRecords(nextProblemId)
+            // AI解説の存在チェックも事前実行
+            if (nextProblem.category && nextProblem.sectionTitle) {
+              await getExplanationBySectionKey(`${nextProblem.category}-${nextProblem.sectionTitle}`)
+            }
+            // 画像解説も事前取得
+            await getImageBasedExplanationsByProblemId(nextProblemId)
+          }
+        } catch (error) {
+          console.log('次の問題のプリフェッチ中にエラー:', error)
+          // エラーは無視（プリフェッチ失敗しても画面遷移時に再取得される）
+        }
+      }
+      prefetchNextProblem()
+    }
+  }, [phase, nextProblemId])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -436,8 +470,8 @@ export default function Study() {
     await loadData()
   }
 
-  // 次の問題の情報を取得（ページ数表示用）
-  const getNextProblemInfo = async (): Promise<{ problemNumber: string; page?: number } | null> => {
+  // 次の問題の情報を取得（ページ数表示用＋プリフェッチ用）
+  const getNextProblemInfo = async (): Promise<{ id: string; problemNumber: string; page?: number } | null> => {
     if (!problem) return null
 
     const currentProblemId = problem.id
@@ -447,7 +481,7 @@ export default function Study() {
     if (isWeakMode) {
       const nextProblem = await getNextWeakProblem(currentProblemId)
       if (nextProblem) {
-        return { problemNumber: nextProblem.problemNumber, page: nextProblem.page }
+        return { id: nextProblem.id, problemNumber: nextProblem.problemNumber, page: nextProblem.page }
       }
       return null
     }
@@ -459,7 +493,7 @@ export default function Study() {
       if (nextProblemId) {
         const nextProblem = await db.problems.get(nextProblemId)
         if (nextProblem) {
-          return { problemNumber: nextProblem.problemNumber, page: nextProblem.page }
+          return { id: nextProblem.id, problemNumber: nextProblem.problemNumber, page: nextProblem.page }
         }
       }
       return null
@@ -522,7 +556,7 @@ export default function Study() {
         .toArray()
 
       if (records.length === 0) {
-        return { problemNumber: p.problemNumber, page: p.page }
+        return { id: p.id, problemNumber: p.problemNumber, page: p.page }
       }
     }
 
@@ -770,6 +804,10 @@ export default function Study() {
       // 次の問題の情報を取得
       const nextInfo = await getNextProblemInfo()
       setNextProblemInfo(nextInfo)
+      // 次の問題のIDをセット（プリフェッチ用）
+      if (nextInfo) {
+        setNextProblemId(nextInfo.id)
+      }
 
       // 自動遷移が有効な場合のみ3秒後に自動遷移
       if (autoAdvanceEnabled) {
@@ -830,7 +868,7 @@ export default function Study() {
   const hasPDF = false
 
   return (
-    <div className={`mx-auto px-2 sm:px-4 max-w-2xl`}>
+    <div className={`mx-auto px-2 sm:px-4 max-w-2xl pb-24`}>
       <div>
         {/* 問題情報エリア */}
         <div>
@@ -901,26 +939,15 @@ export default function Study() {
 
             {/* AI解説リンク */}
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              {problem.category && problem.sectionTitle && (
-                hasExplanation ? (
-                  <button
-                    onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
-                    title="AI解説を見る"
-                  >
-                    <BookOpen size={16} />
-                    <span>AI解説を見る</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => navigate('/explanations')}
-                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                    title="AI解説ライブラリで解説を作成"
-                  >
-                    <BookOpen size={12} />
-                    <span>AI解説を作る</span>
-                  </button>
-                )
+              {problem.category && problem.sectionTitle && hasExplanation && (
+                <button
+                  onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
+                  title="AI解説を見る"
+                >
+                  <BookOpen size={16} />
+                  <span>AI解説を見る</span>
+                </button>
               )}
 
               {/* 画像ベース解説ボタン */}
@@ -962,35 +989,32 @@ export default function Study() {
           {/* メインタイマー：現在の問題を解く時間 */}
           {spartaModeEnabled && targetTime !== null ? (
             // スパルタモード：カウントダウン形式
-            <div className={`rounded-xl p-6 mb-3 text-center shadow-lg transition-all ${
+            <div className={`rounded-lg p-4 mb-3 text-center transition-all ${
               elapsedTime > targetTime
                 ? 'bg-gradient-to-r from-red-600 to-orange-600 animate-pulse'
                 : 'bg-gradient-to-r from-indigo-600 to-purple-600'
             }`}>
-              <p className="text-sm text-white/90 mb-2 font-medium">
-                🔥 スパルタモード：目標時間まで
+              <p className="text-xs text-white/90 mb-1 font-medium">
+                🔥 スパルタモード
               </p>
-              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+              <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
                 {formatTime(targetTime - elapsedTime)}
               </p>
               {elapsedTime > targetTime ? (
                 <p className="text-xs text-white/90 font-bold">
-                  ⚠️ 目標時間を超過しています！
+                  ⚠️ 目標超過
                 </p>
               ) : (
                 <p className="text-xs text-white/80">
-                  {spartaModeType === 'personal'
-                    ? '💪 自己ベストを目指しましょう！'
-                    : '📏 標準時間内で解きましょう！'
-                  }（目標: {formatTime(targetTime)}）
+                  目標: {formatTime(targetTime)}
                 </p>
               )}
             </div>
           ) : (
             // 通常モード：カウントアップ形式
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-3 text-center shadow-lg">
-              <p className="text-sm text-white/90 mb-2 font-medium">⏱️ この問題を解いている時間</p>
-              <p className="text-6xl font-bold text-white mb-3 font-mono tracking-tight">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-4 mb-3 text-center">
+              <p className="text-xs text-white/90 mb-1 font-medium">⏱️ 解答時間</p>
+              <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
                 {formatTime(elapsedTime)}
               </p>
               {timerMode === 'solving' && (
@@ -1000,7 +1024,7 @@ export default function Study() {
               )}
               {timerMode === 'explanation' && (
                 <p className="text-xs text-white/80">
-                  📖 解説を読んでいます...（{formatTime(explanationTime)}）
+                  📖 解説中（{formatTime(explanationTime)}）
                 </p>
               )}
               {timerMode === 'paused' && (
@@ -1032,18 +1056,18 @@ export default function Study() {
           </div>
 
           {/* スパルタモード設定 */}
-          <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-            <label className="flex items-center justify-between cursor-pointer mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🔥</span>
+          <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
+            <label className="flex items-center justify-between cursor-pointer mb-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-base">🔥</span>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">スパルタモード</p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs font-medium text-gray-800">スパルタモード</p>
+                  <p className="text-[10px] text-gray-600">
                     {spartaModeEnabled
                       ? targetTime !== null
-                        ? `目標時間: ${formatTime(targetTime)}`
-                        : '目標時間未設定'
-                      : 'カウントダウン形式で時間制限'}
+                        ? `目標: ${formatTime(targetTime)}`
+                        : '未設定'
+                      : '時間制限'}
                   </p>
                 </div>
               </div>
@@ -1051,90 +1075,75 @@ export default function Study() {
                 type="checkbox"
                 checked={spartaModeEnabled}
                 onChange={toggleSpartaMode}
-                className="w-5 h-5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+                className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
               />
             </label>
 
             {spartaModeEnabled && (
-              <div className="space-y-2 border-t border-orange-200 pt-3">
+              <div className="space-y-1.5 border-t border-orange-200 pt-2">
                 {/* モード選択 */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
                     onClick={() => changeSpartaModeType('standard')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                       spartaModeType === 'standard'
-                        ? 'bg-orange-600 text-white shadow-md'
+                        ? 'bg-orange-600 text-white'
                         : 'bg-white text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    📏 標準タイム
+                    📏 標準
                   </button>
                   <button
                     onClick={() => changeSpartaModeType('personal')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                       spartaModeType === 'personal'
-                        ? 'bg-orange-600 text-white shadow-md'
+                        ? 'bg-orange-600 text-white'
                         : 'bg-white text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    ⚡ 自己ベスト
+                    ⚡ 自己
                   </button>
                 </div>
 
                 {/* 標準タイムモードの説明と設定 */}
-                {spartaModeType === 'standard' && (
-                  <div className="text-xs text-gray-600 space-y-2">
-                    <p>教材やセクション単位で標準時間を設定できます（推奨）</p>
-                    {targetTime === null && (
-                      <div className="bg-white rounded-lg p-2 border border-orange-300">
-                        <p className="text-orange-800 font-medium mb-2">
-                          ⚠️ 標準時間が未設定です
-                        </p>
-                        {!showStandardTimeInput ? (
+                {spartaModeType === 'standard' && targetTime === null && (
+                  <div className="text-[10px] text-gray-600">
+                    {!showStandardTimeInput ? (
+                      <button
+                        onClick={() => setShowStandardTimeInput(true)}
+                        className="text-[10px] bg-orange-600 text-white px-2 py-1 rounded hover:bg-orange-700 w-full"
+                      >
+                        標準時間を設定
+                      </button>
+                    ) : (
+                      <div className="space-y-1">
+                        <input
+                          type="text"
+                          value={standardTimeInput}
+                          onChange={(e) => setStandardTimeInput(e.target.value)}
+                          placeholder="例: 3:00"
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                        />
+                        <div className="flex gap-1">
                           <button
-                            onClick={() => setShowStandardTimeInput(true)}
-                            className="text-xs bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700"
+                            onClick={handleSetStandardTime}
+                            className="flex-1 text-[10px] bg-orange-600 text-white px-2 py-1 rounded hover:bg-orange-700"
                           >
-                            標準時間を設定
+                            保存
                           </button>
-                        ) : (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={standardTimeInput}
-                              onChange={(e) => setStandardTimeInput(e.target.value)}
-                              placeholder="例: 3:00"
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleSetStandardTime}
-                                className="flex-1 text-xs bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700"
-                              >
-                                保存
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setShowStandardTimeInput(false)
-                                  setStandardTimeInput('')
-                                }}
-                                className="flex-1 text-xs bg-gray-300 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-400"
-                              >
-                                キャンセル
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                          <button
+                            onClick={() => {
+                              setShowStandardTimeInput(false)
+                              setStandardTimeInput('')
+                            }}
+                            className="flex-1 text-[10px] bg-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-400"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* 個人記録モードの説明 */}
-                {spartaModeType === 'personal' && (
-                  <p className="text-xs text-gray-600">
-                    あなたの過去の最速記録を目標にします（上級者向け）
-                  </p>
                 )}
               </div>
             )}
