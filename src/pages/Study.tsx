@@ -86,6 +86,15 @@ export default function Study() {
   // スパルタモードの目標時間（秒）
   const [targetTime, setTargetTime] = useState<number | null>(null)
 
+  // 時計表示の設定（localStorage）
+  const [showClock, setShowClock] = useState(() => {
+    const saved = localStorage.getItem('showClock')
+    return saved === 'true'
+  })
+
+  // 現在時刻のstate
+  const [currentTime, setCurrentTime] = useState(new Date())
+
   // 標準時間の設定UI表示フラグ
   const [showStandardTimeInput, setShowStandardTimeInput] = useState(false)
   const [standardTimeInput, setStandardTimeInput] = useState('')
@@ -192,6 +201,16 @@ export default function Study() {
       prefetchNextProblem()
     }
   }, [phase, nextProblemId])
+
+  // 時計更新用タイマー
+  useEffect(() => {
+    if (showClock) {
+      const clockTimer = setInterval(() => {
+        setCurrentTime(new Date())
+      }, 1000)
+      return () => clearInterval(clockTimer)
+    }
+  }, [showClock])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -417,6 +436,13 @@ export default function Study() {
     const newValue = !autoAdvanceEnabled
     setAutoAdvanceEnabled(newValue)
     localStorage.setItem('autoAdvanceEnabled', String(newValue))
+  }
+
+  // 時計表示をトグル
+  const toggleShowClock = () => {
+    const newValue = !showClock
+    setShowClock(newValue)
+    localStorage.setItem('showClock', String(newValue))
   }
 
   // スパルタモード設定をトグル
@@ -974,6 +1000,99 @@ export default function Study() {
                 </button>
               )}
             </div>
+
+            {/* タイマー設定（コンパクト） */}
+            <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
+              {/* スパルタモード */}
+              <label className="inline-flex items-center gap-1.5 cursor-pointer bg-orange-50 px-2 py-1 rounded border border-orange-200">
+                <input
+                  type="checkbox"
+                  checked={spartaModeEnabled}
+                  onChange={toggleSpartaMode}
+                  className="w-3 h-3 text-orange-600 rounded"
+                />
+                <span className="text-[11px] font-medium text-orange-900">🔥 スパルタ</span>
+                {spartaModeEnabled && targetTime !== null && (
+                  <span className="text-[10px] text-orange-700">({formatTime(targetTime)})</span>
+                )}
+              </label>
+
+              {/* スパルタモード設定：有効時のみ表示 */}
+              {spartaModeEnabled && (
+                <>
+                  <button
+                    onClick={() => changeSpartaModeType('standard')}
+                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                      spartaModeType === 'standard'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    📏 標準
+                  </button>
+                  <button
+                    onClick={() => changeSpartaModeType('personal')}
+                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                      spartaModeType === 'personal'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    ⚡ 自己
+                  </button>
+                  {spartaModeType === 'standard' && targetTime === null && (
+                    <button
+                      onClick={() => setShowStandardTimeInput(!showStandardTimeInput)}
+                      className="px-2 py-1 rounded text-[10px] bg-orange-100 text-orange-800 hover:bg-orange-200"
+                    >
+                      ⚙️ 設定
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* 時計表示トグル */}
+              <label className="inline-flex items-center gap-1.5 cursor-pointer bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                <input
+                  type="checkbox"
+                  checked={showClock}
+                  onChange={toggleShowClock}
+                  className="w-3 h-3 text-blue-600 rounded"
+                />
+                <span className="text-[11px] font-medium text-blue-900">🕐 時計</span>
+              </label>
+            </div>
+
+            {/* 標準時間設定入力（展開時のみ） */}
+            {showStandardTimeInput && spartaModeEnabled && spartaModeType === 'standard' && (
+              <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
+                <p className="text-[10px] text-gray-600 mb-1">標準時間を設定</p>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={standardTimeInput}
+                    onChange={(e) => setStandardTimeInput(e.target.value)}
+                    placeholder="例: 3:00"
+                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                  />
+                  <button
+                    onClick={handleSetStandardTime}
+                    className="px-2 py-1 text-[10px] bg-orange-600 text-white rounded hover:bg-orange-700"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowStandardTimeInput(false)
+                      setStandardTimeInput('')
+                    }}
+                    className="px-2 py-1 text-[10px] bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           {/* ページ数を大きく表示 */}
           {problem.page && (
@@ -1035,8 +1154,8 @@ export default function Study() {
             </div>
           )}
 
-          {/* サブ情報：今日の累計・解説時間・セッション時間 */}
-          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+          {/* サブ情報：今日の累計・解説時間・時計 */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-gray-600 mb-1">📊 今日の累計</p>
               <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
@@ -1055,99 +1174,14 @@ export default function Study() {
             </div>
           </div>
 
-          {/* スパルタモード設定 */}
-          <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
-            <label className="flex items-center justify-between cursor-pointer mb-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-base">🔥</span>
-                <div>
-                  <p className="text-xs font-medium text-gray-800">スパルタモード</p>
-                  <p className="text-[10px] text-gray-600">
-                    {spartaModeEnabled
-                      ? targetTime !== null
-                        ? `目標: ${formatTime(targetTime)}`
-                        : '未設定'
-                      : '時間制限'}
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={spartaModeEnabled}
-                onChange={toggleSpartaMode}
-                className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
-              />
-            </label>
-
-            {spartaModeEnabled && (
-              <div className="space-y-1.5 border-t border-orange-200 pt-2">
-                {/* モード選択 */}
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => changeSpartaModeType('standard')}
-                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                      spartaModeType === 'standard'
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    📏 標準
-                  </button>
-                  <button
-                    onClick={() => changeSpartaModeType('personal')}
-                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                      spartaModeType === 'personal'
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    ⚡ 自己
-                  </button>
-                </div>
-
-                {/* 標準タイムモードの説明と設定 */}
-                {spartaModeType === 'standard' && targetTime === null && (
-                  <div className="text-[10px] text-gray-600">
-                    {!showStandardTimeInput ? (
-                      <button
-                        onClick={() => setShowStandardTimeInput(true)}
-                        className="text-[10px] bg-orange-600 text-white px-2 py-1 rounded hover:bg-orange-700 w-full"
-                      >
-                        標準時間を設定
-                      </button>
-                    ) : (
-                      <div className="space-y-1">
-                        <input
-                          type="text"
-                          value={standardTimeInput}
-                          onChange={(e) => setStandardTimeInput(e.target.value)}
-                          placeholder="例: 3:00"
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                        />
-                        <div className="flex gap-1">
-                          <button
-                            onClick={handleSetStandardTime}
-                            className="flex-1 text-[10px] bg-orange-600 text-white px-2 py-1 rounded hover:bg-orange-700"
-                          >
-                            保存
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowStandardTimeInput(false)
-                              setStandardTimeInput('')
-                            }}
-                            className="flex-1 text-[10px] bg-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-400"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {/* 時計表示 */}
+          {showClock && (
+            <div className="mt-2 text-center">
+              <p className="text-2xl font-mono font-bold text-gray-700">
+                {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
