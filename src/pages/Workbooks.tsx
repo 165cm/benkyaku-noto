@@ -373,85 +373,151 @@ export default function Workbooks() {
                   セクションがありません
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {sections.map((section) => (
-                    <div
-                      key={section.sectionKey}
-                      className="bg-white border border-gray-200 rounded-lg p-3"
-                    >
-                      {/* セクション名と正答率 */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-800">
-                            {section.category} - {section.title}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {section.problems.length}問 / 学習済み {section.studiedCount}問
-                          </p>
-                        </div>
-                        {section.accuracy !== null && (
-                          <span
-                            className={`text-xs px-2 py-1 rounded font-medium ${
-                              section.accuracy >= 80
-                                ? 'bg-green-100 text-green-700'
-                                : section.accuracy >= 50
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
-                          >
-                            {section.accuracy}%
-                          </span>
-                        )}
-                      </div>
+                <div className="space-y-4">
+                  {/* カテゴリごとにグループ化 */}
+                  {(() => {
+                    // カテゴリでグループ化
+                    const categoryMap = new Map<string, typeof sections>()
+                    sections.forEach(section => {
+                      const existing = categoryMap.get(section.category) || []
+                      existing.push(section)
+                      categoryMap.set(section.category, existing)
+                    })
 
-                      {/* 標準時間入力と復習除外 */}
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-xs text-gray-600 block mb-1">
-                            📏 標準タイム
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                updateSectionStandardTime(section.sectionKey, currentTime - 10)
-                              }}
-                              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                            >
-                              -10秒
-                            </button>
-                            <div className="flex-1 text-center">
-                              <span className="text-sm font-semibold text-gray-700">
-                                {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                updateSectionStandardTime(section.sectionKey, currentTime + 10)
-                              }}
-                              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                            >
-                              +10秒
-                            </button>
+                    // カテゴリを問題番号順でソート
+                    const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => {
+                      // 各カテゴリの最初の問題を取得してソート
+                      const sectionsA = categoryMap.get(a) || []
+                      const sectionsB = categoryMap.get(b) || []
+
+                      if (sectionsA.length === 0 || sectionsB.length === 0) return 0
+
+                      const firstProblemA = sectionsA[0].problems[0]
+                      const firstProblemB = sectionsB[0].problems[0]
+
+                      if (!firstProblemA || !firstProblemB) return 0
+
+                      // ページ番号でソート
+                      if (firstProblemA.page !== undefined && firstProblemB.page !== undefined) {
+                        if (firstProblemA.page !== firstProblemB.page) {
+                          return firstProblemA.page - firstProblemB.page
+                        }
+                      }
+
+                      // 問題番号で比較
+                      return firstProblemA.problemNumber.localeCompare(firstProblemB.problemNumber)
+                    })
+
+                    return sortedCategories.map(category => {
+                      const categorySections = categoryMap.get(category) || []
+
+                      // セクションを問題番号順でソート
+                      const sortedSections = [...categorySections].sort((a, b) => {
+                        const firstProblemA = a.problems[0]
+                        const firstProblemB = b.problems[0]
+
+                        if (!firstProblemA || !firstProblemB) return 0
+
+                        // ページ番号でソート
+                        if (firstProblemA.page !== undefined && firstProblemB.page !== undefined) {
+                          if (firstProblemA.page !== firstProblemB.page) {
+                            return firstProblemA.page - firstProblemB.page
+                          }
+                        }
+
+                        // 問題番号で比較
+                        return firstProblemA.problemNumber.localeCompare(firstProblemB.problemNumber)
+                      })
+
+                      return (
+                        <div key={category} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                          <h4 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-300">
+                            {category}
+                          </h4>
+                          <div className="space-y-2">
+                            {sortedSections.map((section) => (
+                              <div
+                                key={section.sectionKey}
+                                className="bg-white border border-gray-200 rounded-lg p-3"
+                              >
+                                {/* セクション名と正答率 */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-800">
+                                      {section.title}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {section.problems.length}問 / 学習済み {section.studiedCount}問
+                                    </p>
+                                  </div>
+                                  {section.accuracy !== null && (
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded font-medium ${
+                                        section.accuracy >= 80
+                                          ? 'bg-green-100 text-green-700'
+                                          : section.accuracy >= 50
+                                          ? 'bg-yellow-100 text-yellow-700'
+                                          : 'bg-red-100 text-red-700'
+                                      }`}
+                                    >
+                                      {section.accuracy}%
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* 標準時間入力と復習除外 */}
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs text-gray-600 block mb-1">
+                                      📏 標準タイム
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                          updateSectionStandardTime(section.sectionKey, currentTime - 10)
+                                        }}
+                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                      >
+                                        -10秒
+                                      </button>
+                                      <div className="flex-1 text-center">
+                                        <span className="text-sm font-semibold text-gray-700">
+                                          {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                          updateSectionStandardTime(section.sectionKey, currentTime + 10)
+                                        }}
+                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                      >
+                                        +10秒
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={excludedSections.includes(section.sectionKey)}
+                                        onChange={() => toggleSectionExclusion(section.sectionKey)}
+                                        className="w-4 h-4"
+                                      />
+                                      <span className="text-xs text-gray-700">復習から除外</span>
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div>
-                          <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={excludedSections.includes(section.sectionKey)}
-                              onChange={() => toggleSectionExclusion(section.sectionKey)}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-xs text-gray-700">復習から除外</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      )
+                    })
+                  })()}
                 </div>
               )}
             </div>
