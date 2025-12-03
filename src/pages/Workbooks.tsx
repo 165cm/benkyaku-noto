@@ -5,7 +5,7 @@ import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import { getWorkbooks, addWorkbook, deleteWorkbook, getProblems, updateWorkbook } from '@/lib/db'
 import { calculateRecentAccuracyForProblems, getWorkbookSections, type SectionStats } from '@/lib/review'
-import { getExcludedSections, saveExcludedSections, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
+import { getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
 import type { Workbook } from '@/types'
 
 export default function Workbooks() {
@@ -22,7 +22,6 @@ export default function Workbooks() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [settingsWorkbook, setSettingsWorkbook] = useState<Workbook | null>(null)
   const [sections, setSections] = useState<SectionStats[]>([])
-  const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [workbookStandardTime, setWorkbookStandardTime] = useState(180) // 初期値3分（180秒）
   const [sectionStandardTimes, setSectionStandardTimes] = useState<Map<string, number>>(new Map())
 
@@ -90,9 +89,6 @@ export default function Workbooks() {
     const sectionList = await getWorkbookSections(workbook.id)
     setSections(sectionList)
 
-    // 除外設定を読み込み
-    setExcludedSections(getExcludedSections())
-
     // 問題集の標準時間を読み込み（デフォルトは3分=180秒）
     setWorkbookStandardTime(workbook.standardTime || 180)
 
@@ -126,24 +122,12 @@ export default function Workbooks() {
       }
     }
 
-    // 除外設定を保存
-    saveExcludedSections(excludedSections)
-
     // モーダルを閉じる
     setIsSettingsModalOpen(false)
     setSettingsWorkbook(null)
 
     // 問題集一覧を再読み込み
     loadWorkbooks()
-  }
-
-  // セクション除外をトグル
-  const toggleSectionExclusion = (sectionKey: string) => {
-    if (excludedSections.includes(sectionKey)) {
-      setExcludedSections(excludedSections.filter(s => s !== sectionKey))
-    } else {
-      setExcludedSections([...excludedSections, sectionKey])
-    }
   }
 
   // セクション標準時間を更新
@@ -465,50 +449,37 @@ export default function Workbooks() {
                                   )}
                                 </div>
 
-                                {/* 標準時間入力と復習除外 */}
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600 block mb-1">
-                                      📏 標準タイム
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                          updateSectionStandardTime(section.sectionKey, currentTime - 10)
-                                        }}
-                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                                      >
-                                        -10秒
-                                      </button>
-                                      <div className="flex-1 text-center">
-                                        <span className="text-sm font-semibold text-gray-700">
-                                          {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
-                                          updateSectionStandardTime(section.sectionKey, currentTime + 10)
-                                        }}
-                                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
-                                      >
-                                        +10秒
-                                      </button>
+                                {/* 標準時間入力 */}
+                                <div>
+                                  <label className="text-xs text-gray-600 block mb-1">
+                                    📏 標準タイム
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                        updateSectionStandardTime(section.sectionKey, currentTime - 10)
+                                      }}
+                                      className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                    >
+                                      -10秒
+                                    </button>
+                                    <div className="flex-1 text-center">
+                                      <span className="text-sm font-semibold text-gray-700">
+                                        {formatTime(sectionStandardTimes.get(section.sectionKey) || 0)}
+                                      </span>
                                     </div>
-                                  </div>
-                                  <div>
-                                    <label className="flex items-center gap-2 cursor-pointer w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                      <input
-                                        type="checkbox"
-                                        checked={excludedSections.includes(section.sectionKey)}
-                                        onChange={() => toggleSectionExclusion(section.sectionKey)}
-                                        className="w-4 h-4"
-                                      />
-                                      <span className="text-xs text-gray-700">復習から除外</span>
-                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentTime = sectionStandardTimes.get(section.sectionKey) || 0
+                                        updateSectionStandardTime(section.sectionKey, currentTime + 10)
+                                      }}
+                                      className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                    >
+                                      +10秒
+                                    </button>
                                   </div>
                                 </div>
                               </div>
