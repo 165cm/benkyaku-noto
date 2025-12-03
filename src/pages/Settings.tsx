@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Key, AlertCircle, CheckCircle, Trash2, Bug, Filter, ChevronDown, ChevronRight, Cloud, CloudUpload, CloudDownload, Target, Calendar } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Trash2, Bug, ChevronDown, ChevronRight, Cloud, CloudUpload, CloudDownload, Target, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Card from '@/components/Card'
@@ -10,10 +10,6 @@ import {
   getOpenAIApiKey,
   removeOpenAIApiKey,
   isUsingEnvApiKey,
-  getExcludedCategories,
-  saveExcludedCategories,
-  getExcludedSections,
-  saveExcludedSections,
   getLastBackupTime,
   getLastRestoreTime,
   getWeekStartDay,
@@ -28,27 +24,8 @@ import {
   type WeeklyGoals,
   type DayOfWeek
 } from '@/lib/studyGoals'
-import { db } from '@/lib/db'
 import { backupToCloud, restoreFromCloud, calculateBackupSize, type SyncProgress } from '@/lib/sync'
 import { useAuthStore } from '@/store/authStore'
-import type { Problem, Workbook } from '@/types'
-
-interface SectionInfo {
-  category: string
-  sectionTitle: string
-  sectionKey: string
-}
-
-interface CategoryGroup {
-  category: string
-  sections: SectionInfo[]
-}
-
-interface WorkbookGroup {
-  workbook: Workbook
-  categoryGroups: CategoryGroup[]
-}
-
 export default function Settings() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -58,13 +35,6 @@ export default function Settings() {
   const [saved, setSaved] = useState(false)
   const [showApiKeySection, setShowApiKeySection] = useState(false)
   const [usingEnvKey, setUsingEnvKey] = useState(false)
-
-  // 除外設定
-  const [workbookGroups, setWorkbookGroups] = useState<WorkbookGroup[]>([])
-  const [excludedCategories, setExcludedCategories] = useState<string[]>([])
-  const [excludedSections, setExcludedSections] = useState<string[]>([])
-  const [expandedWorkbooks, setExpandedWorkbooks] = useState<string[]>([])
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([])
 
   // バックアップ・復元
   const [backupSize, setBackupSize] = useState<{ totalItems: number; estimatedSizeKB: number } | null>(null)
@@ -93,131 +63,11 @@ export default function Settings() {
       setIsApiKeySet(true)
     }
 
-    // 除外設定をロード
-    setExcludedCategories(getExcludedCategories())
-    setExcludedSections(getExcludedSections())
-
-    // 問題集・カテゴリ・セクション一覧を取得
-    loadWorkbookCategorySections()
-
     // バックアップサイズと最終同期日時を取得
     calculateBackupSize().then(setBackupSize)
     setLastBackupTime(getLastBackupTime())
     setLastRestoreTime(getLastRestoreTime())
   }, [])
-
-  const loadWorkbookCategorySections = async () => {
-    const allWorkbooks = await db.workbooks.toArray()
-    const allProblems = await db.problems.toArray()
-    const activeProblems = allProblems.filter(p => !p.deletedAt && !p.parentProblemId)
-
-    const result: WorkbookGroup[] = []
-
-    for (const workbook of allWorkbooks) {
-      const workbookProblems = activeProblems.filter(p => p.workbookId === workbook.id)
-
-      // カテゴリごとにセクションをグルーピング
-      const categoryMap = new Map<string, Map<string, Problem[]>>()
-
-      workbookProblems.forEach((problem: Problem) => {
-        const category = problem.category || '未分類'
-        const sectionTitle = problem.sectionTitle || '問題'
-
-        if (!categoryMap.has(category)) {
-          categoryMap.set(category, new Map())
-        }
-
-        const sections = categoryMap.get(category)!
-        if (!sections.has(sectionTitle)) {
-          sections.set(sectionTitle, [])
-        }
-        sections.get(sectionTitle)!.push(problem)
-      })
-
-      // カテゴリごとのセクション一覧を作成
-      const categoryGroups: CategoryGroup[] = []
-      categoryMap.forEach((sections, category) => {
-        const sectionInfos: SectionInfo[] = []
-
-        sections.forEach((_problems, sectionTitle) => {
-          const sectionKey = `${category}|||${sectionTitle}`
-
-          sectionInfos.push({
-            category,
-            sectionTitle,
-            sectionKey,
-          })
-        })
-
-        // セクションをsortOrder順にソート
-        sectionInfos.sort((a, b) => {
-          const problemsA = sections.get(a.sectionTitle) || []
-          const problemsB = sections.get(b.sectionTitle) || []
-          const minA = Math.min(...problemsA.map(p => p.sortOrder || 0))
-          const minB = Math.min(...problemsB.map(p => p.sortOrder || 0))
-          return minA - minB
-        })
-
-        categoryGroups.push({
-          category,
-          sections: sectionInfos
-        })
-      })
-
-      // カテゴリを名前順にソート
-      categoryGroups.sort((a, b) => a.category.localeCompare(b.category, 'ja'))
-
-      if (categoryGroups.length > 0) {
-        result.push({
-          workbook,
-          categoryGroups
-        })
-      }
-    }
-
-    // 問題集を作成日時の新しい順にソート
-    setWorkbookGroups(result.sort((a, b) =>
-      b.workbook.createdAt.getTime() - a.workbook.createdAt.getTime()
-    ))
-  }
-
-  const toggleWorkbook = (workbookId: string) => {
-    if (expandedWorkbooks.includes(workbookId)) {
-      setExpandedWorkbooks(expandedWorkbooks.filter(id => id !== workbookId))
-    } else {
-      setExpandedWorkbooks([...expandedWorkbooks, workbookId])
-    }
-  }
-
-  const toggleCategory = (categoryKey: string) => {
-    if (expandedCategories.includes(categoryKey)) {
-      setExpandedCategories(expandedCategories.filter(c => c !== categoryKey))
-    } else {
-      setExpandedCategories([...expandedCategories, categoryKey])
-    }
-  }
-
-  const toggleExcludeCategory = (category: string) => {
-    let newExcluded: string[]
-    if (excludedCategories.includes(category)) {
-      newExcluded = excludedCategories.filter(c => c !== category)
-    } else {
-      newExcluded = [...excludedCategories, category]
-    }
-    setExcludedCategories(newExcluded)
-    saveExcludedCategories(newExcluded)
-  }
-
-  const toggleExcludeSection = (sectionKey: string) => {
-    let newExcluded: string[]
-    if (excludedSections.includes(sectionKey)) {
-      newExcluded = excludedSections.filter(s => s !== sectionKey)
-    } else {
-      newExcluded = [...excludedSections, sectionKey]
-    }
-    setExcludedSections(newExcluded)
-    saveExcludedSections(newExcluded)
-  }
 
   const handleSave = () => {
     if (apiKey.trim()) {
@@ -533,126 +383,6 @@ export default function Settings() {
               <p className="text-xs text-gray-500 mt-2">
                 <strong>ログイン</strong>が必要です
               </p>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* 復習除外設定 - 使用頻度が高い */}
-      <Card className="mb-4">
-        <div className="flex items-start gap-2">
-          <Filter className="text-gray-600 mt-0.5 flex-shrink-0" size={20} />
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold mb-1">復習除外設定</h2>
-            <p className="text-xs text-gray-600 mb-3">
-              問題集ごとにカテゴリ・セクション単位で復習から除外
-            </p>
-
-            {workbookGroups.length === 0 ? (
-              <p className="text-xs text-gray-500">問題が登録されていません</p>
-            ) : (
-              <div className="space-y-2">
-                {workbookGroups.map(({ workbook, categoryGroups }) => (
-                  <div key={workbook.id} className="border border-border rounded-md overflow-hidden">
-                    {/* 問題集ヘッダー */}
-                    <button
-                      onClick={() => toggleWorkbook(workbook.id)}
-                      className="w-full flex items-center gap-2 p-2 bg-gray-100 hover:bg-gray-150 transition-colors"
-                    >
-                      {expandedWorkbooks.includes(workbook.id) ? (
-                        <ChevronDown size={16} className="flex-shrink-0 text-gray-500" />
-                      ) : (
-                        <ChevronRight size={16} className="flex-shrink-0 text-gray-500" />
-                      )}
-                      <span className="text-sm font-medium text-gray-800 truncate flex-1 text-left">
-                        {workbook.title}
-                      </span>
-                      <span className="text-xs text-gray-500 flex-shrink-0">
-                        {categoryGroups.reduce((sum, cg) => sum + cg.sections.length, 0)}個
-                      </span>
-                    </button>
-
-                    {/* カテゴリ一覧 */}
-                    {expandedWorkbooks.includes(workbook.id) && (
-                      <div className="bg-white">
-                        {categoryGroups.map(({ category, sections }) => {
-                          const categoryKey = `${workbook.id}-${category}`
-                          return (
-                            <div key={categoryKey} className="border-t border-gray-200">
-                              <div className="flex items-center gap-2 p-2 bg-gray-50">
-                                <button
-                                  onClick={() => toggleCategory(categoryKey)}
-                                  className="flex items-center gap-1 text-gray-500 hover:text-gray-700"
-                                >
-                                  {expandedCategories.includes(categoryKey) ? (
-                                    <ChevronDown size={14} />
-                                  ) : (
-                                    <ChevronRight size={14} />
-                                  )}
-                                </button>
-                                <label className="flex items-center gap-2 flex-1 cursor-pointer min-w-0">
-                                  <input
-                                    type="checkbox"
-                                    checked={excludedCategories.includes(category)}
-                                    onChange={() => toggleExcludeCategory(category)}
-                                    className="w-3.5 h-3.5 text-primary rounded flex-shrink-0"
-                                  />
-                                  <span className="text-xs font-medium truncate">{category}</span>
-                                  {excludedCategories.includes(category) && (
-                                    <span className="text-xs text-error flex-shrink-0">(除外)</span>
-                                  )}
-                                </label>
-                              </div>
-
-                              {expandedCategories.includes(categoryKey) && (
-                                <div className="p-2 space-y-1 bg-white">
-                                  {sections.map(section => {
-                                    const isCategoryExcluded = excludedCategories.includes(category)
-                                    return (
-                                      <label
-                                        key={section.sectionKey}
-                                        className={`flex items-center gap-2 ml-4 cursor-pointer ${
-                                          isCategoryExcluded ? 'opacity-50' : ''
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={excludedSections.includes(section.sectionKey)}
-                                          onChange={() => toggleExcludeSection(section.sectionKey)}
-                                          disabled={isCategoryExcluded}
-                                          className="w-3.5 h-3.5 text-primary rounded flex-shrink-0"
-                                        />
-                                        <span className="text-xs truncate flex-1">{section.sectionTitle}</span>
-                                        {excludedSections.includes(section.sectionKey) && !isCategoryExcluded && (
-                                          <span className="text-xs text-error flex-shrink-0">(除外)</span>
-                                        )}
-                                      </label>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(excludedCategories.length > 0 || excludedSections.length > 0) && (
-              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-xs text-yellow-800">
-                  {excludedCategories.length > 0 && (
-                    <span>除外カテゴリ: {excludedCategories.length}件</span>
-                  )}
-                  {excludedCategories.length > 0 && excludedSections.length > 0 && ' / '}
-                  {excludedSections.length > 0 && (
-                    <span>除外セクション: {excludedSections.length}件</span>
-                  )}
-                </p>
-              </div>
             )}
           </div>
         </div>
