@@ -1061,6 +1061,11 @@ export default function Study() {
                 />
                 <span className="text-[11px] font-medium text-blue-900">🕐 時計</span>
               </label>
+              {showClock && (
+                <span className="text-sm font-mono font-bold text-gray-700">
+                  {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
 
             {/* 標準時間設定入力（展開時のみ） */}
@@ -1154,7 +1159,7 @@ export default function Study() {
             </div>
           )}
 
-          {/* サブ情報：今日の累計・解説時間・時計 */}
+          {/* サブ情報：今日の累計・解説時間 */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-gray-600 mb-1">📊 今日の累計</p>
@@ -1173,15 +1178,6 @@ export default function Study() {
               )}
             </div>
           </div>
-
-          {/* 時計表示 */}
-          {showClock && (
-            <div className="mt-2 text-center">
-              <p className="text-2xl font-mono font-bold text-gray-700">
-                {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </p>
-            </div>
-          )}
         </div>
       </Card>
 
