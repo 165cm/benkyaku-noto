@@ -48,7 +48,6 @@ export default function Workbooks() {
   const [studyStatusFilter, setStudyStatusFilter] = useState<StudyStatusFilter>('all')
   const [accuracyFilter, setAccuracyFilter] = useState<AccuracyFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('updated')
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
 
   // 設定モーダル
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -282,21 +281,6 @@ export default function Workbooks() {
     if (accuracy >= 80) return 'bg-green-50'
     if (accuracy >= 50) return 'bg-yellow-50'
     return 'bg-red-50'
-  }
-
-  // ソート名を取得
-  const getSortLabel = (option: SortOption): string => {
-    switch (option) {
-      case 'updated': return '更新日順（新しい順）'
-      case 'updated-asc': return '更新日順（古い順）'
-      case 'accuracy': return '正解率順（高い順）'
-      case 'accuracy-asc': return '正解率順（低い順）'
-      case 'problems': return '問題数順（多い順）'
-      case 'problems-asc': return '問題数順（少ない順）'
-      case 'name': return '名前順（あいうえお）'
-      case 'name-desc': return '名前順（逆順）'
-      default: return ''
-    }
   }
 
   return (
