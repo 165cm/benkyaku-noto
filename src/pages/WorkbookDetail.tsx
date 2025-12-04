@@ -94,6 +94,12 @@ export default function WorkbookDetail() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
+  // 学習開始モーダル
+  const [isStudyStartModalOpen, setIsStudyStartModalOpen] = useState(false)
+  const [studyStartProblems, setStudyStartProblems] = useState<Problem[]>([])
+  const [resumeFromIndex, setResumeFromIndex] = useState<number>(0)
+  const [sectionTitle, setSectionTitle] = useState<string>('')
+
   // フィルタリング用state
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
   const [showTaggedOnly, setShowTaggedOnly] = useState(false)
@@ -220,7 +226,68 @@ export default function WorkbookDetail() {
     setIsModalOpen(true)
   }, [handleEdit])
 
-  const handleStartGroupStudy = async (groupProblems: Problem[]) => {
+  // 続き位置を検出する関数
+  const findResumePosition = async (problems: Problem[]): Promise<number> => {
+    if (problems.length === 0) return 0
+
+    // 各問題の最終学習日を取得
+    const studyDates = await Promise.all(
+      problems.map(async (problem) => {
+        const records = await db.studyRecords
+          .where('problemId')
+          .equals(problem.id)
+          .reverse()
+          .sortBy('studiedAt')
+
+        return records.length > 0 ? records[0].studiedAt : null
+      })
+    )
+
+    // 最も新しい学習日を見つける
+    let latestStudiedIndex = -1
+    let latestDate: Date | null = null
+
+    for (let i = 0; i < studyDates.length; i++) {
+      const date = studyDates[i]
+      if (date && (!latestDate || date > latestDate)) {
+        latestDate = date
+        latestStudiedIndex = i
+      }
+    }
+
+    // 未学習の問題がない場合（全て学習済み）は最初から
+    if (latestStudiedIndex === -1) {
+      return 0
+    }
+
+    // 最後に学習した問題の次から再開
+    // ただし、その次が未学習または学習日が古い場合のみ
+    const resumeIndex = latestStudiedIndex + 1
+
+    // 最後まで学習している場合は最初から
+    if (resumeIndex >= problems.length) {
+      return 0
+    }
+
+    // 次の問題が未学習または学習日が古い（1日以上前）かチェック
+    const nextDate = studyDates[resumeIndex]
+    if (!nextDate) {
+      // 未学習なので続きから
+      return resumeIndex
+    }
+
+    // 次の問題の学習日が最新の学習日より1日以上古い場合は続きとみなす
+    const timeDiff = latestDate!.getTime() - nextDate.getTime()
+    const oneDayInMs = 24 * 60 * 60 * 1000
+    if (timeDiff > oneDayInMs) {
+      return resumeIndex
+    }
+
+    // それ以外は最初から
+    return 0
+  }
+
+  const handleStartGroupStudy = async (groupProblems: Problem[], title?: string) => {
     if (groupProblems.length === 0) return
 
     // 親問題（箱）を除外して学習可能な問題のみを抽出
@@ -286,12 +353,35 @@ export default function WorkbookDetail() {
       return 0
     })
 
+    // 続き位置を検出
+    const resumeIdx = await findResumePosition(learnableProblems)
+
+    // 続き位置が見つかった場合はモーダルを表示
+    if (resumeIdx > 0) {
+      setStudyStartProblems(learnableProblems)
+      setResumeFromIndex(resumeIdx)
+      setSectionTitle(title || 'このセクション')
+      setIsStudyStartModalOpen(true)
+    } else {
+      // 続きがない場合は最初から開始
+      startStudy(learnableProblems, 0)
+    }
+  }
+
+  // 実際に学習を開始する関数
+  const startStudy = (problems: Problem[], startIndex: number) => {
+    // startIndex以降の問題でセッションを作成
+    const studyProblems = problems.slice(startIndex)
+
     // セクション学習用のセッションを作成（時間制限なし=999分）
-    createStudySession(999, learnableProblems)
+    createStudySession(999, studyProblems)
 
     // 最初の問題に遷移
-    const firstProblem = learnableProblems[0]
+    const firstProblem = studyProblems[0]
     navigate(`/study/${firstProblem.id}`)
+
+    // モーダルを閉じる
+    setIsStudyStartModalOpen(false)
   }
 
   const handleEditGroupWrapper = (groupKey: string, groupProblems: Problem[]) => {
@@ -1325,7 +1415,7 @@ export default function WorkbookDetail() {
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleStartGroupStudy(titleProblems)
+                                    handleStartGroupStudy(titleProblems, title)
                                   }}
                                   className="flex-shrink-0"
                                 >
@@ -1801,6 +1891,87 @@ export default function WorkbookDetail() {
             <Button type="submit">更新</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* 学習開始モーダル */}
+      <Modal
+        isOpen={isStudyStartModalOpen}
+        onClose={() => setIsStudyStartModalOpen(false)}
+        title="学習開始"
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-gray-800 mb-2">
+              <span className="font-bold">{sectionTitle}</span> の学習を開始します
+            </p>
+            <p className="text-xs text-gray-600">
+              前回の続きから学習することができます
+            </p>
+          </div>
+
+          {resumeFromIndex > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800 font-medium mb-1">
+                📍 続きから再開可能
+              </p>
+              <p className="text-xs text-yellow-700">
+                問題 {studyStartProblems[resumeFromIndex]?.problemNumber} から再開できます
+                （残り {studyStartProblems.length - resumeFromIndex}/{studyStartProblems.length}問）
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3">
+            {/* 最初から */}
+            <button
+              onClick={() => startStudy(studyStartProblems, 0)}
+              className="border-2 border-gray-300 rounded-lg p-4 hover:border-primary hover:bg-blue-50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Play size={20} className="text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-1">最初から学習</h3>
+                  <p className="text-xs text-gray-600">
+                    全 {studyStartProblems.length}問を最初から学習します
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* 続きから */}
+            {resumeFromIndex > 0 && (
+              <button
+                onClick={() => startStudy(studyStartProblems, resumeFromIndex)}
+                className="border-2 border-primary rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <RotateCcw size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-primary mb-1">続きから学習</h3>
+                    <p className="text-xs text-gray-700">
+                      問題 {studyStartProblems[resumeFromIndex]?.problemNumber} から
+                      （残り {studyStartProblems.length - resumeFromIndex}問）
+                    </p>
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsStudyStartModalOpen(false)}
+            >
+              キャンセル
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
