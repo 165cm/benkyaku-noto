@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2, Star, Tag } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import {
@@ -544,16 +544,13 @@ export default function WorkbookDetail() {
 
           // 未学習フィルタ（セクション単位）
           if (showUnstudiedOnly) {
-            const sectionHasUnstudied = titleProblems.some(p => {
-              return db.studyRecords.where('problemId').equals(p.id).count().then(count => count === 0)
-            })
             // 非同期チェックは後で実装（簡易版として、学習済みでないセクションを表示）
           }
 
           // 苦手フィルタ（セクション単位、正解率80%未満）
           if (showWeakOnly) {
             const accuracy = sectionAccuracyRates.get(titleKey)
-            if (accuracy === null || accuracy >= 80) {
+            if (accuracy === null || accuracy === undefined || accuracy >= 80) {
               continue
             }
           }
@@ -1428,10 +1425,10 @@ export default function WorkbookDetail() {
                               <div className="flex items-center gap-2 mt-2 text-xs flex-wrap" onClick={(e) => e.stopPropagation()}>
                                 {(() => {
                                   const accuracy = sectionAccuracyRates.get(titleKey)
-                                  const emoji = accuracy === null ? '⚪' :
+                                  const emoji = accuracy === null || accuracy === undefined ? '⚪' :
                                     accuracy >= 80 ? '🟢' :
                                     accuracy >= 50 ? '🟡' : '🔴'
-                                  const accuracyText = accuracy === null ? '--' : `${accuracy}%`
+                                  const accuracyText = accuracy === null || accuracy === undefined ? '--' : `${accuracy}%`
                                   return (
                                     <span className="font-medium text-gray-700">
                                       {emoji} {accuracyText}
