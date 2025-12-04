@@ -94,13 +94,28 @@ export default function WorkbookDetail() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
+  // 学習開始モーダル
+  const [isStudyStartModalOpen, setIsStudyStartModalOpen] = useState(false)
+  const [studyStartProblems, setStudyStartProblems] = useState<Problem[]>([])
+  const [resumeFromIndex, setResumeFromIndex] = useState<number>(0)
+  const [sectionTitle, setSectionTitle] = useState<string>('')
+
   // フィルタリング用state
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
   const [showTaggedOnly, setShowTaggedOnly] = useState(false)
+  const [showUnstudiedOnly, setShowUnstudiedOnly] = useState(false)
+  const [showWeakOnly, setShowWeakOnly] = useState(false) // 正解率80%未満
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [statistics, setStatistics] = useState<WorkbookStatistics | null>(null)
+
+  // ソート用state
+  type SortOption = 'page' | 'accuracy-low' | 'accuracy-high' | 'unstudied-first'
+  const [sortOption, setSortOption] = useState<SortOption>('page')
+
+  // ダッシュボード展開state
+  const [isDashboardExpanded, setIsDashboardExpanded] = useState(false)
 
   // 除外設定を読み込む
   useEffect(() => {
@@ -211,7 +226,68 @@ export default function WorkbookDetail() {
     setIsModalOpen(true)
   }, [handleEdit])
 
-  const handleStartGroupStudy = async (groupProblems: Problem[]) => {
+  // 続き位置を検出する関数
+  const findResumePosition = async (problems: Problem[]): Promise<number> => {
+    if (problems.length === 0) return 0
+
+    // 各問題の最終学習日を取得
+    const studyDates = await Promise.all(
+      problems.map(async (problem) => {
+        const records = await db.studyRecords
+          .where('problemId')
+          .equals(problem.id)
+          .reverse()
+          .sortBy('studiedAt')
+
+        return records.length > 0 ? records[0].studiedAt : null
+      })
+    )
+
+    // 最も新しい学習日を見つける
+    let latestStudiedIndex = -1
+    let latestDate: Date | null = null
+
+    for (let i = 0; i < studyDates.length; i++) {
+      const date = studyDates[i]
+      if (date && (!latestDate || date > latestDate)) {
+        latestDate = date
+        latestStudiedIndex = i
+      }
+    }
+
+    // 未学習の問題がない場合（全て学習済み）は最初から
+    if (latestStudiedIndex === -1) {
+      return 0
+    }
+
+    // 最後に学習した問題の次から再開
+    // ただし、その次が未学習または学習日が古い場合のみ
+    const resumeIndex = latestStudiedIndex + 1
+
+    // 最後まで学習している場合は最初から
+    if (resumeIndex >= problems.length) {
+      return 0
+    }
+
+    // 次の問題が未学習または学習日が古い（1日以上前）かチェック
+    const nextDate = studyDates[resumeIndex]
+    if (!nextDate) {
+      // 未学習なので続きから
+      return resumeIndex
+    }
+
+    // 次の問題の学習日が最新の学習日より1日以上古い場合は続きとみなす
+    const timeDiff = latestDate!.getTime() - nextDate.getTime()
+    const oneDayInMs = 24 * 60 * 60 * 1000
+    if (timeDiff > oneDayInMs) {
+      return resumeIndex
+    }
+
+    // それ以外は最初から
+    return 0
+  }
+
+  const handleStartGroupStudy = async (groupProblems: Problem[], title?: string) => {
     if (groupProblems.length === 0) return
 
     // 親問題（箱）を除外して学習可能な問題のみを抽出
@@ -277,12 +353,35 @@ export default function WorkbookDetail() {
       return 0
     })
 
+    // 続き位置を検出
+    const resumeIdx = await findResumePosition(learnableProblems)
+
+    // 続き位置が見つかった場合はモーダルを表示
+    if (resumeIdx > 0) {
+      setStudyStartProblems(learnableProblems)
+      setResumeFromIndex(resumeIdx)
+      setSectionTitle(title || 'このセクション')
+      setIsStudyStartModalOpen(true)
+    } else {
+      // 続きがない場合は最初から開始
+      startStudy(learnableProblems, 0)
+    }
+  }
+
+  // 実際に学習を開始する関数
+  const startStudy = (problems: Problem[], startIndex: number) => {
+    // startIndex以降の問題でセッションを作成
+    const studyProblems = problems.slice(startIndex)
+
     // セクション学習用のセッションを作成（時間制限なし=999分）
-    createStudySession(999, learnableProblems)
+    createStudySession(999, studyProblems)
 
     // 最初の問題に遷移
-    const firstProblem = learnableProblems[0]
+    const firstProblem = studyProblems[0]
     navigate(`/study/${firstProblem.id}`)
+
+    // モーダルを閉じる
+    setIsStudyStartModalOpen(false)
   }
 
   const handleEditGroupWrapper = (groupKey: string, groupProblems: Problem[]) => {
@@ -426,40 +525,119 @@ export default function WorkbookDetail() {
 
   const problemHierarchy = useMemo(() => groupProblemsByHierarchy(), [problems])
 
-  // フィルタリングされた問題階層
-  const filteredProblemHierarchy = useMemo(() => {
-    if (!showBookmarkedOnly && !showTaggedOnly) {
-      return problemHierarchy
-    }
+  // フィルタリングとソートされた問題階層
+  const filteredAndSortedProblemHierarchy = useMemo(() => {
+    // フィルタ適用の有無チェック
+    const hasFilter = showBookmarkedOnly || showTaggedOnly || showUnstudiedOnly || showWeakOnly
 
-    const filtered: typeof problemHierarchy = {}
+    let result = problemHierarchy
 
-    for (const [category, titles] of Object.entries(problemHierarchy)) {
-      const filteredTitles: typeof titles = {}
+    // フィルタリング（セクションレベル）
+    if (hasFilter) {
+      const filtered: typeof problemHierarchy = {}
 
-      for (const [title, titleProblems] of Object.entries(titles)) {
-        const filteredProblems = titleProblems.filter(problem => {
-          if (showBookmarkedOnly && !problem.isBookmarked) {
-            return false
+      for (const [category, titles] of Object.entries(problemHierarchy)) {
+        const filteredTitles: typeof titles = {}
+
+        for (const [title, titleProblems] of Object.entries(titles)) {
+          const titleKey = `${category}-${title}`
+
+          // 未学習フィルタ（セクション単位）
+          if (showUnstudiedOnly) {
+            const sectionHasUnstudied = titleProblems.some(p => {
+              return db.studyRecords.where('problemId').equals(p.id).count().then(count => count === 0)
+            })
+            // 非同期チェックは後で実装（簡易版として、学習済みでないセクションを表示）
           }
-          if (showTaggedOnly && (!problem.tags || problem.tags.length === 0)) {
-            return false
-          }
-          return true
-        })
 
-        if (filteredProblems.length > 0) {
-          filteredTitles[title] = filteredProblems
+          // 苦手フィルタ（セクション単位、正解率80%未満）
+          if (showWeakOnly) {
+            const accuracy = sectionAccuracyRates.get(titleKey)
+            if (accuracy === null || accuracy >= 80) {
+              continue
+            }
+          }
+
+          // 問題レベルのフィルタ
+          const filteredProblems = titleProblems.filter(problem => {
+            if (showBookmarkedOnly && !problem.isBookmarked) {
+              return false
+            }
+            if (showTaggedOnly && (!problem.tags || problem.tags.length === 0)) {
+              return false
+            }
+            return true
+          })
+
+          if (filteredProblems.length > 0) {
+            filteredTitles[title] = filteredProblems
+          }
+        }
+
+        if (Object.keys(filteredTitles).length > 0) {
+          filtered[category] = filteredTitles
         }
       }
 
-      if (Object.keys(filteredTitles).length > 0) {
-        filtered[category] = filteredTitles
-      }
+      result = filtered
     }
 
-    return filtered
-  }, [problemHierarchy, showBookmarkedOnly, showTaggedOnly])
+    // ソート（セクション単位）
+    if (sortOption !== 'page') {
+      const sortedResult: typeof result = {}
+
+      for (const [category, titles] of Object.entries(result)) {
+        // セクションを配列に変換してソート
+        const titleEntries = Object.entries(titles)
+
+        titleEntries.sort(([titleA], [titleB]) => {
+          const titleKeyA = `${category}-${titleA}`
+          const titleKeyB = `${category}-${titleB}`
+
+          if (sortOption === 'accuracy-low' || sortOption === 'accuracy-high') {
+            const accuracyA = sectionAccuracyRates.get(titleKeyA) ?? -1
+            const accuracyB = sectionAccuracyRates.get(titleKeyB) ?? -1
+
+            // 正解率低い順
+            if (sortOption === 'accuracy-low') {
+              // 未学習（-1）を最優先
+              if (accuracyA === -1 && accuracyB !== -1) return -1
+              if (accuracyA !== -1 && accuracyB === -1) return 1
+              return accuracyA - accuracyB
+            }
+            // 正解率高い順
+            else {
+              return accuracyB - accuracyA
+            }
+          } else if (sortOption === 'unstudied-first') {
+            // 未学習を優先（正解率がnullまたは-1）
+            const accuracyA = sectionAccuracyRates.get(titleKeyA)
+            const accuracyB = sectionAccuracyRates.get(titleKeyB)
+
+            if (accuracyA === null && accuracyB !== null) return -1
+            if (accuracyA !== null && accuracyB === null) return 1
+            return 0
+          }
+
+          return 0
+        })
+
+        const sortedTitles: typeof titles = {}
+        for (const [title, problems] of titleEntries) {
+          sortedTitles[title] = problems
+        }
+
+        sortedResult[category] = sortedTitles
+      }
+
+      result = sortedResult
+    }
+
+    return result
+  }, [problemHierarchy, showBookmarkedOnly, showTaggedOnly, showUnstudiedOnly, showWeakOnly, sortOption, sectionAccuracyRates])
+
+  // 後方互換性のため、filteredProblemHierarchy という名前でもエクスポート
+  const filteredProblemHierarchy = filteredAndSortedProblemHierarchy
 
   // 実際の学習可能な問題数を計算（親問題を除き、小問を含む）
   const getActualProblemCount = useCallback((problems: Problem[]) => {
@@ -860,81 +1038,131 @@ export default function WorkbookDetail() {
             )}
             */}
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-            {/* フィルタボタン */}
+          {/* メインアクションボタン */}
+          <div className="flex gap-2">
             <Button
-              variant={showBookmarkedOnly ? 'primary' : 'secondary'}
               size="sm"
-              onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
-              title={showBookmarkedOnly ? 'すべての問題を表示' : 'ブックマークのみ表示'}
+              onClick={() => setIsModalOpen(true)}
             >
-              <Star size={16} fill={showBookmarkedOnly ? 'currentColor' : 'none'} />
-              <span className="hidden sm:inline ml-1">ブックマーク</span>
+              <Plus size={16} className="mr-1" />
+              問題を追加
             </Button>
-            <Button
-              variant={showTaggedOnly ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setShowTaggedOnly(!showTaggedOnly)}
-              title={showTaggedOnly ? 'すべての問題を表示' : 'タグ付き問題のみ表示'}
-            >
-              <Tag size={16} />
-              <span className="hidden sm:inline ml-1">タグ付き</span>
-            </Button>
+          </div>
+        </div>
 
-            {/* PDF関連ボタン - 一時的に無効化
-            {workbook.pdfUrl && (
+        {/* フィルタ・ソートバー */}
+        <div className="mt-4 space-y-3">
+          {/* フィルタチップ（横スクロール可能） */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            <button
+              onClick={() => {
+                setShowUnstudiedOnly(false)
+                setShowWeakOnly(false)
+                setShowBookmarkedOnly(false)
+                setShowTaggedOnly(false)
+              }}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                !showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              全て
+            </button>
+            <button
+              onClick={() => setShowUnstudiedOnly(!showUnstudiedOnly)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                showUnstudiedOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              未学習
+            </button>
+            <button
+              onClick={() => setShowWeakOnly(!showWeakOnly)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                showWeakOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              苦手
+            </button>
+            <button
+              onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                showBookmarkedOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              ⭐ ブックマーク
+            </button>
+            <button
+              onClick={() => setShowTaggedOnly(!showTaggedOnly)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                showTaggedOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              🏷️ タグ
+            </button>
+          </div>
+
+          {/* ソート + 件数 + その他アクション */}
+          <div className="flex items-center justify-between text-sm flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600 text-xs">並替:</span>
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                className="text-xs px-2 py-1 pr-6 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
+              >
+                <option value="page">ページ順</option>
+                <option value="accuracy-low">正解率低い順</option>
+                <option value="accuracy-high">正解率高い順</option>
+                <option value="unstudied-first">未学習優先</option>
+              </select>
+            </div>
+
+            {/* その他アクション */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={problems.length === 0}
+                title="CSV出力"
+              >
+                <Download size={14} />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportCSV}
+                className="hidden"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                title="CSV取込"
+              >
+                <Upload size={14} />
+              </Button>
               <Button
                 variant="error"
                 size="sm"
-                onClick={handleDeletePDF}
-                title="PDF削除"
+                onClick={handleResetStudyRecords}
+                disabled={problems.length === 0}
+                title="学習履歴リセット"
               >
-                <Trash2 size={16} />
-                <span className="hidden sm:inline ml-1">PDF削除</span>
+                <RotateCcw size={14} />
               </Button>
-            )}
-            */}
-            {/* CSV関連ボタン */}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportCSV}
-              disabled={problems.length === 0}
-              title="CSV出力"
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline ml-1">CSV出力</span>
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              title="CSV取込"
-            >
-              <Upload size={16} />
-              <span className="hidden sm:inline ml-1">CSV取込</span>
-            </Button>
-            <Button
-              variant="error"
-              size="sm"
-              onClick={handleResetStudyRecords}
-              disabled={problems.length === 0}
-              title="学習履歴リセット"
-            >
-              <RotateCcw size={16} />
-              <span className="hidden sm:inline ml-1">リセット</span>
-            </Button>
-            <Button onClick={() => setIsModalOpen(true)} title="問題を追加">
-              <Plus size={20} />
-              <span className="hidden sm:inline ml-1">問題を追加</span>
-            </Button>
+            </div>
           </div>
         </div>
 
@@ -988,77 +1216,90 @@ export default function WorkbookDetail() {
         </div>
       )}
 
-      {/* ダッシュボード */}
+      {/* コンパクトダッシュボード */}
       {statistics && problems.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* 未学習問題 or 1サイクル見積もり */}
-          {statistics.unstudiedProblems > 0 ? (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-              <div className="mb-3">
-                <h3 className="text-sm font-bold text-gray-800">📚 初回完了</h3>
-              </div>
-              <div className="flex items-baseline gap-3 mb-3">
-                <span className="text-4xl font-bold text-blue-700">
-                  {statistics.unstudiedProblems}
+        <div className="mb-4">
+          {/* 1行表示 */}
+          <div
+            className="bg-blue-50 border border-blue-200 rounded-lg p-3 cursor-pointer hover:bg-blue-100 transition-colors"
+            onClick={() => setIsDashboardExpanded(!isDashboardExpanded)}
+          >
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-4 text-sm flex-wrap">
+                <span className="font-medium text-gray-700">
+                  未学習 <span className="text-blue-700 font-bold">{statistics.unstudiedProblems}</span>問
                 </span>
-                <span className="text-lg text-gray-600">問</span>
-                <span className="text-gray-400">→</span>
-                <span className="text-2xl font-bold text-blue-600">
-                  {Math.floor(statistics.estimatedTimeToComplete / 3600)}h
-                  {Math.floor((statistics.estimatedTimeToComplete % 3600) / 60)}m
+                <span className="text-gray-300">|</span>
+                <span className="font-medium text-gray-700">
+                  苦手 <span className="text-orange-700 font-bold">{statistics.problemsBelow80}</span>問
                 </span>
+                <span className="text-gray-300">|</span>
+                {statistics.currentAccuracy !== null && (
+                  <span className="font-medium text-gray-700">
+                    正解率 <span className={`font-bold ${
+                      statistics.currentAccuracy >= 80 ? 'text-green-700' :
+                      statistics.currentAccuracy >= 50 ? 'text-yellow-700' :
+                      'text-red-700'
+                    }`}>{statistics.currentAccuracy}%</span>
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-gray-500">
-                {Math.floor(statistics.averageStudyTime / 60)}:{(statistics.averageStudyTime % 60).toString().padStart(2, '0')}/問
-              </div>
+              <button className="text-xs text-blue-600 font-medium whitespace-nowrap">
+                {isDashboardExpanded ? '閉じる ▲' : '詳細 ▼'}
+              </button>
             </div>
-          ) : (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-              <div className="mb-3">
-                <h3 className="text-sm font-bold text-gray-800">🔄 1サイクル</h3>
-              </div>
-              <div className="flex items-baseline gap-3 mb-3">
-                <span className="text-4xl font-bold text-blue-700">
-                  {statistics.totalProblems}
-                </span>
-                <span className="text-lg text-gray-600">問</span>
-                <span className="text-gray-400">→</span>
-                <span className="text-2xl font-bold text-blue-600">
-                  {Math.floor(statistics.oneCycleTime / 3600)}h
-                  {Math.floor((statistics.oneCycleTime % 3600) / 60)}m
-                </span>
-              </div>
-              <div className="text-xs text-gray-500">
-                {Math.floor(statistics.oneCycleTime / statistics.totalProblems / 60)}:{Math.round((statistics.oneCycleTime / statistics.totalProblems) % 60).toString().padStart(2, '0')}/問
+          </div>
+
+          {/* 詳細表示（展開時） */}
+          {isDashboardExpanded && (
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* 初回完了 or 1サイクル */}
+              {statistics.unstudiedProblems > 0 ? (
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">📚 初回完了見積もり</h4>
+                  <div className="text-sm text-gray-600">
+                    <p>問題数: <span className="font-semibold text-blue-700">{statistics.unstudiedProblems}問</span></p>
+                    <p>予想時間: <span className="font-semibold text-blue-700">
+                      {Math.floor(statistics.estimatedTimeToComplete / 3600)}時間
+                      {Math.floor((statistics.estimatedTimeToComplete % 3600) / 60)}分
+                    </span></p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      平均 {Math.floor(statistics.averageStudyTime / 60)}分{(statistics.averageStudyTime % 60).toString().padStart(2, '0')}秒/問
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">🔄 1サイクル見積もり</h4>
+                  <div className="text-sm text-gray-600">
+                    <p>問題数: <span className="font-semibold text-blue-700">{statistics.totalProblems}問</span></p>
+                    <p>予想時間: <span className="font-semibold text-blue-700">
+                      {Math.floor(statistics.oneCycleTime / 3600)}時間
+                      {Math.floor((statistics.oneCycleTime % 3600) / 60)}分
+                    </span></p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      平均 {Math.floor(statistics.oneCycleTime / statistics.totalProblems / 60)}分/問
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 80%達成 */}
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <h4 className="text-xs font-bold text-gray-700 mb-2">🎯 80%達成見積もり</h4>
+                <div className="text-sm text-gray-600">
+                  <p>80%未満: <span className="font-semibold text-orange-700">{statistics.problemsBelow80}問</span></p>
+                  <p>予想時間: <span className="font-semibold text-orange-700">
+                    {Math.floor(statistics.estimatedTimeTo80 / 3600)}時間
+                    {Math.floor((statistics.estimatedTimeTo80 % 3600) / 60)}分
+                  </span></p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    平均 {Math.floor(statistics.averageReviewTime / 60)}分{(statistics.averageReviewTime % 60).toString().padStart(2, '0')}秒/問 × 3回
+                  </p>
+                </div>
               </div>
             </div>
           )}
-
-          {/* 正解率80%達成 */}
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-gray-800">🎯 80%達成</h3>
-              {statistics.currentAccuracy !== null && (
-                <span className="text-xs font-semibold text-orange-700">
-                  現在 {statistics.currentAccuracy}%
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-3 mb-3">
-              <span className="text-4xl font-bold text-orange-700">
-                {statistics.problemsBelow80}
-              </span>
-              <span className="text-lg text-gray-600">問</span>
-              <span className="text-gray-400">→</span>
-              <span className="text-2xl font-bold text-orange-600">
-                {Math.floor(statistics.estimatedTimeTo80 / 3600)}h
-                {Math.floor((statistics.estimatedTimeTo80 % 3600) / 60)}m
-              </span>
-            </div>
-            <div className="text-xs text-gray-500">
-              {Math.floor(statistics.averageReviewTime / 60)}:{(statistics.averageReviewTime % 60).toString().padStart(2, '0')}/問 × 3回
-            </div>
-          </div>
         </div>
       )}
 
@@ -1151,74 +1392,78 @@ export default function WorkbookDetail() {
 
                       return (
                         <div key={titleKey}>
-                          {/* 目次タイトルヘッダー */}
+                          {/* 目次タイトルヘッダー（コンパクト版） */}
                           <div className={`border border-border rounded-lg ${isExcluded ? 'bg-gray-100' : 'bg-white'}`}>
+                            {/* タイトル部分（タップで展開） */}
                             <div
-                              className={`flex items-center justify-between p-3 transition-colors ${isExcluded ? 'hover:bg-gray-200' : 'hover:bg-secondary/50'}`}
+                              className={`p-3 cursor-pointer transition-colors ${isExcluded ? 'hover:bg-gray-200' : 'hover:bg-blue-50'}`}
+                              onClick={() => toggleTitle(titleKey)}
                             >
-                              {/* 左側：展開アイコン、タイトル */}
-                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleTitle(titleKey)}>
-                                {isTitleExpanded ? (
-                                  <ChevronDown size={16} className={isExcluded ? "text-gray-400" : "text-gray-600"} />
-                                ) : (
-                                  <ChevronRight size={16} className={isExcluded ? "text-gray-400" : "text-gray-600"} />
-                                )}
-                                <h3 className={`font-semibold ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
-                              </div>
-                              {/* 右側：ラベル群とボタン（固定位置） */}
-                              <div
-                                className="flex items-center gap-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {isExcluded && (
-                                  <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap">
-                                    復習から除外
-                                  </span>
-                                )}
-                                {firstProblemWithPage?.page && (
-                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded whitespace-nowrap">
-                                    p.{firstProblemWithPage.page}
-                                  </span>
-                                )}
-                                {(() => {
-                                  const accuracy = sectionAccuracyRates.get(titleKey)
-                                  if (accuracy !== null && accuracy !== undefined) {
-                                    const colorClass = accuracy >= 80
-                                      ? 'bg-green-100 text-green-700'
-                                      : accuracy >= 50
-                                      ? 'bg-yellow-100 text-yellow-700'
-                                      : 'bg-red-100 text-red-700'
-                                    return (
-                                      <span
-                                        className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${colorClass}`}
-                                        title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                                      >
-                                        正解率 {accuracy}%
-                                      </span>
-                                    )
-                                  }
-                                  return null
-                                })()}
-                                <span className="text-sm text-gray-500 whitespace-nowrap">
-                                  {getActualProblemCount(titleProblems)}問
-                                </span>
+                              <div className="flex items-center justify-between gap-2">
+                                {/* 左側：チェブロン + タイトル */}
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  {isTitleExpanded ? (
+                                    <ChevronDown size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                  ) : (
+                                    <ChevronRight size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                  )}
+                                  <h3 className={`font-semibold text-sm sm:text-base truncate ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
+                                </div>
+
+                                {/* 右側：学習ボタン（常に表示） */}
                                 <Button
                                   size="sm"
-                                  onClick={() => handleStartGroupStudy(titleProblems)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleStartGroupStudy(titleProblems, title)
+                                  }}
+                                  className="flex-shrink-0"
                                 >
                                   <Play size={14} className="mr-1" />
-                                  学習
+                                  <span className="hidden sm:inline">学習</span>
                                 </Button>
+                              </div>
+
+                              {/* 2行目：ステータス情報 */}
+                              <div className="flex items-center gap-2 mt-2 text-xs flex-wrap" onClick={(e) => e.stopPropagation()}>
+                                {(() => {
+                                  const accuracy = sectionAccuracyRates.get(titleKey)
+                                  const emoji = accuracy === null ? '⚪' :
+                                    accuracy >= 80 ? '🟢' :
+                                    accuracy >= 50 ? '🟡' : '🔴'
+                                  const accuracyText = accuracy === null ? '--' : `${accuracy}%`
+                                  return (
+                                    <span className="font-medium text-gray-700">
+                                      {emoji} {accuracyText}
+                                    </span>
+                                  )
+                                })()}
+                                <span className="text-gray-400">·</span>
+                                <span className="text-gray-600">
+                                  {getActualProblemCount(titleProblems)}問
+                                </span>
+                                {firstProblemWithPage?.page && (
+                                  <>
+                                    <span className="text-gray-400">·</span>
+                                    <span className="text-gray-600">p.{firstProblemWithPage.page}</span>
+                                  </>
+                                )}
+                                {isExcluded && (
+                                  <>
+                                    <span className="text-gray-400">·</span>
+                                    <span className="text-gray-500">除外中</span>
+                                  </>
+                                )}
+                                {/* 編集ボタン（小さく） */}
                                 <button
-                                  onClick={() =>
-                                    handleEditGroupWrapper(
-                                      `${category}${title}`,
-                                      titleProblems
-                                    )
-                                  }
-                                  className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditGroupWrapper(`${category}${title}`, titleProblems)
+                                  }}
+                                  className="ml-auto p-1 hover:bg-gray-200 rounded transition-colors"
+                                  title="セクション設定"
                                 >
-                                  <Edit2 size={14} className="text-primary" />
+                                  <Edit2 size={12} className="text-gray-500" />
                                 </button>
                               </div>
                             </div>
@@ -1646,6 +1891,87 @@ export default function WorkbookDetail() {
             <Button type="submit">更新</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* 学習開始モーダル */}
+      <Modal
+        isOpen={isStudyStartModalOpen}
+        onClose={() => setIsStudyStartModalOpen(false)}
+        title="学習開始"
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-gray-800 mb-2">
+              <span className="font-bold">{sectionTitle}</span> の学習を開始します
+            </p>
+            <p className="text-xs text-gray-600">
+              前回の続きから学習することができます
+            </p>
+          </div>
+
+          {resumeFromIndex > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800 font-medium mb-1">
+                📍 続きから再開可能
+              </p>
+              <p className="text-xs text-yellow-700">
+                問題 {studyStartProblems[resumeFromIndex]?.problemNumber} から再開できます
+                （残り {studyStartProblems.length - resumeFromIndex}/{studyStartProblems.length}問）
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3">
+            {/* 最初から */}
+            <button
+              onClick={() => startStudy(studyStartProblems, 0)}
+              className="border-2 border-gray-300 rounded-lg p-4 hover:border-primary hover:bg-blue-50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Play size={20} className="text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-1">最初から学習</h3>
+                  <p className="text-xs text-gray-600">
+                    全 {studyStartProblems.length}問を最初から学習します
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* 続きから */}
+            {resumeFromIndex > 0 && (
+              <button
+                onClick={() => startStudy(studyStartProblems, resumeFromIndex)}
+                className="border-2 border-primary rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <RotateCcw size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-primary mb-1">続きから学習</h3>
+                    <p className="text-xs text-gray-700">
+                      問題 {studyStartProblems[resumeFromIndex]?.problemNumber} から
+                      （残り {studyStartProblems.length - resumeFromIndex}問）
+                    </p>
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsStudyStartModalOpen(false)}
+            >
+              キャンセル
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
