@@ -737,3 +737,40 @@ export async function deleteImageBasedExplanation(id: string) {
 export async function permanentlyDeleteImageBasedExplanation(id: string) {
   await db.imageBasedExplanations.delete(id)
 }
+
+// 問題集の最終学習日を取得
+export async function getLastStudyDate(workbookId: string): Promise<Date | null> {
+  const records = await db.studyRecords
+    .where('workbookId')
+    .equals(workbookId)
+    .reverse()
+    .sortBy('studiedAt')
+
+  if (records.length === 0) return null
+  return records[0].studiedAt
+}
+
+// 問題集の学習済み問題数を取得（1回でも学習した問題の数）
+export async function getStudiedProblemCount(workbookId: string): Promise<number> {
+  const problems = await getProblems(workbookId)
+  const problemIds = problems.map(p => p.id)
+
+  if (problemIds.length === 0) return 0
+
+  // 各問題について学習記録があるかチェック
+  const studiedProblemIds = new Set<string>()
+
+  for (const problemId of problemIds) {
+    const records = await db.studyRecords
+      .where('problemId')
+      .equals(problemId)
+      .limit(1)
+      .toArray()
+
+    if (records.length > 0) {
+      studiedProblemIds.add(problemId)
+    }
+  }
+
+  return studiedProblemIds.size
+}
