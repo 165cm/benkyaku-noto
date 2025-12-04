@@ -117,14 +117,13 @@ export default function WorkbookDetail() {
   // ダッシュボード展開state
   const [isDashboardExpanded, setIsDashboardExpanded] = useState(false)
 
-  // 除外設定を読み込む
-  useEffect(() => {
-    setExcludedSections(getExcludedSections())
-  }, [])
-
   // 統計情報を読み込む
   useEffect(() => {
     const loadStatistics = async () => {
+      // 最新の除外設定を取得（設定画面で変更された場合に対応）
+      const latestExcludedSections = getExcludedSections()
+      setExcludedSections(latestExcludedSections)
+
       if (id) {
         const stats = await getWorkbookStatistics(id)
         setStatistics(stats)
@@ -1058,50 +1057,50 @@ export default function WorkbookDetail() {
                 setShowBookmarkedOnly(false)
                 setShowTaggedOnly(false)
               }}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border ${
                 !showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               全て
             </button>
             <button
               onClick={() => setShowUnstudiedOnly(!showUnstudiedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border ${
                 showUnstudiedOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               未学習
             </button>
             <button
               onClick={() => setShowWeakOnly(!showWeakOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border ${
                 showWeakOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               苦手
             </button>
             <button
               onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border ${
                 showBookmarkedOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               ⭐ ブックマーク
             </button>
             <button
               onClick={() => setShowTaggedOnly(!showTaggedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border ${
                 showTaggedOnly
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               🏷️ タグ
