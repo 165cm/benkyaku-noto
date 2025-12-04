@@ -1389,25 +1389,87 @@ export default function WorkbookDetail() {
 
                       return (
                         <div key={titleKey}>
-                          {/* 目次タイトルヘッダー（コンパクト版） */}
+                          {/* 目次タイトルヘッダー（1行版） */}
                           <div className={`border border-border rounded-lg ${isExcluded ? 'bg-gray-100' : 'bg-white'}`}>
-                            {/* タイトル部分（タップで展開） */}
                             <div
                               className={`p-3 cursor-pointer transition-colors ${isExcluded ? 'hover:bg-gray-200' : 'hover:bg-blue-50'}`}
                               onClick={() => toggleTitle(titleKey)}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                {/* 左側：チェブロン + タイトル */}
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  {isTitleExpanded ? (
-                                    <ChevronDown size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
-                                  ) : (
-                                    <ChevronRight size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
-                                  )}
-                                  <h3 className={`font-semibold text-sm sm:text-base truncate ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
-                                </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {/* チェブロン */}
+                                {isTitleExpanded ? (
+                                  <ChevronDown size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                ) : (
+                                  <ChevronRight size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                )}
 
-                                {/* 右側：学習ボタン（常に表示） */}
+                                {/* タイトル */}
+                                <h3 className={`font-semibold text-sm sm:text-base truncate flex-shrink min-w-0 ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
+
+                                {/* 正解率バッジ */}
+                                {(() => {
+                                  const accuracy = sectionAccuracyRates.get(titleKey)
+                                  if (accuracy !== null && accuracy !== undefined) {
+                                    const colorClass = accuracy >= 80
+                                      ? 'bg-green-100 text-green-700'
+                                      : accuracy >= 50
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-700'
+                                    return (
+                                      <span
+                                        className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${colorClass}`}
+                                        title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {accuracy}%
+                                      </span>
+                                    )
+                                  }
+                                  return (
+                                    <span
+                                      className="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-500"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      --
+                                    </span>
+                                  )
+                                })()}
+
+                                {/* 問題数 */}
+                                <span className="text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
+                                  {getActualProblemCount(titleProblems)}問
+                                </span>
+
+                                {/* ページ */}
+                                {firstProblemWithPage?.page && (
+                                  <span className="text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
+                                    p.{firstProblemWithPage.page}
+                                  </span>
+                                )}
+
+                                {/* 除外バッジ */}
+                                {isExcluded && (
+                                  <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                                    除外中
+                                  </span>
+                                )}
+
+                                {/* スペーサー（右寄せのため） */}
+                                <div className="flex-1 min-w-[8px]"></div>
+
+                                {/* 編集ボタン */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditGroupWrapper(`${category}${title}`, titleProblems)
+                                  }}
+                                  className="p-1.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                  title="セクション設定"
+                                >
+                                  <Edit2 size={14} className="text-gray-500" />
+                                </button>
+
+                                {/* 学習ボタン */}
                                 <Button
                                   size="sm"
                                   onClick={(e) => {
@@ -1419,49 +1481,6 @@ export default function WorkbookDetail() {
                                   <Play size={14} className="mr-1" />
                                   <span className="hidden sm:inline">学習</span>
                                 </Button>
-                              </div>
-
-                              {/* 2行目：ステータス情報 */}
-                              <div className="flex items-center gap-2 mt-2 text-xs flex-wrap" onClick={(e) => e.stopPropagation()}>
-                                {(() => {
-                                  const accuracy = sectionAccuracyRates.get(titleKey)
-                                  const emoji = accuracy === null || accuracy === undefined ? '⚪' :
-                                    accuracy >= 80 ? '🟢' :
-                                    accuracy >= 50 ? '🟡' : '🔴'
-                                  const accuracyText = accuracy === null || accuracy === undefined ? '--' : `${accuracy}%`
-                                  return (
-                                    <span className="font-medium text-gray-700">
-                                      {emoji} {accuracyText}
-                                    </span>
-                                  )
-                                })()}
-                                <span className="text-gray-400">·</span>
-                                <span className="text-gray-600">
-                                  {getActualProblemCount(titleProblems)}問
-                                </span>
-                                {firstProblemWithPage?.page && (
-                                  <>
-                                    <span className="text-gray-400">·</span>
-                                    <span className="text-gray-600">p.{firstProblemWithPage.page}</span>
-                                  </>
-                                )}
-                                {isExcluded && (
-                                  <>
-                                    <span className="text-gray-400">·</span>
-                                    <span className="text-gray-500">除外中</span>
-                                  </>
-                                )}
-                                {/* 編集ボタン（小さく） */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEditGroupWrapper(`${category}${title}`, titleProblems)
-                                  }}
-                                  className="ml-auto p-1 hover:bg-gray-200 rounded transition-colors"
-                                  title="セクション設定"
-                                >
-                                  <Edit2 size={12} className="text-gray-500" />
-                                </button>
                               </div>
                             </div>
 
