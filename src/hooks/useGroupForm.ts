@@ -39,12 +39,14 @@ export function useGroupForm() {
 
     const newPage = groupFormData.page ? parseInt(groupFormData.page) : undefined
     const newCategory = groupFormData.category || undefined
+    const newSectionTitle = groupFormData.groupName || undefined
 
-    // グループ内のすべての問題のページ数とカテゴリを更新
+    // グループ内のすべての問題のページ数、カテゴリ、セクションタイトルを更新
     for (const problem of editingGroup.problems) {
       await db.problems.update(problem.id, {
         category: newCategory,
         page: newPage,
+        sectionTitle: newSectionTitle,
       })
     }
 
