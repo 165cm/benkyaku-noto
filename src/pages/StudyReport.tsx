@@ -38,6 +38,7 @@ export default function StudyReport() {
   const [studyRecordsMap, setStudyRecordsMap] = useState<Map<string, StudyRecord[]>>(new Map())
   const [activeTab, setActiveTab] = useState<TabType>('review')
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [isReviewMode, setIsReviewMode] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -49,6 +50,10 @@ export default function StudyReport() {
       navigate('/')
       return
     }
+
+    // 復習モードかチェック
+    const reviewMode = sessionStorage.getItem('reviewModeActive') === 'true'
+    setIsReviewMode(reviewMode)
 
     setSession(currentSession)
 
@@ -146,9 +151,20 @@ export default function StudyReport() {
   }
 
   const handleFinish = () => {
-    // 問題集のTOPに戻る
-    const workbookId = problems[0]?.workbookId
+    const isReviewMode = sessionStorage.getItem('reviewModeActive') === 'true'
+
+    // セッションとフラグをクリア
     clearSession()
+    sessionStorage.removeItem('reviewModeActive')
+
+    // 復習モードから開始した場合は復習リストに戻る
+    if (isReviewMode) {
+      navigate('/review')
+      return
+    }
+
+    // 通常モードの場合は問題集のTOPに戻る
+    const workbookId = problems[0]?.workbookId
     if (workbookId) {
       navigate(`/workbooks/${workbookId}`)
     } else {
@@ -489,7 +505,7 @@ export default function StudyReport() {
           </Button>
         )}
         <Button onClick={handleFinish} size="lg" variant={nextSection ? 'secondary' : 'primary'}>
-          問題集に戻る
+          {isReviewMode ? '復習リストに戻る' : '問題集に戻る'}
         </Button>
       </div>
     </div>
