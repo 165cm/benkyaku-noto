@@ -21,6 +21,7 @@ export default function Review() {
   const [reviewList, setReviewList] = useState<ReviewWithTiming[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<TimingCategory | 'all'>('all')
+  const [selectedWorkbook, setSelectedWorkbook] = useState<string>('all')
 
   useEffect(() => {
     loadReviewList()
@@ -86,16 +87,25 @@ export default function Review() {
     return review.problemNumber
   }
 
-  // フィルター後のリスト
-  const filteredList = selectedCategory === 'all'
-    ? reviewList
-    : reviewList.filter(r => r.timingCategory === selectedCategory)
+  // 問題集リストを取得（重複削除）
+  const workbooks = Array.from(new Set(reviewList.map(r => r.workbookTitle))).sort()
 
-  // カテゴリ別カウント
-  const todayCount = reviewList.filter(r => r.timingCategory === 'today').length
-  const tomorrowCount = reviewList.filter(r => r.timingCategory === 'tomorrow').length
-  const thisWeekCount = reviewList.filter(r => r.timingCategory === 'thisWeek').length
-  const laterCount = reviewList.filter(r => r.timingCategory === 'later').length
+  // フィルター後のリスト
+  const filteredList = reviewList.filter(r => {
+    const categoryMatch = selectedCategory === 'all' || r.timingCategory === selectedCategory
+    const workbookMatch = selectedWorkbook === 'all' || r.workbookTitle === selectedWorkbook
+    return categoryMatch && workbookMatch
+  })
+
+  // カテゴリ別カウント（問題集フィルター適用後）
+  const workbookFilteredList = selectedWorkbook === 'all'
+    ? reviewList
+    : reviewList.filter(r => r.workbookTitle === selectedWorkbook)
+
+  const todayCount = workbookFilteredList.filter(r => r.timingCategory === 'today').length
+  const tomorrowCount = workbookFilteredList.filter(r => r.timingCategory === 'tomorrow').length
+  const thisWeekCount = workbookFilteredList.filter(r => r.timingCategory === 'thisWeek').length
+  const laterCount = workbookFilteredList.filter(r => r.timingCategory === 'later').length
 
   if (loading) {
     return <div>読み込み中...</div>
@@ -108,6 +118,9 @@ export default function Review() {
           <h1 className="text-2xl font-bold">復習リスト</h1>
           <p className="text-gray-600 mt-1">
             復習が推奨される問題を優先度順に表示しています（全{reviewList.length}問）
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            📅 復習タイミングや 📚 問題集で絞り込んで効率的に復習できます
           </p>
         </div>
       </div>
@@ -170,11 +183,48 @@ export default function Review() {
         </div>
       )}
 
+      {reviewList.length > 0 && (
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-3">📚 問題集で絞り込み</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedWorkbook('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedWorkbook === 'all'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              すべての問題集 ({reviewList.length})
+            </button>
+            {workbooks.map((workbook) => {
+              const count = reviewList.filter(r => r.workbookTitle === workbook).length
+              return (
+                <button
+                  key={workbook}
+                  onClick={() => setSelectedWorkbook(workbook)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedWorkbook === workbook
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {workbook} ({count})
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {filteredList.length === 0 && reviewList.length > 0 ? (
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 mb-2">このカテゴリの復習問題はありません</p>
-          <Button onClick={() => setSelectedCategory('all')}>すべて表示</Button>
+          <p className="text-gray-500 mb-2">この条件の復習問題はありません</p>
+          <Button onClick={() => {
+            setSelectedCategory('all')
+            setSelectedWorkbook('all')
+          }}>すべて表示</Button>
         </div>
       ) : reviewList.length === 0 ? (
         <div className="text-center py-12">
