@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Play, TrendingUp, Info } from 'lucide-react'
+import { Calendar, Play, TrendingUp, Info, Zap } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { getTodayReviewList } from '@/lib/review'
+import { createStudySession } from '@/lib/studySession'
+import { db } from '@/lib/db'
 import type { ReviewSchedule } from '@/types'
 
 // 復習タイミングのカテゴリ
@@ -87,6 +89,30 @@ export default function Review() {
     return review.problemNumber
   }
 
+  // 連続学習を開始
+  const startContinuousStudy = async () => {
+    if (filteredList.length === 0) {
+      alert('復習する問題がありません')
+      return
+    }
+
+    // 問題IDリストから実際のProblemオブジェクトを取得
+    const problemIds = filteredList.map(r => r.problemId)
+    const problems = await db.problems.where('id').anyOf(problemIds).toArray()
+
+    // filteredListの順序を保持するためにソート
+    const sortedProblems = problemIds.map(id => problems.find(p => p.id === id)).filter(p => p !== undefined)
+
+    // 学習セッションを作成（時間制限なし: 9999分）
+    createStudySession(9999, sortedProblems)
+
+    // 復習モードフラグを保存（レポートで復習リストに戻るため）
+    sessionStorage.setItem('reviewModeActive', 'true')
+
+    // 最初の問題に遷移
+    navigate(`/study/${filteredList[0].problemId}`)
+  }
+
   // 問題集リストを取得（重複削除）
   const workbooks = Array.from(new Set(reviewList.map(r => r.workbookTitle))).sort()
 
@@ -124,6 +150,22 @@ export default function Review() {
           </p>
         </div>
       </div>
+
+      {/* 連続学習ボタン */}
+      {filteredList.length > 0 && (
+        <div className="mb-6">
+          <Button
+            onClick={startContinuousStudy}
+            className="w-full h-16 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+          >
+            <Zap size={24} className="mr-2" />
+            連続学習を開始（{filteredList.length}問を優先順に出題）
+          </Button>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            フィルターした問題を優先度順に連続で学習できます
+          </p>
+        </div>
+      )}
 
       {reviewList.length > 0 && (
         <div className="mb-6">
