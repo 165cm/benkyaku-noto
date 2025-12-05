@@ -110,6 +110,16 @@ export default function WorkbookDetail() {
   const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [statistics, setStatistics] = useState<WorkbookStatistics | null>(null)
 
+  // セクション別の進捗情報
+  interface SectionProgress {
+    studiedCount: number      // 学習済み問題数
+    totalCount: number         // 総問題数
+    cycles: number             // 周回数（最小学習回数）
+    avgTimePerProblem: number  // 1問あたりの平均時間（秒）
+    estimatedTime: number      // 見積もり時間（秒）
+  }
+  const [sectionProgressMap, setSectionProgressMap] = useState<Map<string, SectionProgress>>(new Map())
+
   // ソート用state
   type SortOption = 'page' | 'accuracy-low' | 'accuracy-high' | 'unstudied-first'
   const [sortOption, setSortOption] = useState<SortOption>('page')
@@ -205,6 +215,88 @@ export default function WorkbookDetail() {
     } else {
       setSectionAccuracyRates(new Map())
       setCategoryAccuracyRates(new Map())
+    }
+  }, [problems, subProblemsMap])
+
+  // 各セクションの進捗情報を計算
+  useEffect(() => {
+    const calculateSectionProgress = async () => {
+      const hierarchy = groupProblemsByHierarchy()
+      const progressMap = new Map<string, SectionProgress>()
+
+      for (const [category, titles] of Object.entries(hierarchy)) {
+        for (const [title, titleProblems] of Object.entries(titles)) {
+          const sectionKey = `${category}-${title}`
+
+          // 学習可能な問題を抽出（親問題を除外し、小問を含める）
+          const learnableProblems: Problem[] = []
+          for (const problem of titleProblems) {
+            const hasSubProblems = await isParentProblem(problem.id)
+            if (!hasSubProblems) {
+              learnableProblems.push(problem)
+            }
+          }
+
+          // 親問題の小問を追加
+          for (const problem of titleProblems) {
+            const subProblems = subProblemsMap.get(problem.id) || []
+            learnableProblems.push(...subProblems)
+          }
+
+          const totalCount = learnableProblems.length
+          if (totalCount === 0) continue
+
+          // 各問題の学習回数と学習時間を取得
+          const problemStats = await Promise.all(
+            learnableProblems.map(async (problem) => {
+              const records = await db.studyRecords
+                .where('problemId')
+                .equals(problem.id)
+                .toArray()
+
+              const studyCount = records.length
+              const totalTime = records.reduce((sum, r) => sum + r.studyTime, 0)
+              const avgTime = studyCount > 0 ? totalTime / studyCount : 180 // デフォルト3分
+
+              return { studyCount, avgTime }
+            })
+          )
+
+          // 学習済み問題数（1回以上学習した問題）
+          const studiedCount = problemStats.filter(s => s.studyCount > 0).length
+
+          // 周回数（全問題の最小学習回数）
+          const cycles = studiedCount === 0 ? 0 : Math.min(...problemStats.map(s => s.studyCount))
+
+          // 平均学習時間（学習済み問題の平均、未学習は180秒と仮定）
+          const studiedProblems = problemStats.filter(s => s.studyCount > 0)
+          const avgTimePerProblem = studiedProblems.length > 0
+            ? Math.round(studiedProblems.reduce((sum, s) => sum + s.avgTime, 0) / studiedProblems.length)
+            : 180
+
+          // 見積もり時間（未学習問題数 × 平均時間、全て学習済みなら全問題 × 平均時間）
+          const unstudiedCount = totalCount - studiedCount
+          const estimatedTime = unstudiedCount > 0
+            ? unstudiedCount * avgTimePerProblem
+            : totalCount * avgTimePerProblem
+
+          progressMap.set(sectionKey, {
+            studiedCount,
+            totalCount,
+            cycles,
+            avgTimePerProblem,
+            estimatedTime
+          })
+        }
+      }
+
+      setSectionProgressMap(progressMap)
+    }
+
+    if (problems.length > 0) {
+      calculateSectionProgress()
+    } else {
+      setSectionProgressMap(new Map())
     }
   }, [problems, subProblemsMap])
 
@@ -1448,10 +1540,61 @@ export default function WorkbookDetail() {
                                     )
                                   })()}
 
-                                  {/* 問題数 */}
-                                  <span className="text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
-                                    {getActualProblemCount(titleProblems)}問
-                                  </span>
+                                  {/* 進捗バッジ（学習済み/総問題数-周回数） */}
+                                  {(() => {
+                                    const progress = sectionProgressMap.get(titleKey)
+                                    if (progress) {
+                                      const { studiedCount, totalCount, cycles } = progress
+
+                                      // 周回数に応じた色分け
+                                      let colorClass = 'bg-gray-100 text-gray-700' // 0周（未完了）
+                                      if (cycles >= 3) {
+                                        colorClass = 'bg-purple-100 text-purple-700' // 3周以上
+                                      } else if (cycles >= 2) {
+                                        colorClass = 'bg-green-100 text-green-700' // 2周
+                                      } else if (cycles >= 1) {
+                                        colorClass = 'bg-blue-100 text-blue-700' // 1周
+                                      }
+
+                                      return (
+                                        <span
+                                          className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${colorClass}`}
+                                          title={`学習済み${studiedCount}/${totalCount}問、${cycles}周完了`}
+                                        >
+                                          {studiedCount}/{totalCount}問-{cycles}
+                                        </span>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+
+                                  {/* 見積もり時間バッジ */}
+                                  {(() => {
+                                    const progress = sectionProgressMap.get(titleKey)
+                                    if (progress) {
+                                      const { estimatedTime } = progress
+                                      const minutes = Math.ceil(estimatedTime / 60)
+                                      const hours = Math.floor(minutes / 60)
+                                      const remainingMinutes = minutes % 60
+
+                                      let timeText = ''
+                                      if (hours > 0) {
+                                        timeText = remainingMinutes > 0 ? `${hours}h${remainingMinutes}分` : `${hours}時間`
+                                      } else {
+                                        timeText = `${minutes}分`
+                                      }
+
+                                      return (
+                                        <span
+                                          className="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 bg-blue-50 text-blue-700"
+                                          title={`見積もり時間: ${timeText}`}
+                                        >
+                                          ⏱️{timeText}
+                                        </span>
+                                      )
+                                    }
+                                    return null
+                                  })()}
 
                                   {/* ページ */}
                                   {firstProblemWithPage?.page && (
