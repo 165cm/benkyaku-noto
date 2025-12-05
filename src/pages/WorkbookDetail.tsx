@@ -1499,18 +1499,17 @@ export default function WorkbookDetail() {
                                   {/* タイトル */}
                                   <h3 className={`font-semibold text-sm sm:text-base truncate flex-1 min-w-0 ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
 
-                                  {/* 学習ボタン（スマホのみ表示） */}
-                                  <Button
-                                    size="sm"
+                                  {/* 学習ボタン（スマホのみ表示、小さめ） */}
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleStartGroupStudy(titleProblems, title)
                                     }}
-                                    className="flex-shrink-0 sm:hidden"
+                                    className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90 transition-colors flex-shrink-0"
                                   >
-                                    <Play size={14} className="mr-1" />
+                                    <Play size={12} />
                                     学習
-                                  </Button>
+                                  </button>
                                 </div>
 
                                 {/* 2行目（スマホ）/ 右側（PC）：ステータス情報 + ボタン */}
@@ -1626,17 +1625,18 @@ export default function WorkbookDetail() {
                                   </button>
 
                                   {/* 学習ボタン（PCのみ表示） */}
-                                  <Button
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleStartGroupStudy(titleProblems, title)
-                                    }}
-                                    className="hidden sm:flex flex-shrink-0"
-                                  >
-                                    <Play size={14} className="mr-1" />
-                                    学習
-                                  </Button>
+                                  <div className="hidden sm:block flex-shrink-0">
+                                    <Button
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleStartGroupStudy(titleProblems, title)
+                                      }}
+                                    >
+                                      <Play size={14} className="mr-1" />
+                                      学習
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
