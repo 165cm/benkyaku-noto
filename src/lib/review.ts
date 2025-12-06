@@ -170,6 +170,19 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   const todayStudied = reviewSchedules.filter(s => s.priorityScore === 0).length
   console.log(`⏰ 今日学習済み（除外）: ${todayStudied}問`)
 
+  // 問題集別の詳細を出力
+  console.log('📊 問題集別の復習リスト内訳:')
+  for (const workbook of allWorkbooks) {
+    const workbookSchedules = reviewSchedules.filter(s => s.workbookTitle === workbook.title)
+    const workbookTodayStudied = workbookSchedules.filter(s => s.priorityScore === 0).length
+    const workbookReviewable = workbookSchedules.filter(s => s.priorityScore > 0).length
+    console.log(`  - ${workbook.title}:`, {
+      学習記録あり: workbookSchedules.length,
+      今日学習済み: workbookTodayStudied,
+      復習可能: workbookReviewable
+    })
+  }
+
   // 今日学習済み（priorityScore = 0）を除外し、優先度スコアの降順でソート
   const finalList = reviewSchedules
     .filter((schedule) => schedule.priorityScore > 0)

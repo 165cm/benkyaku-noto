@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, Play, TrendingUp, Info, Zap } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import { getTodayReviewList } from '@/lib/review'
+import { getTodayReviewList, isProblemExcluded } from '@/lib/review'
 import { createStudySession } from '@/lib/studySession'
 import { db } from '@/lib/db'
 import type { ReviewSchedule } from '@/types'
@@ -78,6 +78,14 @@ export default function Review() {
     for (const workbook of allWorkbooks) {
       const recordCount = recordsByWorkbook.get(workbook.id) || 0
       console.log(`  - ${workbook.title}: ${recordCount}件`)
+    }
+
+    // デバッグ: 除外設定の詳細を確認
+    console.log('🚫 問題集別の除外状況:')
+    for (const workbook of allWorkbooks) {
+      const workbookProblems = activeProblems.filter(p => p.workbookId === workbook.id)
+      const excludedInWorkbook = workbookProblems.filter(p => isProblemExcluded(p)).length
+      console.log(`  - ${workbook.title}: ${excludedInWorkbook}/${workbookProblems.length}問が除外`)
     }
 
     const list = await getTodayReviewList()
