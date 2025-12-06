@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, Play, TrendingUp, Info, Zap } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import { getTodayReviewList, isProblemExcluded } from '@/lib/review'
+import { getTodayReviewList } from '@/lib/review'
 import { createStudySession } from '@/lib/studySession'
 import { db } from '@/lib/db'
 import type { ReviewSchedule } from '@/types'
@@ -43,110 +43,7 @@ export default function Review() {
 
   const loadReviewList = async () => {
     setLoading(true)
-
-    // デバッグ: すべての問題集を確認
-    const allWorkbooks = await db.workbooks.toArray()
-    console.log('📚 すべての問題集:', allWorkbooks.map(w => ({ id: w.id, title: w.title })))
-
-    // デバッグ: すべての問題を確認
-    const allProblems = await db.problems.toArray()
-    const activeProblems = allProblems.filter(p => !p.deletedAt)
-    console.log('📝 アクティブな問題数:', activeProblems.length)
-
-    // 問題集ごとの問題数を集計
-    const problemsByWorkbook = new Map<string, number>()
-    for (const problem of activeProblems) {
-      const count = problemsByWorkbook.get(problem.workbookId) || 0
-      problemsByWorkbook.set(problem.workbookId, count + 1)
-    }
-
-    console.log('📊 問題集別問題数:')
-    for (const workbook of allWorkbooks) {
-      const problemCount = problemsByWorkbook.get(workbook.id) || 0
-      console.log(`  - ${workbook.title}: ${problemCount}問`)
-    }
-
-    // デバッグ: 学習記録を確認
-    const allRecords = await db.studyRecords.toArray()
-    const recordsByWorkbook = new Map<string, number>()
-    for (const record of allRecords) {
-      const count = recordsByWorkbook.get(record.workbookId) || 0
-      recordsByWorkbook.set(record.workbookId, count + 1)
-    }
-
-    console.log('📈 問題集別学習記録数:')
-    for (const workbook of allWorkbooks) {
-      const recordCount = recordsByWorkbook.get(workbook.id) || 0
-      console.log(`  - ${workbook.title}: ${recordCount}件`)
-    }
-
-    // デバッグ: 除外設定の詳細を確認
-    console.log('🚫 問題集別の除外状況:')
-    for (const workbook of allWorkbooks) {
-      const workbookProblems = activeProblems.filter(p => p.workbookId === workbook.id)
-      const excludedInWorkbook = workbookProblems.filter(p => isProblemExcluded(p)).length
-      console.log(`  - ${workbook.title}: ${excludedInWorkbook}/${workbookProblems.length}問が除外`)
-
-      // SPI完全攻略の場合、除外理由を詳しく調査
-      if (workbook.title === 'SPI完全攻略' && excludedInWorkbook > 0) {
-        const { getExcludedProblems, getExcludedCategories, getExcludedSections } = await import('@/lib/storage')
-        const excludedProblemIds = getExcludedProblems()
-        const excludedCategories = getExcludedCategories()
-        const excludedSections = getExcludedSections()
-
-        console.log('🔍 SPI完全攻略の除外理由詳細:')
-
-        // サンプル問題で除外理由を確認
-        const sampleProblems = workbookProblems.slice(0, 5)
-        for (const problem of sampleProblems) {
-          const reasons = []
-
-          if (excludedProblemIds.includes(problem.id)) {
-            reasons.push('問題ID除外 (ギブアップタグ)')
-          }
-
-          const category = problem.category || '未分類'
-          if (excludedCategories.includes(category)) {
-            reasons.push(`カテゴリ除外: ${category}`)
-          }
-
-          // セクションキーを計算
-          let sectionTitle = '問題'
-          if (problem.category) {
-            const parts = problem.problemNumber.split('-')
-            sectionTitle = parts.length > 1 ? parts.slice(0, -1).join('-') : '問題'
-          } else {
-            const match = problem.problemNumber.match(/^(\[.+?\])(.+?)-\d+$/)
-            if (match) {
-              sectionTitle = match[2]
-            } else {
-              const parts = problem.problemNumber.split('-')
-              sectionTitle = parts.length > 1 ? parts[0] : '問題'
-            }
-          }
-          const sectionKey = `${category}-${sectionTitle}`
-
-          if (excludedSections.includes(sectionKey)) {
-            reasons.push(`セクション除外: ${sectionKey}`)
-          }
-
-          if (reasons.length > 0) {
-            console.log(`  ${problem.problemNumber}: ${reasons.join(', ')}`)
-          }
-        }
-      }
-    }
-
     const list = await getTodayReviewList()
-
-    // デバッグ: 復習リストに含まれる問題集を確認
-    const reviewWorkbooks = Array.from(new Set(list.map(r => r.workbookTitle)))
-    console.log('✅ 復習リストに含まれる問題集:', reviewWorkbooks)
-    console.log('❌ 復習リストに含まれない問題集:',
-      allWorkbooks
-        .map(w => w.title)
-        .filter(title => !reviewWorkbooks.includes(title))
-    )
 
     // 各レビューにタイミング情報を追加
     const listWithTiming: ReviewWithTiming[] = list.map(review => {
