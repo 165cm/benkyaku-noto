@@ -43,7 +43,53 @@ export default function Review() {
 
   const loadReviewList = async () => {
     setLoading(true)
+
+    // デバッグ: すべての問題集を確認
+    const allWorkbooks = await db.workbooks.toArray()
+    console.log('📚 すべての問題集:', allWorkbooks.map(w => ({ id: w.id, title: w.title })))
+
+    // デバッグ: すべての問題を確認
+    const allProblems = await db.problems.toArray()
+    const activeProblems = allProblems.filter(p => !p.deletedAt)
+    console.log('📝 アクティブな問題数:', activeProblems.length)
+
+    // 問題集ごとの問題数を集計
+    const problemsByWorkbook = new Map<string, number>()
+    for (const problem of activeProblems) {
+      const count = problemsByWorkbook.get(problem.workbookId) || 0
+      problemsByWorkbook.set(problem.workbookId, count + 1)
+    }
+
+    console.log('📊 問題集別問題数:')
+    for (const workbook of allWorkbooks) {
+      const problemCount = problemsByWorkbook.get(workbook.id) || 0
+      console.log(`  - ${workbook.title}: ${problemCount}問`)
+    }
+
+    // デバッグ: 学習記録を確認
+    const allRecords = await db.studyRecords.toArray()
+    const recordsByWorkbook = new Map<string, number>()
+    for (const record of allRecords) {
+      const count = recordsByWorkbook.get(record.workbookId) || 0
+      recordsByWorkbook.set(record.workbookId, count + 1)
+    }
+
+    console.log('📈 問題集別学習記録数:')
+    for (const workbook of allWorkbooks) {
+      const recordCount = recordsByWorkbook.get(workbook.id) || 0
+      console.log(`  - ${workbook.title}: ${recordCount}件`)
+    }
+
     const list = await getTodayReviewList()
+
+    // デバッグ: 復習リストに含まれる問題集を確認
+    const reviewWorkbooks = Array.from(new Set(list.map(r => r.workbookTitle)))
+    console.log('✅ 復習リストに含まれる問題集:', reviewWorkbooks)
+    console.log('❌ 復習リストに含まれない問題集:',
+      allWorkbooks
+        .map(w => w.title)
+        .filter(title => !reviewWorkbooks.includes(title))
+    )
 
     // 各レビューにタイミング情報を追加
     const listWithTiming: ReviewWithTiming[] = list.map(review => {

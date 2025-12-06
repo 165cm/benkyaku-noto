@@ -96,10 +96,28 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   const allRecords = await db.studyRecords.toArray()
   const allProblems = await db.problems.toArray()
 
+  // デバッグ: 削除フィルター前後を確認
+  const deletedCount = allProblems.filter(p => p.deletedAt).length
+  console.log(`🗑️ 削除済み問題数: ${deletedCount}`)
+
   // 削除された問題と除外設定された問題を除外
-  const activeProblems = allProblems
-    .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+  const notDeletedProblems = allProblems.filter(p => !p.deletedAt)
+
+  // デバッグ: 除外設定を確認
+  const excludedProblems = getExcludedProblems()
+  const excludedCategories = getExcludedCategories()
+  const excludedSections = getExcludedSections()
+  console.log('🚫 除外設定:', {
+    problems: excludedProblems.length,
+    categories: excludedCategories.length,
+    sections: excludedSections.length
+  })
+
+  const excludedCount = notDeletedProblems.filter(p => isProblemExcluded(p)).length
+  console.log(`⛔ 除外設定により除外された問題数: ${excludedCount}`)
+
+  const activeProblems = notDeletedProblems.filter(p => !isProblemExcluded(p))
+  console.log(`✅ アクティブな問題数: ${activeProblems.length}`)
 
   const allWorkbooks = await db.workbooks.toArray()
 
@@ -147,10 +165,19 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     }
   }
 
+  // デバッグ: 学習記録がある問題と今日学習済みの問題を確認
+  console.log(`📋 学習記録がある問題数: ${reviewSchedules.length}`)
+  const todayStudied = reviewSchedules.filter(s => s.priorityScore === 0).length
+  console.log(`⏰ 今日学習済み（除外）: ${todayStudied}問`)
+
   // 今日学習済み（priorityScore = 0）を除外し、優先度スコアの降順でソート
-  return reviewSchedules
+  const finalList = reviewSchedules
     .filter((schedule) => schedule.priorityScore > 0)
     .sort((a, b) => b.priorityScore - a.priorityScore)
+
+  console.log(`📝 最終的な復習リスト: ${finalList.length}問`)
+
+  return finalList
 }
 
 // 学習統計の計算
