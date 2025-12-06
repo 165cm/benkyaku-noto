@@ -113,6 +113,23 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     sections: excludedSections.length
   })
 
+  // 除外設定の詳細を出力
+  if (excludedCategories.length > 0) {
+    console.log('📋 除外カテゴリ一覧:', excludedCategories)
+  }
+  if (excludedSections.length > 0) {
+    console.log('📋 除外セクション一覧 (最初の10件):', excludedSections.slice(0, 10))
+    if (excludedSections.length > 10) {
+      console.log(`   ... 他 ${excludedSections.length - 10} 件`)
+    }
+  }
+  if (excludedProblems.length > 0) {
+    console.log('📋 除外問題一覧 (最初の10件):', excludedProblems.slice(0, 10))
+    if (excludedProblems.length > 10) {
+      console.log(`   ... 他 ${excludedProblems.length - 10} 件`)
+    }
+  }
+
   const excludedCount = notDeletedProblems.filter(p => isProblemExcluded(p)).length
   console.log(`⛔ 除外設定により除外された問題数: ${excludedCount}`)
 
