@@ -83,6 +83,14 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
 
   const allWorkbooks = await db.workbooks.toArray()
 
+  // 親問題のIDを取得（子問題を持つ問題）
+  const parentProblemIds = new Set<string>()
+  activeProblems.forEach(p => {
+    if (p.parentProblemId) {
+      parentProblemIds.add(p.parentProblemId)
+    }
+  })
+
   // 問題ごとにグループ化
   const problemRecordsMap = new Map<string, StudyRecord[]>()
 
@@ -95,36 +103,81 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   // 復習スケジュールを計算
   const reviewSchedules: ReviewSchedule[] = []
   const today = getStudyDate(new Date())  // 3時基準の今日の日付
+  const processedProblems = new Set<string>() // 処理済み問題を記録
 
   for (const [problemId, records] of problemRecordsMap) {
-    const sortedRecords = records.sort(
-      (a, b) => b.studiedAt.getTime() - a.studiedAt.getTime()
-    )
-
-    const lastRecord = sortedRecords[0]
-    // 3時基準で経過日数を計算
-    const daysSince = getStudyDaysDiff(lastRecord.studiedAt, new Date())
-
-    const averageScore = calculateAverageScore(records)
-    const priorityScore = calculatePriorityScore(averageScore, daysSince)
+    // 既に処理済みの問題はスキップ
+    if (processedProblems.has(problemId)) {
+      continue
+    }
 
     const problem = activeProblems.find((p) => p.id === problemId)
-    const workbook = allWorkbooks.find((w) => w.id === problem?.workbookId)
+    if (!problem) continue
 
-    if (problem && workbook) {
-      reviewSchedules.push({
-        problemId,
-        problemNumber: problem.problemNumber,
-        sectionTitle: problem.sectionTitle,
-        category: problem.category,
-        workbookTitle: workbook.title,
-        nextReviewDate: today,
-        reviewCount: records.length,
-        averageScore,
-        lastStudiedAt: lastRecord.studiedAt,
-        priorityScore,
-      })
+    // 子問題の場合、親問題で処理するためスキップ
+    if (problem.parentProblemId) {
+      continue
     }
+
+    const workbook = allWorkbooks.find((w) => w.id === problem?.workbookId)
+    if (!workbook) continue
+
+    // 親問題の場合、子問題全体の学習記録を集計
+    let averageScore: number
+    let lastStudiedAt: Date
+    let reviewCount: number
+
+    if (parentProblemIds.has(problemId)) {
+      // 親問題: 子問題全体の学習記録を集計
+      const subProblems = activeProblems.filter(p => p.parentProblemId === problemId)
+      const allSubRecords: StudyRecord[] = [...records]
+
+      // 子問題の学習記録を収集
+      subProblems.forEach(subProblem => {
+        const subRecords = problemRecordsMap.get(subProblem.id)
+        if (subRecords) {
+          allSubRecords.push(...subRecords)
+          processedProblems.add(subProblem.id) // 子問題を処理済みとしてマーク
+        }
+      })
+
+      // 全体の平均スコアを計算
+      averageScore = calculateAverageScore(allSubRecords)
+
+      // 最新の学習日時を取得
+      const sortedRecords = allSubRecords.sort(
+        (a, b) => b.studiedAt.getTime() - a.studiedAt.getTime()
+      )
+      lastStudiedAt = sortedRecords[0].studiedAt
+      reviewCount = allSubRecords.length
+    } else {
+      // 通常問題: 自身の学習記録のみを使用
+      const sortedRecords = records.sort(
+        (a, b) => b.studiedAt.getTime() - a.studiedAt.getTime()
+      )
+      lastStudiedAt = sortedRecords[0].studiedAt
+      averageScore = calculateAverageScore(records)
+      reviewCount = records.length
+    }
+
+    // 3時基準で経過日数を計算
+    const daysSince = getStudyDaysDiff(lastStudiedAt, new Date())
+    const priorityScore = calculatePriorityScore(averageScore, daysSince)
+
+    reviewSchedules.push({
+      problemId,
+      problemNumber: problem.problemNumber,
+      sectionTitle: problem.sectionTitle,
+      category: problem.category,
+      workbookTitle: workbook.title,
+      nextReviewDate: today,
+      reviewCount,
+      averageScore,
+      lastStudiedAt,
+      priorityScore,
+    })
+
+    processedProblems.add(problemId)
   }
 
   // 今日学習済み（priorityScore = 0）を除外し、優先度スコアの降順でソート

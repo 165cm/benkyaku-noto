@@ -45,32 +45,6 @@ export default function Review() {
     setLoading(true)
     const list = await getTodayReviewList()
 
-    // デバッグ: 除外設定を確認
-    const { getExcludedCategories, getExcludedSections, getExcludedProblems } = await import('@/lib/storage')
-    const excludedCategories = getExcludedCategories()
-    const excludedSections = getExcludedSections()
-    const excludedProblems = getExcludedProblems()
-
-    console.log('📋 現在の除外設定:')
-    console.log('  カテゴリ除外:', excludedCategories.length, '件', excludedCategories)
-    console.log('  セクション除外:', excludedSections.length, '件')
-    if (excludedSections.length > 0) {
-      console.log('    最初の10件:', excludedSections.slice(0, 10))
-    }
-    console.log('  問題除外 (ギブアップ):', excludedProblems.length, '件')
-
-    // 復習リストに含まれる問題のセクションをチェック
-    console.log('📝 復習リスト内のセクション一覧:')
-    const sectionKeys = new Set(list.map(r => {
-      const category = r.category || '未分類'
-      const title = r.sectionTitle || '問題'
-      return `${category}-${title}`
-    }))
-    Array.from(sectionKeys).slice(0, 10).forEach(key => {
-      const isExcluded = excludedSections.includes(key)
-      console.log(`  ${key}: ${isExcluded ? '⛔ 除外中' : '✅ 含まれる'}`)
-    })
-
     // 各レビューにタイミング情報を追加
     const listWithTiming: ReviewWithTiming[] = list.map(review => {
       const daysSince = getDaysSinceLastStudy(review.lastStudiedAt)
@@ -129,14 +103,38 @@ export default function Review() {
     // filteredListの順序を保持するためにソート
     const sortedProblems = problemIds.map(id => problems.find(p => p.id === id)).filter(p => p !== undefined)
 
+    // 親問題を子問題に展開
+    const expandedProblems: typeof sortedProblems = []
+
+    for (const problem of sortedProblems) {
+      // 子問題を取得
+      const subProblems = await db.problems
+        .where('parentProblemId')
+        .equals(problem.id)
+        .toArray()
+
+      // 削除されていない子問題を sortOrder 順に並べる
+      const activeSubProblems = subProblems
+        .filter(p => !p.deletedAt)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+      if (activeSubProblems.length > 0) {
+        // 親問題の場合: 子問題を順番に追加（X-1, X-2, X-3...）
+        expandedProblems.push(...activeSubProblems)
+      } else {
+        // 通常問題の場合: そのまま追加
+        expandedProblems.push(problem)
+      }
+    }
+
     // 学習セッションを作成（時間制限なし: 9999分）
-    createStudySession(9999, sortedProblems)
+    createStudySession(9999, expandedProblems)
 
     // 復習モードフラグを保存（レポートで復習リストに戻るため）
     sessionStorage.setItem('reviewModeActive', 'true')
 
     // 最初の問題に遷移
-    navigate(`/study/${filteredList[0].problemId}`)
+    navigate(`/study/${expandedProblems[0].id}`)
   }
 
   // 問題集リストを取得（重複削除）
