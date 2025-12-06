@@ -10,11 +10,13 @@ import {
   isParentProblem,
   deleteStudyRecordsForWorkbook,
   addProblem,
+  addTagToProblem,
+  removeTagFromProblem,
 } from '@/lib/db'
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems, getWorkbookStatistics, type WorkbookStatistics } from '@/lib/review'
-import { getExcludedSections, getExcludedProblems, removeExcludedProblem } from '@/lib/storage'
+import { getExcludedSections, getExcludedProblems, removeExcludedProblem, addExcludedProblem } from '@/lib/storage'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
@@ -316,6 +318,21 @@ export default function WorkbookDetail() {
   const handleDelete = useCallback((problemId: string) => {
     handleProblemDelete(problemId, loadData)
   }, [handleProblemDelete, loadData])
+
+  // ギブアップタグをトグル
+  const handleToggleGiveUp = useCallback(async (problem: Problem) => {
+    const currentTags = problem.tags || []
+    const hasGiveUpTag = currentTags.includes('ギブアップ')
+
+    if (hasGiveUpTag) {
+      await removeTagFromProblem(problem.id, 'ギブアップ')
+      removeExcludedProblem(problem.id)
+    } else {
+      await addTagToProblem(problem.id, 'ギブアップ')
+      addExcludedProblem(problem.id)
+    }
+    await loadData()
+  }, [loadData])
 
   const handleEditProblem = useCallback(async (problem: Problem) => {
     await handleEdit(problem)
@@ -1712,6 +1729,20 @@ export default function WorkbookDetail() {
 
                                         <div className="flex items-center gap-1">
                                           <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleToggleGiveUp(problem)
+                                            }}
+                                            className={`p-1.5 rounded transition-colors ${
+                                              problem.tags?.includes('ギブアップ')
+                                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                                : 'hover:bg-red-100 text-red-600'
+                                            }`}
+                                            title={problem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
+                                          >
+                                            🏳️
+                                          </button>
+                                          <button
                                             onClick={() => handleAddSubProblem(problem)}
                                             className="p-1.5 hover:bg-green-100 rounded transition-colors"
                                             title="小問を追加"
@@ -1759,6 +1790,20 @@ export default function WorkbookDetail() {
                                               </div>
 
                                               <div className="flex items-center gap-1">
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleToggleGiveUp(subProblem)
+                                                  }}
+                                                  className={`p-1.5 rounded transition-colors ${
+                                                    subProblem.tags?.includes('ギブアップ')
+                                                      ? 'bg-red-600 text-white hover:bg-red-700'
+                                                      : 'hover:bg-red-100 text-red-600'
+                                                  }`}
+                                                  title={subProblem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
+                                                >
+                                                  🏳️
+                                                </button>
                                                 <button
                                                   onClick={() => handleEditProblem(subProblem)}
                                                   className="p-1.5 hover:bg-blue-200 rounded transition-colors"
