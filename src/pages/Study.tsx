@@ -19,6 +19,8 @@ import {
   isSessionComplete,
   getNextProblemId,
   clearSession,
+  getSessionProgress,
+  type SessionProgress,
 } from '@/lib/studySession'
 import type { Problem, Workbook, StudyRecord, StudyResult, ImageBasedExplanation } from '@/types'
 
@@ -98,6 +100,9 @@ export default function Study() {
   // 標準時間の設定UI表示フラグ
   const [showStandardTimeInput, setShowStandardTimeInput] = useState(false)
   const [standardTimeInput, setStandardTimeInput] = useState('')
+
+  // セッション進捗情報
+  const [sessionProgress, setSessionProgress] = useState<SessionProgress | null>(null)
 
   // 次の問題の情報（ページ数表示用）
   const [nextProblemInfo, setNextProblemInfo] = useState<{ problemNumber: string; page?: number } | null>(null)
@@ -242,6 +247,10 @@ export default function Study() {
         const sessionElapsed = Math.floor((now - new Date(session.startTime).getTime()) / 1000)
         setSessionElapsedTime(sessionElapsed)
 
+        // 進捗情報を更新
+        const progress = getSessionProgress(session)
+        setSessionProgress(progress)
+
         // 制限時間をチェック
         if (!timeExpired && timerMode === 'solving') {
           const targetSeconds = session.targetMinutes * 60
@@ -249,6 +258,9 @@ export default function Study() {
             setTimeExpired(true)
           }
         }
+      } else {
+        // セッションがない場合は進捗情報をクリア
+        setSessionProgress(null)
       }
     }, 1000)
 
@@ -1121,6 +1133,48 @@ export default function Study() {
 
         {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
         <div className="mt-4 pt-4 border-t border-border">
+          {/* 連続学習プログレスバー */}
+          {sessionProgress && (
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-bold text-gray-700">🎯 連続学習の進捗</p>
+                <p className="text-sm font-bold text-green-700">
+                  {sessionProgress.completedCount} / {sessionProgress.totalCount} 問
+                </p>
+              </div>
+
+              {/* プログレスバー */}
+              <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-3">
+                <div
+                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500 ease-out"
+                  style={{ width: `${sessionProgress.progressRate}%` }}
+                />
+              </div>
+
+              {/* 進捗率と見積もり時間 */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-white rounded-lg p-2 border border-green-100">
+                  <p className="text-gray-600 mb-1">進捗率</p>
+                  <p className="text-lg font-bold text-green-700">{sessionProgress.progressRate}%</p>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-blue-100">
+                  <p className="text-gray-600 mb-1">残り時間（見積）</p>
+                  <p className="text-lg font-bold text-blue-700">
+                    {formatTime(sessionProgress.estimatedRemainingTime)}
+                  </p>
+                </div>
+              </div>
+
+              {/* 見積もり総時間 */}
+              {sessionProgress.completedCount > 0 && (
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  💡 見積もり総時間: {formatTime(sessionProgress.estimatedTotalTime)}
+                  （平均 {formatTime(sessionProgress.averageTimePerProblem)}/問）
+                </p>
+              )}
+            </div>
+          )}
+
           {/* メインタイマー：現在の問題を解く時間 */}
           {spartaModeEnabled && targetTime !== null ? (
             // スパルタモード：カウントダウン形式
