@@ -899,15 +899,6 @@ export default function Study() {
     }
   }
 
-  // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
-  const getProblemDisplayTitle = (problem: Problem) => {
-    if (problem.sectionTitle) {
-      return `${problem.sectionTitle}-${problem.problemNumber}`
-    }
-    // 後方互換性：sectionTitleがない場合はproblemNumberのみ
-    return problem.problemNumber
-  }
-
   if (!problem || !workbook) {
     return <div>読み込み中...</div>
   }
@@ -970,8 +961,15 @@ export default function Study() {
               </p>
             )}
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold truncate">
-                {getProblemDisplayTitle(problem)}
+              {/* セクションタイトル（省略可） */}
+              {problem.sectionTitle && (
+                <h1 className="text-xl sm:text-2xl font-bold truncate">
+                  {problem.sectionTitle}
+                </h1>
+              )}
+              {/* 問題番号（常に表示） */}
+              <h1 className="text-xl sm:text-2xl font-bold whitespace-nowrap shrink-0">
+                {problem.sectionTitle ? `-${problem.problemNumber}` : problem.problemNumber}
               </h1>
               <button
                 onClick={handleToggleBookmark}
