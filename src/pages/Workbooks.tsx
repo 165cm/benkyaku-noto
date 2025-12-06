@@ -275,12 +275,12 @@ export default function Workbooks() {
     return result
   }, [extendedWorkbooks, subjectFilter, studyStatusFilter, accuracyFilter, sortOption])
 
-  // 背景色を決定
-  const getBackgroundColor = (accuracy: number | null): string => {
-    if (accuracy === null) return 'bg-gray-50'
-    if (accuracy >= 80) return 'bg-green-50'
-    if (accuracy >= 50) return 'bg-yellow-50'
-    return 'bg-red-50'
+  // ボーダー色を決定（詳細ページと統一）
+  const getBorderColor = (accuracy: number | null): string => {
+    if (accuracy === null) return 'border-gray-200'
+    if (accuracy >= 80) return 'border-green-200'
+    if (accuracy >= 50) return 'border-blue-200'
+    return 'border-red-200'
   }
 
   return (
@@ -392,7 +392,7 @@ export default function Workbooks() {
           {filteredAndSortedWorkbooks.map((workbook) => (
             <div
               key={workbook.id}
-              className={`border border-gray-200 rounded-lg transition-all ${getBackgroundColor(workbook.accuracy)}`}
+              className={`border-2 rounded-lg transition-all bg-white hover:shadow-md ${getBorderColor(workbook.accuracy)}`}
             >
               {/* タイトルエリア（タップで詳細へ） */}
               <div
