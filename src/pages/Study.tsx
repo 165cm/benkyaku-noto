@@ -960,15 +960,17 @@ export default function Study() {
                 {problem.category}
               </p>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {/* セクションタイトル（省略可） */}
               {problem.sectionTitle && (
-                <h1 className="text-xl sm:text-2xl font-bold truncate">
-                  {problem.sectionTitle}
-                </h1>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold truncate">
+                    {problem.sectionTitle}
+                  </h1>
+                </div>
               )}
               {/* 問題番号（常に表示） */}
-              <h1 className="text-xl sm:text-2xl font-bold whitespace-nowrap shrink-0">
+              <h1 className="text-xl sm:text-2xl font-bold whitespace-nowrap flex-none">
                 {problem.sectionTitle ? `-${problem.problemNumber}` : problem.problemNumber}
               </h1>
               <button
