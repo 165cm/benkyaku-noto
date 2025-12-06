@@ -6,7 +6,7 @@ import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId, updateProblem } from '@/lib/db'
-import { getPDFUrl, getSectionStandardTime, setSectionStandardTime, addExcludedProblem, removeExcludedProblem, getExcludedProblems } from '@/lib/storage'
+import { getPDFUrl, getSectionStandardTime, setSectionStandardTime, addExcludedProblem, removeExcludedProblem } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
   createWeakModeSession,

@@ -16,7 +16,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems, getWorkbookStatistics, type WorkbookStatistics } from '@/lib/review'
-import { getExcludedSections, getExcludedProblems, removeExcludedProblem, addExcludedProblem } from '@/lib/storage'
+import { getExcludedSections, addExcludedProblem, removeExcludedProblem } from '@/lib/storage'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
@@ -111,7 +111,6 @@ export default function WorkbookDetail() {
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [excludedSections, setExcludedSections] = useState<string[]>([])
-  const [excludedProblems, setExcludedProblems] = useState<string[]>([])
   const [statistics, setStatistics] = useState<WorkbookStatistics | null>(null)
 
   // セクション別の進捗情報
@@ -137,9 +136,6 @@ export default function WorkbookDetail() {
       // 最新の除外設定を取得（設定画面で変更された場合に対応）
       const latestExcludedSections = getExcludedSections()
       setExcludedSections(latestExcludedSections)
-
-      const latestExcludedProblems = getExcludedProblems()
-      setExcludedProblems(latestExcludedProblems)
 
       if (id) {
         const stats = await getWorkbookStatistics(id)
