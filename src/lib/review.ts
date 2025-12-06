@@ -1,5 +1,5 @@
 import { db } from './db'
-import { getExcludedCategories, getExcludedSections } from './storage'
+import { getExcludedCategories, getExcludedSections, getExcludedProblems } from './storage'
 import { getTodayStartTime, getStudyDate, getStudyDaysDiff } from './dateUtils'
 import { calculateWeightedAverage } from './weakModeSession'
 import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
@@ -35,6 +35,12 @@ function getProblemSectionKey(problem: Problem): string {
 export function isProblemExcluded(problem: Problem): boolean {
   const excludedCategories = getExcludedCategories()
   const excludedSections = getExcludedSections()
+  const excludedProblems = getExcludedProblems()
+
+  // 問題ID単位で除外（最優先）
+  if (excludedProblems.includes(problem.id)) {
+    return true
+  }
 
   // カテゴリで除外
   const category = problem.category || '未分類'

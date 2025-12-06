@@ -6,7 +6,7 @@ import Card from '@/components/Card'
 import PDFViewer from '@/components/PDFViewer'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId, updateProblem } from '@/lib/db'
-import { getPDFUrl, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
+import { getPDFUrl, getSectionStandardTime, setSectionStandardTime, addExcludedProblem, removeExcludedProblem, getExcludedProblems } from '@/lib/storage'
 import { getNextWeakProblem, getTodayStudyTime } from '@/lib/review'
 import {
   createWeakModeSession,
@@ -112,6 +112,7 @@ export default function Study() {
     { name: 'うっかりミス', emoji: '😅', help: '分かっていたのにミスした（計算・転記・読み間違い）→ 見直しを徹底、落ち着いて解く' },
     { name: '時間が足りない', emoji: '⏱️', help: '時間をかければ解けた → 時間を測って練習、解法を効率化' },
     { name: '反復練習が必要', emoji: '🔁', help: '完全に覚えたい、定着させたい → 間隔をあけて繰り返し解く' },
+    { name: 'ギブアップ', emoji: '🏳️', help: 'この問題は諦める → 復習リストから除外（後で復旧可能）', isGiveUp: true },
   ]
 
   useEffect(() => {
@@ -423,10 +424,20 @@ export default function Study() {
   const handleToggleTag = async (tag: string) => {
     if (!problem) return
     const currentTags = problem.tags || []
-    if (currentTags.includes(tag)) {
+    const isRemoving = currentTags.includes(tag)
+
+    if (isRemoving) {
       await removeTagFromProblem(problem.id, tag)
+      // 「ギブアップ」タグを削除する場合、除外リストからも削除
+      if (tag === 'ギブアップ') {
+        removeExcludedProblem(problem.id)
+      }
     } else {
       await addTagToProblem(problem.id, tag)
+      // 「ギブアップ」タグを追加する場合、除外リストにも追加
+      if (tag === 'ギブアップ') {
+        addExcludedProblem(problem.id)
+      }
     }
     await loadData()
   }
@@ -1502,16 +1513,21 @@ export default function Study() {
               {/* タグ選択（よく使うもののみ） */}
               <p className="text-sm font-medium text-gray-700 mb-2">🏷️ タグをつける</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {COMMON_TAGS.slice(0, 5).map(tag => {
+                {COMMON_TAGS.map(tag => {
                   const isActive = problem?.tags?.includes(tag.name)
+                  const isGiveUp = tag.name === 'ギブアップ'
                   return (
                     <button
                       key={tag.name}
                       onClick={() => handleToggleTag(tag.name)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         isActive
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? isGiveUp
+                            ? 'bg-red-600 text-white shadow-md'
+                            : 'bg-purple-600 text-white shadow-md'
+                          : isGiveUp
+                            ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                       title={tag.help}
                     >
