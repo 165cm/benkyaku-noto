@@ -16,7 +16,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems, getWorkbookStatistics, type WorkbookStatistics } from '@/lib/review'
-import { getExcludedSections, addExcludedProblem, removeExcludedProblem } from '@/lib/storage'
+import { getExcludedSections, getExcludedCategories, saveExcludedCategories, addExcludedProblem, removeExcludedProblem } from '@/lib/storage'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
@@ -111,6 +111,7 @@ export default function WorkbookDetail() {
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [excludedSections, setExcludedSections] = useState<string[]>([])
+  const [excludedCategories, setExcludedCategories] = useState<string[]>([])
   const [statistics, setStatistics] = useState<WorkbookStatistics | null>(null)
 
   // セクション別の進捗情報
@@ -136,6 +137,9 @@ export default function WorkbookDetail() {
       // 最新の除外設定を取得（設定画面で変更された場合に対応）
       const latestExcludedSections = getExcludedSections()
       setExcludedSections(latestExcludedSections)
+
+      const latestExcludedCategories = getExcludedCategories()
+      setExcludedCategories(latestExcludedCategories)
 
       if (id) {
         const stats = await getWorkbookStatistics(id)
@@ -329,6 +333,23 @@ export default function WorkbookDetail() {
     }
     await loadData()
   }, [loadData])
+
+  // カテゴリ除外をトグル
+  const handleToggleCategoryExclusion = useCallback((category: string) => {
+    const isExcluded = excludedCategories.includes(category)
+    let newExcludedCategories: string[]
+
+    if (isExcluded) {
+      // 除外を解除
+      newExcludedCategories = excludedCategories.filter(c => c !== category)
+    } else {
+      // 除外に追加
+      newExcludedCategories = [...excludedCategories, category]
+    }
+
+    saveExcludedCategories(newExcludedCategories)
+    setExcludedCategories(newExcludedCategories)
+  }, [excludedCategories])
 
   const handleEditProblem = useCallback(async (problem: Problem) => {
     await handleEdit(problem)
@@ -1439,32 +1460,34 @@ export default function WorkbookDetail() {
               0
             )
 
-            // カテゴリ全体が除外されているか判定（全セクションが除外されている場合）
+            // カテゴリ全体が除外されているか判定（カテゴリ除外 or 全セクションが除外されている場合）
+            const isCategoryExcluded = excludedCategories.includes(category)
             const allSectionsExcluded = Object.keys(titles).every((title) => {
               const titleKey = `${category}-${title}`
               return excludedSections.includes(titleKey)
             })
+            const categoryExcluded = isCategoryExcluded || allSectionsExcluded
 
             return (
               <div key={category}>
                 {/* 親カテゴリヘッダー */}
-                <div className={`flex items-center justify-between p-4 rounded-lg transition-colors ${allSectionsExcluded ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                <div className={`flex items-center justify-between p-4 rounded-lg transition-colors ${categoryExcluded ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
                   <div
                     className="flex items-center gap-3 flex-1 cursor-pointer"
                     onClick={() => toggleCategory(category)}
                   >
                     {isCategoryExpanded ? (
-                      <ChevronDown size={20} className={allSectionsExcluded ? "text-gray-400" : "text-gray-600"} />
+                      <ChevronDown size={20} className={categoryExcluded ? "text-gray-400" : "text-gray-600"} />
                     ) : (
-                      <ChevronRight size={20} className={allSectionsExcluded ? "text-gray-400" : "text-gray-600"} />
+                      <ChevronRight size={20} className={categoryExcluded ? "text-gray-400" : "text-gray-600"} />
                     )}
-                    <h2 className={`text-xl font-bold ${allSectionsExcluded ? 'text-gray-400' : ''}`}>{category}</h2>
-                    {allSectionsExcluded && (
+                    <h2 className={`text-xl font-bold ${categoryExcluded ? 'text-gray-400' : ''}`}>{category}</h2>
+                    {categoryExcluded && (
                       <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap">
                         復習から除外
                       </span>
                     )}
-                    <span className={`text-sm ${allSectionsExcluded ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span className={`text-sm ${categoryExcluded ? 'text-gray-400' : 'text-gray-500'}`}>
                       {Object.keys(titles).length}セクション · {totalProblems}問
                     </span>
                     {(() => {
@@ -1487,15 +1510,31 @@ export default function WorkbookDetail() {
                       return null
                     })()}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleEditCategoryWrapper(category, Object.values(titles))
-                    }}
-                    className="p-2 hover:bg-blue-100 rounded transition-colors"
-                  >
-                    <Edit2 size={16} className="text-primary" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleToggleCategoryExclusion(category)
+                      }}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                        isCategoryExcluded
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                      }`}
+                      title={isCategoryExcluded ? 'カテゴリ除外を解除' : 'カテゴリを除外'}
+                    >
+                      {isCategoryExcluded ? '✅ 除外解除' : '⛔ 除外'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditCategoryWrapper(category, Object.values(titles))
+                      }}
+                      className="p-2 hover:bg-blue-100 rounded transition-colors"
+                    >
+                      <Edit2 size={16} className="text-primary" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* 目次タイトルリスト */}
