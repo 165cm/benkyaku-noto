@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   OPENAI_API_KEY: 'benkyaku-openai-api-key',
   EXCLUDED_CATEGORIES: 'benkyaku-excluded-categories',
   EXCLUDED_SECTIONS: 'benkyaku-excluded-sections',
+  EXCLUDED_PROBLEMS: 'benkyaku-excluded-problems',
   LAST_BACKUP_TIME: 'benkyaku-last-backup-time',
   LAST_RESTORE_TIME: 'benkyaku-last-restore-time',
   WEEK_START_DAY: 'benkyaku-week-start-day',
@@ -39,6 +40,33 @@ export function saveExcludedSections(sections: string[]): void {
 export function getExcludedSections(): string[] {
   const stored = localStorage.getItem(STORAGE_KEYS.EXCLUDED_SECTIONS)
   return stored ? JSON.parse(stored) : []
+}
+
+// 除外問題の保存（問題IDの配列）
+export function saveExcludedProblems(problemIds: string[]): void {
+  localStorage.setItem(STORAGE_KEYS.EXCLUDED_PROBLEMS, JSON.stringify(problemIds))
+}
+
+// 除外問題の取得
+export function getExcludedProblems(): string[] {
+  const stored = localStorage.getItem(STORAGE_KEYS.EXCLUDED_PROBLEMS)
+  return stored ? JSON.parse(stored) : []
+}
+
+// 問題を除外リストに追加
+export function addExcludedProblem(problemId: string): void {
+  const excluded = getExcludedProblems()
+  if (!excluded.includes(problemId)) {
+    excluded.push(problemId)
+    saveExcludedProblems(excluded)
+  }
+}
+
+// 問題を除外リストから削除
+export function removeExcludedProblem(problemId: string): void {
+  const excluded = getExcludedProblems()
+  const filtered = excluded.filter(id => id !== problemId)
+  saveExcludedProblems(filtered)
 }
 
 // セクション標準時間の取得

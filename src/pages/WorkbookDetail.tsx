@@ -14,7 +14,7 @@ import {
 import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems, getWorkbookStatistics, type WorkbookStatistics } from '@/lib/review'
-import { getExcludedSections } from '@/lib/storage'
+import { getExcludedSections, getExcludedProblems, removeExcludedProblem } from '@/lib/storage'
 // import { deletePDF } from '@/lib/storage' // PDF機能一時無効化
 import { createStudySession } from '@/lib/studySession'
 import type { Problem } from '@/types'
@@ -105,9 +105,11 @@ export default function WorkbookDetail() {
   const [showTaggedOnly, setShowTaggedOnly] = useState(false)
   const [showUnstudiedOnly, setShowUnstudiedOnly] = useState(false)
   const [showWeakOnly, setShowWeakOnly] = useState(false) // 正解率80%未満
+  const [showGiveUpOnly, setShowGiveUpOnly] = useState(false) // ギブアップタグのみ
   const [sectionAccuracyRates, setSectionAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [categoryAccuracyRates, setCategoryAccuracyRates] = useState<Map<string, number | null>>(new Map())
   const [excludedSections, setExcludedSections] = useState<string[]>([])
+  const [excludedProblems, setExcludedProblems] = useState<string[]>([])
   const [statistics, setStatistics] = useState<WorkbookStatistics | null>(null)
 
   // セクション別の進捗情報
@@ -133,6 +135,9 @@ export default function WorkbookDetail() {
       // 最新の除外設定を取得（設定画面で変更された場合に対応）
       const latestExcludedSections = getExcludedSections()
       setExcludedSections(latestExcludedSections)
+
+      const latestExcludedProblems = getExcludedProblems()
+      setExcludedProblems(latestExcludedProblems)
 
       if (id) {
         const stats = await getWorkbookStatistics(id)
@@ -619,7 +624,7 @@ export default function WorkbookDetail() {
   // フィルタリングとソートされた問題階層
   const filteredAndSortedProblemHierarchy = useMemo(() => {
     // フィルタ適用の有無チェック
-    const hasFilter = showBookmarkedOnly || showTaggedOnly || showUnstudiedOnly || showWeakOnly
+    const hasFilter = showBookmarkedOnly || showTaggedOnly || showUnstudiedOnly || showWeakOnly || showGiveUpOnly
 
     let result = problemHierarchy
 
@@ -652,6 +657,9 @@ export default function WorkbookDetail() {
               return false
             }
             if (showTaggedOnly && (!problem.tags || problem.tags.length === 0)) {
+              return false
+            }
+            if (showGiveUpOnly && (!problem.tags || !problem.tags.includes('ギブアップ'))) {
               return false
             }
             return true
@@ -722,7 +730,7 @@ export default function WorkbookDetail() {
     }
 
     return result
-  }, [problemHierarchy, showBookmarkedOnly, showTaggedOnly, showUnstudiedOnly, showWeakOnly, sortOption, sectionAccuracyRates])
+  }, [problemHierarchy, showBookmarkedOnly, showTaggedOnly, showUnstudiedOnly, showWeakOnly, showGiveUpOnly, sortOption, sectionAccuracyRates])
 
   // 後方互換性のため、filteredProblemHierarchy という名前でもエクスポート
   const filteredProblemHierarchy = filteredAndSortedProblemHierarchy
@@ -1148,9 +1156,10 @@ export default function WorkbookDetail() {
                 setShowWeakOnly(false)
                 setShowBookmarkedOnly(false)
                 setShowTaggedOnly(false)
+                setShowGiveUpOnly(false)
               }}
               className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                !showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly
+                !showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly && !showGiveUpOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
               }`}
@@ -1196,6 +1205,16 @@ export default function WorkbookDetail() {
               }`}
             >
               🏷️ タグ
+            </button>
+            <button
+              onClick={() => setShowGiveUpOnly(!showGiveUpOnly)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
+                showGiveUpOnly
+                  ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                  : 'bg-red-50 text-red-700 border-red-200 hover:border-red-400 hover:bg-red-100'
+              }`}
+            >
+              🏳️ ギブアップ
             </button>
           </div>
 
