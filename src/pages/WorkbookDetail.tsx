@@ -116,9 +116,10 @@ export default function WorkbookDetail() {
 
   // セクション別の進捗情報
   interface SectionProgress {
-    studiedCount: number      // 学習済み問題数
+    studiedCount: number       // 学習済み問題数（1回以上学習した問題）
     totalCount: number         // 総問題数
-    cycles: number             // 周回数（最小学習回数）
+    cycles: number             // 現在の周回数（最も進んでいる周回数）
+    cycleProgressCount: number // その周回を完了した問題数
     avgTimePerProblem: number  // 1問あたりの平均時間（秒）
     estimatedTime: number      // 見積もり時間（秒）
   }
@@ -272,8 +273,15 @@ export default function WorkbookDetail() {
           // 学習済み問題数（1回以上学習した問題）
           const studiedCount = problemStats.filter(s => s.studyCount > 0).length
 
-          // 周回数（全問題の最小学習回数）
-          const cycles = studiedCount === 0 ? 0 : Math.min(...problemStats.map(s => s.studyCount))
+          // 現在の周回数（最も進んでいる周回数）と、その周回を完了した問題数
+          let cycles = 0
+          let cycleProgressCount = 0
+
+          if (studiedCount > 0) {
+            const maxStudyCount = Math.max(...problemStats.map(s => s.studyCount))
+            cycles = maxStudyCount
+            cycleProgressCount = problemStats.filter(s => s.studyCount >= maxStudyCount).length
+          }
 
           // 平均学習時間（学習済み問題の平均、未学習は180秒と仮定）
           const studiedProblems = problemStats.filter(s => s.studyCount > 0)
@@ -291,6 +299,7 @@ export default function WorkbookDetail() {
             studiedCount,
             totalCount,
             cycles,
+            cycleProgressCount,
             avgTimePerProblem,
             estimatedTime
           })
@@ -1614,7 +1623,7 @@ export default function WorkbookDetail() {
                                   {(() => {
                                     const progress = sectionProgressMap.get(titleKey)
                                     if (progress) {
-                                      const { studiedCount, totalCount, cycles } = progress
+                                      const { studiedCount, totalCount, cycles, cycleProgressCount } = progress
 
                                       // 周回数に応じた色分け
                                       let colorClass = 'bg-gray-100 text-gray-700' // 0周（未完了）
@@ -1629,9 +1638,9 @@ export default function WorkbookDetail() {
                                       return (
                                         <span
                                           className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${colorClass}`}
-                                          title={`学習済み${studiedCount}/${totalCount}問、${cycles}周完了`}
+                                          title={`${cycles}周目: ${cycleProgressCount}/${totalCount}問完了 (全体: ${studiedCount}問学習済み)`}
                                         >
-                                          {studiedCount}/{totalCount}問-{cycles}
+                                          {cycleProgressCount}/{totalCount}問-{cycles}
                                         </span>
                                       )
                                     }

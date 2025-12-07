@@ -689,6 +689,11 @@ export default function Workbooks() {
                                     </p>
                                     <p className="text-[10px] text-gray-500">
                                       {section.problems.length}問 / 済{section.studiedCount}
+                                      {section.averageReviewCount > 0 && (
+                                        <span className="ml-1 text-purple-600 font-semibold">
+                                          / {section.averageReviewCount}周目
+                                        </span>
+                                      )}
                                     </p>
                                   </div>
 
