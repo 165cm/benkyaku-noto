@@ -541,6 +541,7 @@ export interface SectionStats {
   problems: Problem[]
   accuracy: number | null
   studiedCount: number
+  averageReviewCount: number  // 平均周回数（学習記録数の平均）
 }
 
 // セクション別の正解率を計算
@@ -577,15 +578,24 @@ export async function calculateSectionStats(): Promise<SectionStats[]> {
     // このセクションの正解率を計算
     const accuracy = await calculateRecentAccuracyForProblems(problems)
 
-    // 学習済みの問題数をカウント
+    // 学習済みの問題数と平均周回数をカウント
     let studiedCount = 0
+    let totalReviewCount = 0
     for (const problem of problems) {
       const records = await db.studyRecords
         .where('problemId')
         .equals(problem.id)
         .count()
-      if (records > 0) studiedCount++
+      if (records > 0) {
+        studiedCount++
+        totalReviewCount += records
+      }
     }
+
+    // 平均周回数を計算（学習済み問題がある場合のみ）
+    const averageReviewCount = studiedCount > 0
+      ? Math.round(totalReviewCount / studiedCount)
+      : 0
 
     sectionStats.push({
       sectionKey,
@@ -594,6 +604,7 @@ export async function calculateSectionStats(): Promise<SectionStats[]> {
       problems,
       accuracy,
       studiedCount,
+      averageReviewCount,
     })
   }
 
@@ -661,15 +672,24 @@ export async function getWorkbookSections(workbookId: string): Promise<SectionSt
     // このセクションの正解率を計算
     const accuracy = await calculateRecentAccuracyForProblems(problems)
 
-    // 学習済みの問題数をカウント
+    // 学習済みの問題数と平均周回数をカウント
     let studiedCount = 0
+    let totalReviewCount = 0
     for (const problem of problems) {
       const records = await db.studyRecords
         .where('problemId')
         .equals(problem.id)
         .count()
-      if (records > 0) studiedCount++
+      if (records > 0) {
+        studiedCount++
+        totalReviewCount += records
+      }
     }
+
+    // 平均周回数を計算（学習済み問題がある場合のみ）
+    const averageReviewCount = studiedCount > 0
+      ? Math.round(totalReviewCount / studiedCount)
+      : 0
 
     sectionStats.push({
       sectionKey,
@@ -678,6 +698,7 @@ export async function getWorkbookSections(workbookId: string): Promise<SectionSt
       problems,
       accuracy,
       studiedCount,
+      averageReviewCount,
     })
   }
 
