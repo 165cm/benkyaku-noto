@@ -186,6 +186,164 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
     .sort((a, b) => b.priorityScore - a.priorityScore)
 }
 
+// 配列をシャッフルする
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+// もう一周リストを取得（回答回数が少ない問題を優先）
+export interface ReviewAgainOptions {
+  maxReviewCount?: number  // 最大回答回数（例: 3 → 3回以下の問題）
+  minAccuracy?: number     // 最低正答率（例: 80 → 80%以上の問題）
+  sortBy?: 'count' | 'oldest' | 'newest' | 'random'  // 並び順
+}
+
+export async function getReviewAgainList(options?: ReviewAgainOptions): Promise<ReviewSchedule[]> {
+  const allRecords = await db.studyRecords.toArray()
+  const allProblems = await db.problems.toArray()
+
+  // 削除された問題と除外設定された問題を除外
+  const activeProblems = allProblems
+    .filter(p => !p.deletedAt)
+    .filter(p => !isProblemExcluded(p))
+
+  const allWorkbooks = await db.workbooks.toArray()
+
+  // 親問題のIDを取得（子問題を持つ問題）
+  const parentProblemIds = new Set<string>()
+  activeProblems.forEach(p => {
+    if (p.parentProblemId) {
+      parentProblemIds.add(p.parentProblemId)
+    }
+  })
+
+  // 問題ごとにグループ化
+  const problemRecordsMap = new Map<string, StudyRecord[]>()
+
+  allRecords.forEach((record) => {
+    const records = problemRecordsMap.get(record.problemId) || []
+    records.push(record)
+    problemRecordsMap.set(record.problemId, records)
+  })
+
+  // 復習スケジュールを計算
+  const reviewSchedules: ReviewSchedule[] = []
+  const today = getStudyDate(new Date())  // 3時基準の今日の日付
+  const processedProblems = new Set<string>() // 処理済み問題を記録
+
+  for (const [problemId, records] of problemRecordsMap) {
+    // 既に処理済みの問題はスキップ
+    if (processedProblems.has(problemId)) {
+      continue
+    }
+
+    const problem = activeProblems.find((p) => p.id === problemId)
+    if (!problem) continue
+
+    // 子問題の場合、親問題で処理するためスキップ
+    if (problem.parentProblemId) {
+      continue
+    }
+
+    const workbook = allWorkbooks.find((w) => w.id === problem?.workbookId)
+    if (!workbook) continue
+
+    // 親問題の場合、子問題全体の学習記録を集計
+    let averageScore: number
+    let lastStudiedAt: Date
+    let reviewCount: number
+
+    if (parentProblemIds.has(problemId)) {
+      // 親問題: 子問題全体の学習記録を集計
+      const subProblems = activeProblems.filter(p => p.parentProblemId === problemId)
+      const allSubRecords: StudyRecord[] = [...records]
+
+      // 子問題の学習記録を収集
+      subProblems.forEach(subProblem => {
+        const subRecords = problemRecordsMap.get(subProblem.id)
+        if (subRecords) {
+          allSubRecords.push(...subRecords)
+          processedProblems.add(subProblem.id) // 子問題を処理済みとしてマーク
+        }
+      })
+
+      // 全体の平均スコアを計算
+      averageScore = calculateAverageScore(allSubRecords)
+
+      // 最新の学習日時を取得
+      const sortedRecords = allSubRecords.sort(
+        (a, b) => b.studiedAt.getTime() - a.studiedAt.getTime()
+      )
+      lastStudiedAt = sortedRecords[0].studiedAt
+      reviewCount = allSubRecords.length
+    } else {
+      // 通常問題: 自身の学習記録のみを使用
+      const sortedRecords = records.sort(
+        (a, b) => b.studiedAt.getTime() - a.studiedAt.getTime()
+      )
+      lastStudiedAt = sortedRecords[0].studiedAt
+      averageScore = calculateAverageScore(records)
+      reviewCount = records.length
+    }
+
+    // 3時基準で経過日数を計算
+    const daysSince = getStudyDaysDiff(lastStudiedAt, new Date())
+    const priorityScore = calculatePriorityScore(averageScore, daysSince)
+
+    reviewSchedules.push({
+      problemId,
+      problemNumber: problem.problemNumber,
+      sectionTitle: problem.sectionTitle,
+      category: problem.category,
+      workbookTitle: workbook.title,
+      nextReviewDate: today,
+      reviewCount,
+      averageScore,
+      lastStudiedAt,
+      priorityScore,
+    })
+
+    processedProblems.add(problemId)
+  }
+
+  // フィルター適用（今日学習済みも含む）
+  let filtered = reviewSchedules
+
+  if (options?.maxReviewCount !== undefined) {
+    filtered = filtered.filter(s => s.reviewCount <= options.maxReviewCount!)
+  }
+
+  if (options?.minAccuracy !== undefined) {
+    filtered = filtered.filter(s => s.averageScore >= options.minAccuracy!)
+  }
+
+  // ソート
+  switch (options?.sortBy) {
+    case 'oldest':
+      // 最終学習が古い順（新鮮に感じる）
+      return filtered.sort((a, b) =>
+        a.lastStudiedAt.getTime() - b.lastStudiedAt.getTime()
+      )
+    case 'newest':
+      // 最終学習が新しい順
+      return filtered.sort((a, b) =>
+        b.lastStudiedAt.getTime() - a.lastStudiedAt.getTime()
+      )
+    case 'random':
+      // ランダム
+      return shuffleArray(filtered)
+    case 'count':
+    default:
+      // デフォルト: 回答回数が少ない順
+      return filtered.sort((a, b) => a.reviewCount - b.reviewCount)
+  }
+}
+
 // 学習統計の計算
 export async function calculateStudyStats() {
   const todayStart = getTodayStartTime()  // 今日の3時
