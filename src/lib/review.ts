@@ -344,6 +344,44 @@ export async function getReviewAgainList(options?: ReviewAgainOptions): Promise<
   }
 }
 
+// 問題リストの推定学習時間を計算（秒単位）
+export async function estimateReviewTime(problemIds: string[]): Promise<number> {
+  if (problemIds.length === 0) return 0
+
+  const allRecords = await db.studyRecords.toArray()
+
+  // 各問題の復習時間を収集
+  const reviewTimes: number[] = []
+
+  for (const problemId of problemIds) {
+    const records = allRecords.filter(r => r.problemId === problemId)
+
+    if (records.length > 1) {
+      // 2回目以降の学習時間を取得（復習時間）
+      const sortedRecords = records.sort((a, b) => a.studiedAt.getTime() - b.studiedAt.getTime())
+      for (let i = 1; i < sortedRecords.length; i++) {
+        reviewTimes.push(sortedRecords[i].studyTime)
+      }
+    } else if (records.length === 1) {
+      // 1回しか学習していない場合は初回時間を使う
+      reviewTimes.push(records[0].studyTime)
+    }
+  }
+
+  if (reviewTimes.length === 0) {
+    // データがない場合はデフォルト（3分 = 180秒）
+    return problemIds.length * 180
+  }
+
+  // 外れ値を除外して平均を計算
+  const cleanedTimes = removeOutliers(reviewTimes)
+  const averageTime = cleanedTimes.length > 0
+    ? calculateWeightedMean(cleanedTimes)
+    : 180
+
+  return problemIds.length * averageTime
+}
+
 // 学習統計の計算
 export async function calculateStudyStats() {
   const todayStart = getTodayStartTime()  // 今日の3時
@@ -672,7 +710,7 @@ export async function getTodayStudyTime(): Promise<number> {
 }
 
 // 外れ値を除外する（IQR法）
-function removeOutliers(values: number[]): number[] {
+export function removeOutliers(values: number[]): number[] {
   if (values.length < 4) return values // データが少ない場合はそのまま
 
   const sorted = [...values].sort((a, b) => a - b)
@@ -688,7 +726,7 @@ function removeOutliers(values: number[]): number[] {
 }
 
 // ベイズ更新を考慮した重み付き平均（最新のデータを重視）
-function calculateWeightedMean(values: number[]): number {
+export function calculateWeightedMean(values: number[]): number {
   if (values.length === 0) return 0
 
   // 最新のデータほど重みを大きくする（指数的減衰）
