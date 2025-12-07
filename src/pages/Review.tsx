@@ -53,22 +53,35 @@ export default function Review() {
   // 通常の復習リストの推定時間を計算
   useEffect(() => {
     const calculateEstimatedTime = async () => {
-      const problemIds = filteredList.map(r => r.problemId)
+      // フィルター後のリストを計算
+      const filtered = reviewList.filter(r => {
+        const categoryMatch = selectedCategory === 'all' || r.timingCategory === selectedCategory
+        const workbookMatch = selectedWorkbook === 'all' || r.workbookTitle === selectedWorkbook
+        return categoryMatch && workbookMatch
+      })
+
+      const problemIds = filtered.map(r => r.problemId)
       const time = await estimateReviewTime(problemIds)
       setEstimatedTime(time)
     }
     calculateEstimatedTime()
-  }, [filteredList])
+  }, [reviewList, selectedCategory, selectedWorkbook])
 
   // もう一周モードの推定時間を計算
   useEffect(() => {
     const calculateEstimatedTime = async () => {
-      const problemIds = filteredReviewAgainList.map(r => r.problemId)
+      // フィルター後のリストを計算
+      const filtered = reviewAgainList.filter(r => {
+        const workbookMatch = selectedWorkbook === 'all' || r.workbookTitle === selectedWorkbook
+        return workbookMatch
+      })
+
+      const problemIds = filtered.map(r => r.problemId)
       const time = await estimateReviewTime(problemIds)
       setEstimatedReviewAgainTime(time)
     }
     calculateEstimatedTime()
-  }, [filteredReviewAgainList])
+  }, [reviewAgainList, selectedWorkbook])
 
   const getTimingCategory = (daysSince: number): { category: TimingCategory, label: string, color: string, bgColor: string } => {
     if (daysSince >= 1 && daysSince <= 3) {
