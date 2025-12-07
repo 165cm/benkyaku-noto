@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Play, TrendingUp, Info, Zap, RefreshCw } from 'lucide-react'
+import { Calendar, Play, TrendingUp, Info, Zap, RefreshCw, Clock } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import { getTodayReviewList, getReviewAgainList, type ReviewAgainOptions } from '@/lib/review'
+import { getTodayReviewList, getReviewAgainList, estimateReviewTime, type ReviewAgainOptions } from '@/lib/review'
 import { createStudySession } from '@/lib/studySession'
 import { db } from '@/lib/db'
 import type { ReviewSchedule } from '@/types'
@@ -35,6 +35,10 @@ export default function Review() {
   const [minAccuracy, setMinAccuracy] = useState<number | undefined>(undefined)
   const [sortBy, setSortBy] = useState<ReviewAgainOptions['sortBy']>('count')
 
+  // 推定時間（秒単位）
+  const [estimatedTime, setEstimatedTime] = useState<number>(0)
+  const [estimatedReviewAgainTime, setEstimatedReviewAgainTime] = useState<number>(0)
+
   useEffect(() => {
     loadReviewList()
     loadReviewAgainList()
@@ -45,6 +49,26 @@ export default function Review() {
       loadReviewAgainList()
     }
   }, [maxReviewCount, minAccuracy, sortBy, activeTab])
+
+  // 通常の復習リストの推定時間を計算
+  useEffect(() => {
+    const calculateEstimatedTime = async () => {
+      const problemIds = filteredList.map(r => r.problemId)
+      const time = await estimateReviewTime(problemIds)
+      setEstimatedTime(time)
+    }
+    calculateEstimatedTime()
+  }, [filteredList])
+
+  // もう一周モードの推定時間を計算
+  useEffect(() => {
+    const calculateEstimatedTime = async () => {
+      const problemIds = filteredReviewAgainList.map(r => r.problemId)
+      const time = await estimateReviewTime(problemIds)
+      setEstimatedReviewAgainTime(time)
+    }
+    calculateEstimatedTime()
+  }, [filteredReviewAgainList])
 
   const getTimingCategory = (daysSince: number): { category: TimingCategory, label: string, color: string, bgColor: string } => {
     if (daysSince >= 1 && daysSince <= 3) {
@@ -106,6 +130,23 @@ export default function Review() {
     if (score >= 150) return '最優先'
     if (score >= 100) return '優先'
     return '通常'
+  }
+
+  // 秒を「X分」「X時間Y分」形式に変換
+  const formatEstimatedTime = (seconds: number): string => {
+    if (seconds === 0) return '0分'
+
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+
+    if (hours > 0) {
+      if (minutes > 0) {
+        return `約${hours}時間${minutes}分`
+      }
+      return `約${hours}時間`
+    }
+
+    return `約${minutes}分`
   }
 
   // 問題の表示用タイトルを取得（sectionTitle-problemNumber形式）
@@ -326,9 +367,15 @@ export default function Review() {
                 <Zap size={24} className="mr-2" />
                 連続学習を開始（{filteredList.length}問を優先順に出題）
               </Button>
-              <p className="text-xs text-gray-500 text-center mt-2">
-                フィルターした問題を優先度順に連続で学習できます
-              </p>
+              <div className="flex items-center justify-center gap-4 mt-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Clock size={14} />
+                  <span>推定時間: {formatEstimatedTime(estimatedTime)}</span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  フィルターした問題を優先度順に連続で学習できます
+                </p>
+              </div>
             </div>
           )}
 
@@ -557,9 +604,15 @@ export default function Review() {
                 <RefreshCw size={24} className="mr-2" />
                 もう一周を開始（{filteredReviewAgainList.length}問）
               </Button>
-              <p className="text-xs text-gray-500 text-center mt-2">
-                フィルターした問題を連続で学習できます
-              </p>
+              <div className="flex items-center justify-center gap-4 mt-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Clock size={14} />
+                  <span>推定時間: {formatEstimatedTime(estimatedReviewAgainTime)}</span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  フィルターした問題を連続で学習できます
+                </p>
+              </div>
             </div>
           )}
 
