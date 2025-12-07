@@ -1577,7 +1577,17 @@ export default function WorkbookDetail() {
                                   )}
 
                                   {/* タイトル */}
-                                  <h3 className={`font-semibold text-sm sm:text-base truncate flex-1 min-w-0 ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
+                                  <h3 className={`font-semibold text-sm sm:text-base truncate ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
+
+                                  {/* 除外バッジ（タイトルの直後） */}
+                                  {isExcluded && (
+                                    <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                                      除外中
+                                    </span>
+                                  )}
+
+                                  {/* スペーサー（タイトルエリアの残りスペース） */}
+                                  <div className="flex-1 min-w-0"></div>
 
                                   {/* 学習ボタン（スマホのみ表示、小さめ） */}
                                   <button
@@ -1679,13 +1689,6 @@ export default function WorkbookDetail() {
                                   {firstProblemWithPage?.page && (
                                     <span className="text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
                                       p.{firstProblemWithPage.page}
-                                    </span>
-                                  )}
-
-                                  {/* 除外バッジ */}
-                                  {isExcluded && (
-                                    <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
-                                      除外中
                                     </span>
                                   )}
 
