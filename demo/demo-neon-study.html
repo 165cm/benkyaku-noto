@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>案1: Neon Study - ホーム画面デモ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+          },
+          colors: {
+            neon: {
+              bg: '#0f172a',
+              card: '#1e293b',
+              purple: '#a855f7',
+              cyan: '#22d3ee',
+              pink: '#f472b6',
+              blue: '#3b82f6',
+            }
+          },
+          animation: {
+            'glow': 'glow 2s ease-in-out infinite alternate',
+            'float': 'float 3s ease-in-out infinite',
+          },
+          keyframes: {
+            glow: {
+              '0%': { boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)' },
+              '100%': { boxShadow: '0 0 30px rgba(168, 85, 247, 0.8), 0 0 60px rgba(168, 85, 247, 0.4)' },
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-10px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+    }
+    .neon-text {
+      text-shadow: 0 0 10px rgba(168, 85, 247, 0.8), 0 0 20px rgba(168, 85, 247, 0.5);
+    }
+    .neon-border {
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.3), inset 0 0 15px rgba(168, 85, 247, 0.1);
+    }
+    .progress-glow {
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+    }
+    .streak-glow {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-white font-sans">
+  <!-- Header -->
+  <header class="sticky top-0 z-50 glass-card border-b border-purple-500/20">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center animate-glow">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <h1 class="text-xl font-bold neon-text">Neon Study</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-500/30">
+          <span class="text-cyan-400 streak-glow">🔥</span>
+          <span class="text-sm font-medium">7日連続</span>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-pink-500 to-purple-500"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <!-- Welcome Section -->
+    <div class="glass-card rounded-2xl p-6 neon-border">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-400 text-sm">おかえりなさい</p>
+          <h2 class="text-2xl font-bold mt-1">田中さん、今日も頑張ろう！</h2>
+          <p class="text-purple-300 mt-2">今週の目標まであと <span class="text-cyan-400 font-bold">2時間30分</span></p>
+        </div>
+        <div class="hidden md:block animate-float">
+          <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-500/30 to-cyan-500/30 flex items-center justify-center">
+            <span class="text-5xl">📚</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Today's Study Time -->
+      <div class="glass-card rounded-xl p-4 hover:border-cyan-500/50 transition-all cursor-pointer group">
+        <div class="flex items-center gap-2 text-gray-400 text-sm mb-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          今日の学習
+        </div>
+        <p class="text-3xl font-bold text-cyan-400 group-hover:neon-text transition-all">1:45</p>
+        <p class="text-xs text-gray-500 mt-1">目標: 3時間</p>
+      </div>
+
+      <!-- Weekly Progress -->
+      <div class="glass-card rounded-xl p-4 hover:border-purple-500/50 transition-all cursor-pointer group">
+        <div class="flex items-center gap-2 text-gray-400 text-sm mb-2">
+          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          週間進捗
+        </div>
+        <p class="text-3xl font-bold text-purple-400 group-hover:neon-text transition-all">68%</p>
+        <p class="text-xs text-gray-500 mt-1">12/20時間</p>
+      </div>
+
+      <!-- Solved Problems -->
+      <div class="glass-card rounded-xl p-4 hover:border-pink-500/50 transition-all cursor-pointer group">
+        <div class="flex items-center gap-2 text-gray-400 text-sm mb-2">
+          <svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          解いた問題
+        </div>
+        <p class="text-3xl font-bold text-pink-400 group-hover:neon-text transition-all">247</p>
+        <p class="text-xs text-gray-500 mt-1">今月 +52</p>
+      </div>
+
+      <!-- Mastery Rate -->
+      <div class="glass-card rounded-xl p-4 hover:border-green-500/50 transition-all cursor-pointer group">
+        <div class="flex items-center gap-2 text-gray-400 text-sm mb-2">
+          <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+          習得率
+        </div>
+        <p class="text-3xl font-bold text-green-400 group-hover:neon-text transition-all">73%</p>
+        <p class="text-xs text-gray-500 mt-1">先週比 +5%</p>
+      </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- Quick Study -->
+      <button class="glass-card rounded-2xl p-6 text-left hover:scale-[1.02] transition-all group neon-border animate-glow">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-bold text-white group-hover:text-purple-300 transition-colors">
+              🎯 弱点克服モード
+            </h3>
+            <p class="text-gray-400 mt-2">AIが苦手な問題を自動選出</p>
+            <div class="flex items-center gap-2 mt-4">
+              <span class="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-sm">12問待機中</span>
+            </div>
+          </div>
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+        </div>
+      </button>
+
+      <!-- Continue Learning -->
+      <button class="glass-card rounded-2xl p-6 text-left hover:scale-[1.02] transition-all group border border-cyan-500/30">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyan-300 transition-colors">
+              📖 前回の続きから
+            </h3>
+            <p class="text-gray-400 mt-2">数学IA - 第3章 二次関数</p>
+            <div class="flex items-center gap-2 mt-4">
+              <div class="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div class="h-full w-3/5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full progress-glow"></div>
+              </div>
+              <span class="text-cyan-400 text-sm font-medium">60%</span>
+            </div>
+          </div>
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Recent Workbooks -->
+    <div class="glass-card rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold">最近の問題集</h3>
+        <button class="text-purple-400 hover:text-purple-300 text-sm">すべて見る →</button>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <!-- Workbook 1 -->
+        <div class="bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800 transition-colors cursor-pointer group">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-2xl">
+              📐
+            </div>
+            <div class="flex-1">
+              <h4 class="font-medium group-hover:text-purple-300 transition-colors">数学IA</h4>
+              <p class="text-gray-500 text-sm">チャート式</p>
+              <div class="flex items-center gap-2 mt-2">
+                <div class="flex-1 h-1.5 bg-gray-700 rounded-full">
+                  <div class="h-full w-4/5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                </div>
+                <span class="text-xs text-gray-400">80%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workbook 2 -->
+        <div class="bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800 transition-colors cursor-pointer group">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-cyan-500 flex items-center justify-center text-2xl">
+              🧪
+            </div>
+            <div class="flex-1">
+              <h4 class="font-medium group-hover:text-cyan-300 transition-colors">化学基礎</h4>
+              <p class="text-gray-500 text-sm">セミナー化学</p>
+              <div class="flex items-center gap-2 mt-2">
+                <div class="flex-1 h-1.5 bg-gray-700 rounded-full">
+                  <div class="h-full w-3/5 bg-gradient-to-r from-green-500 to-cyan-500 rounded-full"></div>
+                </div>
+                <span class="text-xs text-gray-400">60%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workbook 3 -->
+        <div class="bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800 transition-colors cursor-pointer group">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-2xl">
+              📝
+            </div>
+            <div class="flex-1">
+              <h4 class="font-medium group-hover:text-orange-300 transition-colors">英語長文</h4>
+              <p class="text-gray-500 text-sm">やっておきたい500</p>
+              <div class="flex items-center gap-2 mt-2">
+                <div class="flex-1 h-1.5 bg-gray-700 rounded-full">
+                  <div class="h-full w-2/5 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
+                </div>
+                <span class="text-xs text-gray-400">40%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Chart -->
+    <div class="glass-card rounded-2xl p-6">
+      <h3 class="text-lg font-bold mb-4">今週の学習時間</h3>
+      <div class="flex items-end justify-between h-40 gap-2">
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-lg" style="height: 60%"></div>
+          <span class="text-xs text-gray-500">月</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-lg" style="height: 80%"></div>
+          <span class="text-xs text-gray-500">火</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-lg" style="height: 45%"></div>
+          <span class="text-xs text-gray-500">水</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-lg" style="height: 90%"></div>
+          <span class="text-xs text-gray-500">木</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-lg" style="height: 70%"></div>
+          <span class="text-xs text-gray-500">金</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gradient-to-t from-purple-600 to-pink-400 rounded-t-lg animate-pulse" style="height: 55%"></div>
+          <span class="text-xs text-cyan-400 font-medium">今日</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full bg-gray-700 rounded-t-lg" style="height: 20%"></div>
+          <span class="text-xs text-gray-500">日</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 glass-card border-t border-purple-500/20 px-4 py-2">
+    <div class="max-w-md mx-auto flex justify-around">
+      <button class="flex flex-col items-center gap-1 p-2 text-purple-400">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+        <span class="text-xs">ホーム</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-gray-300">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+        <span class="text-xs">問題集</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-gray-300">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span class="text-xs">復習</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-gray-300">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <span class="text-xs">統計</span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="h-20"></div>
+</body>
+</html>

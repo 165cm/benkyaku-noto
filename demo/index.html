@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デザイン案デモ - 比較ページ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="text-center mb-12">
+      <h1 class="text-3xl font-bold text-gray-900 mb-4">
+        リブランディング デザイン案 デモ
+      </h1>
+      <p class="text-gray-600">
+        高校生・大学生向け学習アプリの3つのデザイン案を比較してください
+      </p>
+    </header>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <!-- Neon Study -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="h-48 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center relative overflow-hidden">
+          <div class="absolute inset-0 opacity-30">
+            <div class="absolute top-4 left-4 w-20 h-20 bg-purple-500 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-4 right-4 w-16 h-16 bg-cyan-500 rounded-full blur-2xl"></div>
+          </div>
+          <div class="text-center z-10">
+            <div class="text-4xl mb-2">⚡</div>
+            <h2 class="text-2xl font-bold text-white" style="text-shadow: 0 0 20px rgba(168, 85, 247, 0.8);">
+              Neon Study
+            </h2>
+          </div>
+        </div>
+        <div class="p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-2">案1: サイバーポップ路線</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            夜遅くまで頑張る学生をイメージした、クールで都会的なネオンカラーデザイン。
+          </p>
+          <ul class="text-xs text-gray-500 space-y-1 mb-4">
+            <li>・ダークモード基調</li>
+            <li>・ネオングロー効果</li>
+            <li>・トレンドに敏感な大学生向け</li>
+          </ul>
+          <a href="demo-neon-study.html"
+             class="block w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-center rounded-lg font-medium hover:from-purple-700 hover:to-cyan-600 transition-all">
+            デモを見る →
+          </a>
+        </div>
+      </div>
+
+      <!-- Mochi -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="h-48 bg-gradient-to-br from-purple-100 via-pink-100 to-green-100 flex items-center justify-center relative overflow-hidden">
+          <div class="absolute top-2 right-4 text-2xl animate-bounce">✨</div>
+          <div class="absolute bottom-4 left-4 text-xl">🌸</div>
+          <div class="text-center z-10">
+            <div class="text-5xl mb-2">🍡</div>
+            <h2 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">
+              Mochi
+            </h2>
+          </div>
+        </div>
+        <div class="p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-2">案4: かわいい・ゆるふわ路線</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            ゆるキャラマスコットと一緒に学ぶ、親しみやすいデザイン。
+          </p>
+          <ul class="text-xs text-gray-500 space-y-1 mb-4">
+            <li>・パステルカラー</li>
+            <li>・スタンプ・バッジ報酬</li>
+            <li>・高校生・かわいいもの好き向け</li>
+          </ul>
+          <a href="demo-mochi.html"
+             class="block w-full py-3 px-4 bg-gradient-to-r from-purple-400 to-pink-400 text-white text-center rounded-lg font-medium hover:from-purple-500 hover:to-pink-500 transition-all">
+            デモを見る →
+          </a>
+        </div>
+      </div>
+
+      <!-- Focus -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="h-48 bg-gradient-to-br from-gray-50 to-indigo-50 flex items-center justify-center relative overflow-hidden border-b border-gray-100">
+          <div class="absolute top-4 right-4 w-24 h-24 bg-indigo-100 rounded-full opacity-50"></div>
+          <div class="text-center z-10">
+            <div class="w-12 h-12 rounded-xl bg-indigo-500 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+              </svg>
+            </div>
+            <h2 class="text-2xl font-semibold text-gray-900">
+              Focus
+            </h2>
+          </div>
+        </div>
+        <div class="p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-2">案5: ミニマル・プレミアム路線</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            集中力を高める、洗練されたミニマルデザイン。
+          </p>
+          <ul class="text-xs text-gray-500 space-y-1 mb-4">
+            <li>・余白を活かしたレイアウト</li>
+            <li>・Notion風の洗練さ</li>
+            <li>・意識高い系大学生向け</li>
+          </ul>
+          <a href="demo-focus.html"
+             class="block w-full py-3 px-4 bg-indigo-500 text-white text-center rounded-lg font-medium hover:bg-indigo-600 transition-all">
+            デモを見る →
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="mt-12 bg-white rounded-2xl shadow-lg p-6">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">比較表</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="text-left py-3 px-4 font-semibold text-gray-700">項目</th>
+              <th class="text-center py-3 px-4 font-semibold text-purple-600">Neon Study</th>
+              <th class="text-center py-3 px-4 font-semibold text-pink-600">Mochi</th>
+              <th class="text-center py-3 px-4 font-semibold text-indigo-600">Focus</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr>
+              <td class="py-3 px-4 text-gray-600">コンセプト</td>
+              <td class="py-3 px-4 text-center">クール・サイバー</td>
+              <td class="py-3 px-4 text-center">かわいい・親しみ</td>
+              <td class="py-3 px-4 text-center">洗練・集中</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 text-gray-600">メインターゲット</td>
+              <td class="py-3 px-4 text-center">大学生（男性）</td>
+              <td class="py-3 px-4 text-center">高校生（女性）</td>
+              <td class="py-3 px-4 text-center">大学生（男女）</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 text-gray-600">差別化度</td>
+              <td class="py-3 px-4 text-center">★★★★★</td>
+              <td class="py-3 px-4 text-center">★★★★☆</td>
+              <td class="py-3 px-4 text-center">★★☆☆☆</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 text-gray-600">親しみやすさ</td>
+              <td class="py-3 px-4 text-center">★★☆☆☆</td>
+              <td class="py-3 px-4 text-center">★★★★★</td>
+              <td class="py-3 px-4 text-center">★★★☆☆</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 text-gray-600">実装難易度</td>
+              <td class="py-3 px-4 text-center">
+                <span class="px-2 py-1 rounded-full bg-red-100 text-red-600 text-xs">高</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-600 text-xs">中〜高</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span class="px-2 py-1 rounded-full bg-green-100 text-green-600 text-xs">低</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 text-gray-600">競合との差別化</td>
+              <td class="py-3 px-4 text-center">学習アプリで稀少</td>
+              <td class="py-3 px-4 text-center">ゲームアプリ風</td>
+              <td class="py-3 px-4 text-center">Notion/生産性ツール風</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-8 text-center text-sm text-gray-500">
+      <p>各デモはモバイル表示にも対応しています。ブラウザの幅を狭くして確認してください。</p>
+    </footer>
+  </div>
+</body>
+</html>

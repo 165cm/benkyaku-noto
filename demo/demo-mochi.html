@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>案4: Mochi - ホーム画面デモ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Kosugi+Maru&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'Kosugi Maru', 'sans-serif'],
+          },
+          colors: {
+            mochi: {
+              lavender: '#e9d5ff',
+              mint: '#a7f3d0',
+              peach: '#fed7aa',
+              sky: '#bae6fd',
+              pink: '#fbcfe8',
+              cream: '#fef3c7',
+            }
+          },
+          animation: {
+            'bounce-slow': 'bounce 2s infinite',
+            'wiggle': 'wiggle 1s ease-in-out infinite',
+            'float': 'float 3s ease-in-out infinite',
+          },
+          keyframes: {
+            wiggle: {
+              '0%, 100%': { transform: 'rotate(-3deg)' },
+              '50%': { transform: 'rotate(3deg)' },
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-10px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: linear-gradient(180deg, #fdf4ff 0%, #f0fdf4 50%, #fef3c7 100%);
+    }
+    .card-cute {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    .mascot-shadow {
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+    }
+    .bubble {
+      position: relative;
+    }
+    .bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 24px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      transform: rotate(45deg);
+      border-radius: 4px;
+    }
+    .stamp {
+      transition: transform 0.2s;
+    }
+    .stamp:hover {
+      transform: scale(1.1) rotate(5deg);
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans">
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-purple-100">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-300 to-pink-300 flex items-center justify-center text-xl animate-wiggle">
+          🍡
+        </div>
+        <h1 class="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">
+          Mochi
+        </h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-orange-100 border-2 border-orange-200">
+          <span class="text-lg">🔥</span>
+          <span class="text-sm font-bold text-orange-600">7日</span>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-200 to-pink-200 border-2 border-white shadow-md"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <!-- Mascot Welcome -->
+    <div class="card-cute p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-100 to-transparent rounded-bl-full"></div>
+      <div class="flex items-center gap-4">
+        <!-- Mascot -->
+        <div class="relative animate-float mascot-shadow">
+          <div class="w-24 h-24 bg-gradient-to-br from-pink-200 to-purple-200 rounded-full flex items-center justify-center">
+            <div class="text-center">
+              <div class="text-4xl">🐰</div>
+            </div>
+          </div>
+          <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-yellow-200 rounded-full flex items-center justify-center text-sm border-2 border-white">
+            ✨
+          </div>
+        </div>
+        <!-- Speech Bubble -->
+        <div class="flex-1">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border-2 border-purple-100 bubble">
+            <p class="text-gray-600 text-sm">おかえり〜！</p>
+            <p class="text-lg font-bold text-purple-700 mt-1">
+              今日も一緒にがんばろ〜 💪
+            </p>
+            <p class="text-purple-400 text-sm mt-2">
+              あと <span class="font-bold text-pink-500">2時間30分</span> で今週の目標達成だよ！
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today's Stamps -->
+    <div class="card-cute p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+          <span class="text-xl">📅</span> 今週のがんばりスタンプ
+        </h3>
+        <span class="text-xs text-purple-500 bg-purple-50 px-2 py-1 rounded-full">12月第2週</span>
+      </div>
+      <div class="flex justify-between">
+        <div class="flex flex-col items-center gap-2 stamp">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center text-2xl border-4 border-pink-300">
+            ⭐
+          </div>
+          <span class="text-xs text-gray-500">月</span>
+        </div>
+        <div class="flex flex-col items-center gap-2 stamp">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-green-200 to-teal-200 flex items-center justify-center text-2xl border-4 border-green-300">
+            🌟
+          </div>
+          <span class="text-xs text-gray-500">火</span>
+        </div>
+        <div class="flex flex-col items-center gap-2 stamp">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-200 to-orange-200 flex items-center justify-center text-2xl border-4 border-yellow-300">
+            💫
+          </div>
+          <span class="text-xs text-gray-500">水</span>
+        </div>
+        <div class="flex flex-col items-center gap-2 stamp">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-200 to-purple-200 flex items-center justify-center text-2xl border-4 border-blue-300">
+            ✨
+          </div>
+          <span class="text-xs text-gray-500">木</span>
+        </div>
+        <div class="flex flex-col items-center gap-2 stamp">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-200 to-pink-200 flex items-center justify-center text-2xl border-4 border-purple-300">
+            🎉
+          </div>
+          <span class="text-xs text-gray-500">金</span>
+        </div>
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-orange-100 to-pink-100 flex items-center justify-center border-4 border-dashed border-orange-200 animate-pulse">
+            <span class="text-xl">❓</span>
+          </div>
+          <span class="text-xs text-orange-500 font-bold">今日</span>
+        </div>
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center border-4 border-dashed border-gray-200">
+            <span class="text-gray-300 text-xl">○</span>
+          </div>
+          <span class="text-xs text-gray-400">日</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 gap-4">
+      <div class="card-cute p-4 border-2 border-purple-100">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-2xl">⏰</span>
+          <span class="text-sm text-gray-500">今日の学習</span>
+        </div>
+        <p class="text-3xl font-bold text-purple-600">1:45</p>
+        <div class="flex items-center gap-2 mt-2">
+          <div class="flex-1 h-3 bg-purple-100 rounded-full overflow-hidden">
+            <div class="h-full w-3/5 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full"></div>
+          </div>
+          <span class="text-xs text-purple-400">58%</span>
+        </div>
+      </div>
+
+      <div class="card-cute p-4 border-2 border-green-100">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-2xl">✅</span>
+          <span class="text-sm text-gray-500">解いた問題</span>
+        </div>
+        <p class="text-3xl font-bold text-green-600">247</p>
+        <p class="text-xs text-green-400 mt-2">今月 +52問 がんばった！</p>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="space-y-4">
+      <!-- Main Action -->
+      <button class="w-full card-cute p-5 border-4 border-purple-200 hover:border-purple-300 transition-all hover:scale-[1.02] active:scale-[0.98] group">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-300 to-pink-300 flex items-center justify-center text-3xl group-hover:animate-bounce-slow shadow-lg">
+            🎯
+          </div>
+          <div class="flex-1 text-left">
+            <h3 class="text-lg font-bold text-purple-700">にがて克服チャレンジ！</h3>
+            <p class="text-gray-500 text-sm mt-1">AIがキミの苦手を見つけてくれるよ</p>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 text-xs font-bold">12問まってるよ</span>
+            </div>
+          </div>
+          <div class="text-purple-300 group-hover:text-purple-500 transition-colors">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+      </button>
+
+      <!-- Secondary Action -->
+      <button class="w-full card-cute p-5 border-4 border-green-200 hover:border-green-300 transition-all hover:scale-[1.02] active:scale-[0.98] group">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-300 to-teal-300 flex items-center justify-center text-3xl shadow-lg">
+            📖
+          </div>
+          <div class="flex-1 text-left">
+            <h3 class="text-lg font-bold text-green-700">つづきからやる</h3>
+            <p class="text-gray-500 text-sm mt-1">数学IA - 第3章 二次関数</p>
+            <div class="flex items-center gap-2 mt-2">
+              <div class="flex-1 h-2 bg-green-100 rounded-full">
+                <div class="h-full w-3/5 bg-gradient-to-r from-green-400 to-teal-400 rounded-full"></div>
+              </div>
+              <span class="text-xs text-green-500 font-bold">60%</span>
+            </div>
+          </div>
+          <div class="text-green-300 group-hover:text-green-500 transition-colors">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Workbooks -->
+    <div class="card-cute p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+          <span class="text-xl">📚</span> 最近の問題集
+        </h3>
+        <button class="text-purple-500 text-sm font-medium hover:underline">もっと見る →</button>
+      </div>
+      <div class="space-y-3">
+        <!-- Workbook Item -->
+        <div class="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 transition-colors cursor-pointer">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-300 to-pink-300 flex items-center justify-center text-2xl shadow-md">
+            📐
+          </div>
+          <div class="flex-1">
+            <h4 class="font-bold text-gray-700">数学IA</h4>
+            <p class="text-xs text-gray-400">チャート式</p>
+          </div>
+          <div class="text-right">
+            <p class="text-lg font-bold text-purple-600">80%</p>
+            <p class="text-xs text-gray-400">あと20問</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-green-50 to-teal-50 hover:from-green-100 hover:to-teal-100 transition-colors cursor-pointer">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-300 to-teal-300 flex items-center justify-center text-2xl shadow-md">
+            🧪
+          </div>
+          <div class="flex-1">
+            <h4 class="font-bold text-gray-700">化学基礎</h4>
+            <p class="text-xs text-gray-400">セミナー化学</p>
+          </div>
+          <div class="text-right">
+            <p class="text-lg font-bold text-green-600">60%</p>
+            <p class="text-xs text-gray-400">あと40問</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-colors cursor-pointer">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-300 to-yellow-300 flex items-center justify-center text-2xl shadow-md">
+            📝
+          </div>
+          <div class="flex-1">
+            <h4 class="font-bold text-gray-700">英語長文</h4>
+            <p class="text-xs text-gray-400">やっておきたい500</p>
+          </div>
+          <div class="text-right">
+            <p class="text-lg font-bold text-orange-600">40%</p>
+            <p class="text-xs text-gray-400">あと30問</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Achievement -->
+    <div class="card-cute p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 to-orange-300 flex items-center justify-center text-3xl shadow-lg animate-bounce-slow">
+          🏆
+        </div>
+        <div class="flex-1">
+          <p class="text-sm text-orange-600 font-medium">もうすぐ達成！</p>
+          <h4 class="font-bold text-gray-700">「1週間連続学習」バッジ</h4>
+          <div class="flex items-center gap-2 mt-2">
+            <div class="flex-1 h-2 bg-orange-100 rounded-full">
+              <div class="h-full bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full" style="width: 85%"></div>
+            </div>
+            <span class="text-xs text-orange-500 font-bold">あと1日！</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t-2 border-purple-100 px-4 py-2 shadow-lg">
+    <div class="max-w-md mx-auto flex justify-around">
+      <button class="flex flex-col items-center gap-1 p-2 text-purple-500">
+        <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+          <span class="text-xl">🏠</span>
+        </div>
+        <span class="text-xs font-bold">ホーム</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-gray-600">
+        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <span class="text-xl">📚</span>
+        </div>
+        <span class="text-xs">問題集</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-gray-600">
+        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <span class="text-xl">🔄</span>
+        </div>
+        <span class="text-xs">復習</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-gray-600">
+        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <span class="text-xl">📊</span>
+        </div>
+        <span class="text-xs">統計</span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="h-24"></div>
+</body>
+</html>
