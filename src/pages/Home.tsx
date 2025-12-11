@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Play, Loader2, Target, ChevronDown, ChevronUp } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import { toast } from '@/store/toastStore'
 import { calculateStudyStats, getTodayReviewList, getWeakSectionProblem, calculateSectionStats, type SectionStats } from '@/lib/review'
 import { getExplanations } from '@/lib/db'
 import { generateFirstTimeStudySet, getUnstudiedProblemsCount } from '@/lib/studySet'
@@ -105,7 +106,7 @@ export default function Home() {
       const problems = await generateFirstTimeStudySet(180) // 最初の1問だけ取得
 
       if (problems.length === 0) {
-        alert('未学習の問題がありません。')
+        toast.info('問題がありません', '未学習の問題がありません')
         setLoading(false)
         return
       }
@@ -114,7 +115,7 @@ export default function Home() {
       navigate(`/study/${problems[0].id}`)
     } catch (error) {
       console.error('Error starting first-time study:', error)
-      alert('学習を開始できませんでした')
+      toast.error('エラー', '学習を開始できませんでした')
       setLoading(false)
     }
   }
@@ -126,7 +127,7 @@ export default function Home() {
       const problem = await getWeakSectionProblem()
 
       if (!problem) {
-        alert('復習する問題がありません。まず初回学習を進めてください。')
+        toast.info('問題がありません', '復習する問題がありません。まず初回学習を進めてください。')
         return
       }
 
@@ -134,7 +135,7 @@ export default function Home() {
       navigate(`/study/${problem.id}?mode=weak`)
     } catch (error) {
       console.error('Error starting weak section review:', error)
-      alert('復習を開始できませんでした')
+      toast.error('エラー', '復習を開始できませんでした')
     } finally {
       setStartingReview(false)
     }

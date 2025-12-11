@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, BookOpen, Trash2, Image, Settings, ChevronDown, Play, RotateCcw } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
 import {
   getWorkbooks,
   addWorkbook,
@@ -33,6 +35,7 @@ type SortOption = 'updated' | 'updated-asc' | 'accuracy' | 'accuracy-asc' | 'pro
 
 export default function Workbooks() {
   const navigate = useNavigate()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState({
@@ -112,7 +115,13 @@ export default function Workbooks() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm('この問題集を削除しますか？関連する問題と学習記録もすべて削除されます。')) {
+    const confirmed = await confirm({
+      title: '問題集の削除',
+      message: 'この問題集を削除しますか？\n関連する問題と学習記録もすべて削除されます。',
+      confirmText: '削除',
+      variant: 'danger',
+    })
+    if (confirmed) {
       await deleteWorkbook(id)
       loadWorkbooks()
     }
@@ -774,6 +783,9 @@ export default function Workbooks() {
           </div>
         </Modal>
       )}
+
+      {/* 確認ダイアログ */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }
