@@ -6,6 +6,7 @@ import Button from '@/components/Button'
 import { getTodayReviewList, getReviewAgainList, estimateReviewTime, type ReviewAgainOptions } from '@/lib/review'
 import { createStudySession } from '@/lib/studySession'
 import { db } from '@/lib/db'
+import { toast } from '@/store/toastStore'
 import type { ReviewSchedule } from '@/types'
 
 // 復習タイミングのカテゴリ
@@ -174,7 +175,7 @@ export default function Review() {
   // 連続学習を開始
   const startContinuousStudy = async () => {
     if (filteredList.length === 0) {
-      alert('復習する問題がありません')
+      toast.info('復習する問題がありません', 'フィルター条件を変更してください')
       return
     }
 
@@ -222,7 +223,7 @@ export default function Review() {
   // もう一周モードの連続学習を開始
   const startReviewAgainStudy = async () => {
     if (filteredReviewAgainList.length === 0) {
-      alert('復習する問題がありません')
+      toast.info('復習する問題がありません', 'フィルター条件を変更してください')
       return
     }
 

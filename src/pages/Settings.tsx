@@ -5,6 +5,9 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
+import { toast } from '@/store/toastStore'
 import {
   saveOpenAIApiKey,
   getOpenAIApiKey,
@@ -28,6 +31,7 @@ import { backupToCloud, restoreFromCloud, calculateBackupSize, type SyncProgress
 import { useAuthStore } from '@/store/authStore'
 export default function Settings() {
   const navigate = useNavigate()
+  const { confirm, dialogProps } = useConfirmDialog()
   const { user } = useAuthStore()
   const [apiKey, setApiKey] = useState('')
   const [isApiKeySet, setIsApiKeySet] = useState(false)
@@ -78,33 +82,45 @@ export default function Settings() {
     }
   }
 
-  const handleRemove = () => {
-    if (confirm('APIキーを削除しますか？')) {
+  const handleRemove = async () => {
+    const confirmed = await confirm({
+      title: 'APIキーの削除',
+      message: 'APIキーを削除しますか？',
+      confirmText: '削除',
+      variant: 'danger',
+    })
+    if (confirmed) {
       removeOpenAIApiKey()
       setApiKey('')
       setIsApiKeySet(false)
+      toast.success('削除完了', 'APIキーを削除しました')
     }
   }
 
   const handleBackup = async () => {
     if (!user) {
-      alert('ログインが必要です')
+      toast.warning('ログインが必要です', 'バックアップにはログインが必要です')
       return
     }
 
-    if (!confirm('ローカルデータをクラウドにバックアップしますか？\n既存のクラウドデータは上書きされます。')) {
-      return
-    }
+    const confirmed = await confirm({
+      title: 'バックアップの確認',
+      message: 'ローカルデータをクラウドにバックアップしますか？\n\n既存のクラウドデータは上書きされます。',
+      confirmText: 'バックアップ',
+    })
+    if (!confirmed) return
 
     try {
       setSyncMessage(null)
       await backupToCloud(user.uid, setSyncProgress)
       setLastBackupTime(getLastBackupTime())
       setSyncMessage({ type: 'success', text: 'バックアップが完了しました' })
+      toast.success('バックアップ完了', 'データをクラウドに保存しました')
       setTimeout(() => setSyncMessage(null), 5000)
     } catch (error) {
       console.error('Backup error:', error)
       setSyncMessage({ type: 'error', text: 'バックアップに失敗しました' })
+      toast.error('エラー', 'バックアップに失敗しました')
     } finally {
       setSyncProgress(null)
     }
@@ -112,19 +128,23 @@ export default function Settings() {
 
   const handleRestore = async () => {
     if (!user) {
-      alert('ログインが必要です')
+      toast.warning('ログインが必要です', '復元にはログインが必要です')
       return
     }
 
-    if (!confirm('クラウドからデータを復元しますか？\nローカルデータとマージされます。')) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '復元の確認',
+      message: 'クラウドからデータを復元しますか？\n\nローカルデータとマージされます。',
+      confirmText: '復元',
+    })
+    if (!confirmed) return
 
     try {
       setSyncMessage(null)
       await restoreFromCloud(user.uid, setSyncProgress)
       setLastRestoreTime(getLastRestoreTime())
       setSyncMessage({ type: 'success', text: '復元が完了しました' })
+      toast.success('復元完了', 'クラウドからデータを復元しました')
       setTimeout(() => {
         setSyncMessage(null)
         window.location.reload()
@@ -132,6 +152,7 @@ export default function Settings() {
     } catch (error) {
       console.error('Restore error:', error)
       setSyncMessage({ type: 'error', text: '復元に失敗しました' })
+      toast.error('エラー', '復元に失敗しました')
     } finally {
       setSyncProgress(null)
     }
@@ -579,6 +600,8 @@ export default function Settings() {
           </div>
         </div>
       </Card>
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

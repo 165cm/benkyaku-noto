@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
 import { getDeletedProblems, restoreProblem, permanentlyDeleteProblem, getWorkbook, emptyTrash } from '@/lib/db'
+import { toast } from '@/store/toastStore'
 import type { Problem } from '@/types'
 
 export default function Trash() {
   const navigate = useNavigate()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [deletedProblems, setDeletedProblems] = useState<Problem[]>([])
   const [workbookNames, setWorkbookNames] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -36,23 +40,43 @@ export default function Trash() {
   }
 
   const handleRestore = async (id: string) => {
-    if (confirm('この問題を復元しますか？')) {
+    const confirmed = await confirm({
+      title: '問題の復元',
+      message: 'この問題を復元しますか？',
+      confirmText: '復元',
+    })
+    if (confirmed) {
       await restoreProblem(id)
       await loadData()
+      toast.success('復元完了', '問題を復元しました')
     }
   }
 
   const handlePermanentDelete = async (id: string) => {
-    if (confirm('この問題を完全に削除しますか？この操作は元に戻せません。学習記録も削除されます。')) {
+    const confirmed = await confirm({
+      title: '完全削除の確認',
+      message: 'この問題を完全に削除しますか？\n\nこの操作は元に戻せません。学習記録も削除されます。',
+      confirmText: '完全削除',
+      variant: 'danger',
+    })
+    if (confirmed) {
       await permanentlyDeleteProblem(id)
       await loadData()
+      toast.success('削除完了', '問題を完全に削除しました')
     }
   }
 
   const handleEmptyTrash = async () => {
-    if (confirm(`ゴミ箱を空にしますか？\n\n${deletedProblems.length}件の問題と学習記録が完全に削除されます。\nこの操作は取り消せません。`)) {
+    const confirmed = await confirm({
+      title: 'ゴミ箱を空にする',
+      message: `${deletedProblems.length}件の問題と学習記録が完全に削除されます。\n\nこの操作は取り消せません。`,
+      confirmText: '空にする',
+      variant: 'danger',
+    })
+    if (confirmed) {
       await emptyTrash()
       await loadData()
+      toast.success('ゴミ箱を空にしました', `${deletedProblems.length}件の問題を削除しました`)
     }
   }
 
@@ -168,6 +192,8 @@ export default function Trash() {
           <li>• 「完全削除」すると学習記録も含めて削除されます（復元不可）</li>
         </ul>
       </div>
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

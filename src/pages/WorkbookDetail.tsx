@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
+import { toast } from '@/store/toastStore'
 import {
   db,
   makeSubProblem,
@@ -31,6 +34,7 @@ export default function WorkbookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { confirm, dialogProps } = useConfirmDialog()
 
   // Custom hooks for data and form management
   const {
@@ -445,7 +449,7 @@ export default function WorkbookDetail() {
     }
 
     if (learnableProblems.length === 0) {
-      alert('学習可能な問題がありません')
+      toast.info('問題がありません', '学習可能な問題がありません')
       return
     }
 
@@ -834,8 +838,12 @@ export default function WorkbookDetail() {
 
     if (!shouldSkipConfirm) {
       // 確認ポップアップ
-      const confirmMessage = `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？\n\n※ OKを押しながらShiftキーを押すと10分間確認を省略できます`
-      if (!confirm(confirmMessage)) {
+      const confirmed = await confirm({
+        title: '小問の設定',
+        message: `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？`,
+        confirmText: '設定',
+      })
+      if (!confirmed) {
         setDraggedProblem(null)
         return
       }
@@ -857,7 +865,7 @@ export default function WorkbookDetail() {
       loadData()
     } catch (error) {
       console.error('小問の設定に失敗しました:', error)
-      alert(error instanceof Error ? error.message : '小問の設定に失敗しました')
+      toast.error('エラー', error instanceof Error ? error.message : '小問の設定に失敗しました')
       setDraggedProblem(null)
       setLastDragOperation(null)
     }
@@ -878,7 +886,7 @@ export default function WorkbookDetail() {
       loadData()
     } catch (error) {
       console.error('元に戻すに失敗しました:', error)
-      alert('元に戻すに失敗しました')
+      toast.error('エラー', '元に戻すに失敗しました')
     }
   }
 
@@ -931,16 +939,21 @@ export default function WorkbookDetail() {
   const handleResetStudyRecords = async () => {
     if (!id || !workbook) return
 
-    const confirmMessage = `「${workbook.title}」の学習履歴を全て削除しますか？\n\nこの操作は取り消せません。`
-    if (!confirm(confirmMessage)) return
+    const confirmed = await confirm({
+      title: '学習履歴のリセット',
+      message: `「${workbook.title}」の学習履歴を全て削除しますか？\n\nこの操作は取り消せません。`,
+      confirmText: 'リセット',
+      variant: 'danger',
+    })
+    if (!confirmed) return
 
     try {
       await deleteStudyRecordsForWorkbook(id)
-      alert('学習履歴をリセットしました')
+      toast.success('完了', '学習履歴をリセットしました')
       loadData() // データを再読み込み
     } catch (error) {
       console.error('学習履歴のリセットに失敗しました:', error)
-      alert('学習履歴のリセットに失敗しました')
+      toast.error('エラー', '学習履歴のリセットに失敗しました')
     }
   }
 
@@ -978,7 +991,7 @@ export default function WorkbookDetail() {
 
     // ファイルサイズチェック（5MB制限）
     if (file.size > 5 * 1024 * 1024) {
-      alert('ファイルサイズが大きすぎます（5MB以下にしてください）')
+      toast.error('エラー', 'ファイルサイズが大きすぎます（5MB以下にしてください）')
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -994,8 +1007,8 @@ export default function WorkbookDetail() {
         // バリデーション
         validateCSVData(parsedProblems)
 
-        // インポート前に確認
-        if (!confirm(`${parsedProblems.length}問の問題をインポートします。よろしいですか？`)) {
+        // インポート前に確認（コールバック内なのでwindow.confirmを使用）
+        if (!window.confirm(`${parsedProblems.length}問の問題をインポートします。よろしいですか？`)) {
           return
         }
 
@@ -1060,20 +1073,19 @@ export default function WorkbookDetail() {
         await loadData()
 
         if (errorCount > 0) {
-          const errorSummary = errors.slice(0, 5).join('\n')
-          const moreErrors = errors.length > 5 ? `\n...他${errors.length - 5}件` : ''
-          alert(
-            `${successCount}問の問題をインポートしました。\n${errorCount}問でエラーが発生しました：\n\n${errorSummary}${moreErrors}`
+          toast.warning(
+            'インポート完了',
+            `${successCount}問をインポート、${errorCount}問でエラーが発生しました`
           )
         } else {
-          alert(`${successCount}問の問題をインポートしました`)
+          toast.success('インポート完了', `${successCount}問の問題をインポートしました`)
         }
       } catch (error) {
         console.error('CSV import error:', error)
         if (error instanceof ValidationError) {
-          alert(`バリデーションエラー: ${error.message}`)
+          toast.error('バリデーションエラー', error.message)
         } else {
-          alert(error instanceof Error ? error.message : 'CSVのインポートに失敗しました')
+          toast.error('エラー', error instanceof Error ? error.message : 'CSVのインポートに失敗しました')
         }
       }
     }
@@ -2257,6 +2269,9 @@ export default function WorkbookDetail() {
           </div>
         </div>
       </Modal>
+
+      {/* 確認ダイアログ */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { BookOpen, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Camera, Image, Filter, Search, SortAsc } from 'lucide-react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
 import { getExplanations, deleteExplanation, getImageBasedExplanations, deleteImageBasedExplanation } from '@/lib/db'
+import { toast } from '@/store/toastStore'
 import { generateAndSaveExplanation, hasUnexplainedSections } from '@/lib/aiExplanation'
 import { getOpenAIApiKey } from '@/lib/storage'
 import type { Explanation, ImageBasedExplanation, UserLevelType } from '@/types'
@@ -13,6 +16,7 @@ type SortOption = 'newest' | 'oldest' | 'level-asc' | 'level-desc' | 'regenerati
 
 export default function Explanations() {
   const navigate = useNavigate()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [explanations, setExplanations] = useState<Explanation[]>([])
   const [imageExplanations, setImageExplanations] = useState<ImageBasedExplanation[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +52,7 @@ export default function Explanations() {
 
   const handleGenerate = async () => {
     if (!hasApiKey) {
-      alert('OpenAI APIキーが設定されていません。設定画面でAPIキーを入力してください。')
+      toast.warning('APIキーが未設定です', '設定画面でOpenAI APIキーを入力してください')
       navigate('/settings')
       return
     }
@@ -58,30 +62,44 @@ export default function Explanations() {
       const result = await generateAndSaveExplanation()
       if (result) {
         await loadData()
-        alert(`「${result.category} ${result.title}」の解説を生成しました！`)
+        toast.success('解説を生成しました', `「${result.category} ${result.title}」の解説を作成しました`)
       } else {
-        alert('生成する解説がありません。全てのセクションの解説が完了しています。')
+        toast.info('生成完了', '全てのセクションの解説が完了しています')
       }
     } catch (error) {
       console.error('Error generating explanation:', error)
-      alert(`エラー: ${error instanceof Error ? error.message : '解説の生成に失敗しました'}`)
+      toast.error('エラー', error instanceof Error ? error.message : '解説の生成に失敗しました')
     } finally {
       setGenerating(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('この解説を削除しますか？')) return
+    const confirmed = await confirm({
+      title: '解説の削除',
+      message: 'この解説を削除しますか？',
+      confirmText: '削除',
+      variant: 'danger',
+    })
+    if (!confirmed) return
 
     await deleteExplanation(id)
     await loadData()
+    toast.success('削除完了', '解説を削除しました')
   }
 
   const handleDeleteImageExplanation = async (id: string) => {
-    if (!confirm('この解説を削除しますか？')) return
+    const confirmed = await confirm({
+      title: '解説の削除',
+      message: 'この解説を削除しますか？',
+      confirmText: '削除',
+      variant: 'danger',
+    })
+    if (!confirmed) return
 
     await deleteImageBasedExplanation(id)
     await loadData()
+    toast.success('削除完了', '解説を削除しました')
   }
 
   const toggleExpand = (id: string) => {
@@ -465,6 +483,8 @@ export default function Explanations() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }
