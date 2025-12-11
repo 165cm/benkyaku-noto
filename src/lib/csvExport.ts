@@ -102,12 +102,22 @@ export async function exportProblemsToCSV(problems: Problem[]): Promise<string> 
 
 // CSVフィールドのエスケープ処理
 function escapeCSVField(field: string): string {
-  // カンマ、改行、ダブルクォートを含む場合はダブルクォートで囲む
-  if (field.includes(',') || field.includes('\n') || field.includes('"')) {
-    // ダブルクォートは2つ重ねてエスケープ
-    return `"${field.replace(/"/g, '""')}"`
+  // CSV Injection対策: 特殊文字で始まる場合はプレフィックスを追加
+  // これにより、Excelなどで数式として実行されることを防ぐ
+  const injectionChars = ['=', '+', '-', '@', '\t', '\r']
+  let escapedField = field
+
+  if (injectionChars.some(char => field.startsWith(char))) {
+    // シングルクォートを追加して、明示的にテキストとして扱う
+    escapedField = "'" + field
   }
-  return field
+
+  // カンマ、改行、ダブルクォートを含む場合はダブルクォートで囲む
+  if (escapedField.includes(',') || escapedField.includes('\n') || escapedField.includes('"')) {
+    // ダブルクォートは2つ重ねてエスケープ
+    return `"${escapedField.replace(/"/g, '""')}"`
+  }
+  return escapedField
 }
 
 // CSVファイルをダウンロード

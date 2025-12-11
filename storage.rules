@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================
+    // User's workbook PDFs
+    // ============================================
+    // Path: /workbooks/{userId}/{fileName}
+    match /workbooks/{userId}/{fileName} {
+      // Only authenticated users can read their own files
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Only authenticated users can upload their own files
+      // Restrictions:
+      // - Max file size: 50MB
+      // - Only PDF files allowed
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 50 * 1024 * 1024
+                   && request.resource.contentType == 'application/pdf';
+
+      // Allow delete for file owner
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // User's problem images (for OCR, etc.)
+    // ============================================
+    // Path: /images/{userId}/{fileName}
+    match /images/{userId}/{fileName} {
+      // Only authenticated users can read their own files
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Only authenticated users can upload their own images
+      // Restrictions:
+      // - Max file size: 10MB
+      // - Only image files allowed
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+
+      // Allow delete for file owner
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // Deny all other access by default
+    // ============================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
