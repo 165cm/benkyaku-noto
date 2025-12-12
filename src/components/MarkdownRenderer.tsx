@@ -1,10 +1,17 @@
 import React from 'react'
+import DOMPurify from 'dompurify'
 
 interface MarkdownRendererProps {
   content: string
 }
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  // XSS対策: コンテンツをサニタイズ
+  const sanitizedContent = DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: [],  // HTMLタグを全て除去（テキストのみ）
+    ALLOWED_ATTR: [],
+  })
+
   // マークダウンをパースして要素に変換
   const parseMarkdown = (text: string) => {
     const lines = text.split('\n')
@@ -119,7 +126,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
   return (
     <div className="prose-custom">
-      {parseMarkdown(content)}
+      {parseMarkdown(sanitizedContent)}
     </div>
   )
 }

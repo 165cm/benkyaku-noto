@@ -3,6 +3,9 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Circle, Triangle, X, Edit2, Trash2, LogOut, Star, BookOpen, Image, Camera } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
+import { toast } from '@/store/toastStore'
 import PDFViewer from '@/components/PDFViewer'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { getProblem, getWorkbook, addStudyRecord, getStudyRecords, updateStudyRecord, deleteStudyRecord, db, isParentProblem, toggleBookmark, addTagToProblem, removeTagFromProblem, getExplanationBySectionKey, getImageBasedExplanationsByProblemId, updateProblem } from '@/lib/db'
@@ -28,6 +31,7 @@ export default function Study() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { confirm, dialogProps } = useConfirmDialog()
   const isWeakMode = searchParams.get('mode') === 'weak'
   const [problem, setProblem] = useState<Problem | null>(null)
   const [workbook, setWorkbook] = useState<Workbook | null>(null)
@@ -499,7 +503,7 @@ export default function Study() {
     const timeInSeconds = mins * 60 + secs
 
     if (timeInSeconds <= 0) {
-      alert('有効な時間を入力してください')
+      toast.warning('入力エラー', '有効な時間を入力してください')
       return
     }
 
@@ -670,7 +674,13 @@ export default function Study() {
 
   // 学習記録を削除
   const handleDeleteRecord = async (recordId: string) => {
-    if (!confirm('この学習記録を削除しますか？')) return
+    const confirmed = await confirm({
+      title: '学習記録の削除',
+      message: 'この学習記録を削除しますか？',
+      confirmText: '削除',
+      variant: 'danger',
+    })
+    if (!confirmed) return
 
     await deleteStudyRecord(recordId)
     await loadData()
@@ -1840,6 +1850,9 @@ export default function Study() {
           </div>
         )}
       </div>
+
+      {/* 確認ダイアログ */}
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }
