@@ -498,6 +498,219 @@ export async function calculateStudyStatsByWorkbook(workbookId?: string) {
   }
 }
 
+// 期間指定の統計を計算
+export type DateRangeType = 'week' | 'month' | 'all' | 'custom'
+
+export interface DateRange {
+  type: DateRangeType
+  startDate?: Date
+  endDate?: Date
+}
+
+export async function calculateStudyStatsWithDateRange(
+  workbookId?: string,
+  dateRange?: DateRange
+) {
+  const todayStart = getTodayStartTime()
+
+  let allRecords = await db.studyRecords.toArray()
+
+  // 問題集でフィルタリング
+  if (workbookId) {
+    allRecords = allRecords.filter((r) => r.workbookId === workbookId)
+  }
+
+  // 期間の設定
+  let startDate: Date
+  let endDate: Date = new Date(todayStart)
+  endDate.setDate(endDate.getDate() + 1) // 今日の終わり
+
+  const rangeType = dateRange?.type || 'week'
+
+  switch (rangeType) {
+    case 'week':
+      startDate = new Date(todayStart)
+      startDate.setDate(startDate.getDate() - 6)
+      break
+    case 'month':
+      startDate = new Date(todayStart)
+      startDate.setDate(startDate.getDate() - 29) // 30日間
+      break
+    case 'all':
+      // 最も古い記録の日付を取得
+      if (allRecords.length > 0) {
+        const sortedRecords = [...allRecords].sort(
+          (a, b) => a.studiedAt.getTime() - b.studiedAt.getTime()
+        )
+        startDate = getStudyDate(sortedRecords[0].studiedAt)
+      } else {
+        startDate = new Date(todayStart)
+        startDate.setDate(startDate.getDate() - 6)
+      }
+      break
+    case 'custom':
+      startDate = dateRange?.startDate || new Date(todayStart)
+      if (dateRange?.endDate) {
+        endDate = new Date(dateRange.endDate)
+        endDate.setDate(endDate.getDate() + 1)
+      }
+      break
+    default:
+      startDate = new Date(todayStart)
+      startDate.setDate(startDate.getDate() - 6)
+  }
+
+  // 期間内の記録をフィルタリング
+  const periodRecords = allRecords.filter((r) => {
+    const recordDate = getStudyDate(r.studiedAt)
+    return recordDate >= getStudyDate(startDate) && recordDate <= endDate
+  })
+
+  // 今日の記録
+  const todayRecords = allRecords.filter((r) => r.studiedAt >= todayStart)
+
+  // 週の記録
+  const weekStart = new Date(todayStart)
+  weekStart.setDate(todayStart.getDate() - 6)
+  const weekRecords = allRecords.filter((r) => r.studiedAt >= weekStart)
+
+  const totalStudyTime = allRecords.reduce((sum, r) => sum + r.studyTime, 0)
+  const todayStudyTime = todayRecords.reduce((sum, r) => sum + r.studyTime, 0)
+  const weekStudyTime = weekRecords.reduce((sum, r) => sum + r.studyTime, 0)
+  const periodStudyTime = periodRecords.reduce((sum, r) => sum + r.studyTime, 0)
+
+  // 期間内の問題IDから正解率を計算
+  const problemIds = new Set(periodRecords.map(r => r.problemId))
+  const problems = await db.problems.where('id').anyOf([...problemIds]).toArray()
+  const correctRate = await calculateRecentAccuracyForProblems(problems) || 0
+
+  // 期間に応じた日付データを生成
+  const chartData: Array<{
+    date: string
+    studyTime: number
+    problemsSolved: number
+    accuracy: number | null
+    isWeekly?: boolean
+    isMonthly?: boolean
+  }> = []
+  const normalizedStartDate = getStudyDate(startDate)
+  const normalizedEndDate = getStudyDate(endDate)
+  const daysDiff = Math.ceil(
+    (normalizedEndDate.getTime() - normalizedStartDate.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  // データを集計する単位を決定（日、週、月）
+  let aggregationType: 'day' | 'week' | 'month' = 'day'
+  if (daysDiff > 90) {
+    aggregationType = 'month'
+  } else if (daysDiff > 31) {
+    aggregationType = 'week'
+  }
+
+  if (aggregationType === 'day') {
+    // 日別データ
+    for (let i = 0; i < daysDiff; i++) {
+      const date = new Date(normalizedStartDate)
+      date.setDate(normalizedStartDate.getDate() + i)
+      const dateStr = date.toISOString().split('T')[0]
+
+      const dayRecords = periodRecords.filter((r) => {
+        const recordStudyDate = getStudyDate(r.studiedAt)
+        return recordStudyDate.getTime() === date.getTime()
+      })
+
+      const dayCorrectCount = dayRecords.filter((r) => r.result === 'correct').length
+      const dayPartialCount = dayRecords.filter((r) => r.result === 'partial').length
+      const dayTotalScore = dayCorrectCount + (dayPartialCount * 0.5)
+      const dayAccuracy = dayRecords.length > 0
+        ? Math.round((dayTotalScore / dayRecords.length) * 100)
+        : null
+
+      chartData.push({
+        date: dateStr,
+        studyTime: dayRecords.reduce((sum, r) => sum + r.studyTime, 0),
+        problemsSolved: dayRecords.length,
+        accuracy: dayAccuracy,
+      })
+    }
+  } else if (aggregationType === 'week') {
+    // 週別データ
+    let currentWeekStart = new Date(normalizedStartDate)
+    while (currentWeekStart < normalizedEndDate) {
+      const weekEnd = new Date(currentWeekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+
+      const weekRecordsInRange = periodRecords.filter((r) => {
+        const recordStudyDate = getStudyDate(r.studiedAt)
+        return recordStudyDate >= currentWeekStart && recordStudyDate <= weekEnd
+      })
+
+      const weekCorrectCount = weekRecordsInRange.filter((r) => r.result === 'correct').length
+      const weekPartialCount = weekRecordsInRange.filter((r) => r.result === 'partial').length
+      const weekTotalScore = weekCorrectCount + (weekPartialCount * 0.5)
+      const weekAccuracy = weekRecordsInRange.length > 0
+        ? Math.round((weekTotalScore / weekRecordsInRange.length) * 100)
+        : null
+
+      chartData.push({
+        date: currentWeekStart.toISOString().split('T')[0],
+        studyTime: weekRecordsInRange.reduce((sum, r) => sum + r.studyTime, 0),
+        problemsSolved: weekRecordsInRange.length,
+        accuracy: weekAccuracy,
+        isWeekly: true,
+      })
+
+      currentWeekStart = new Date(weekEnd)
+      currentWeekStart.setDate(currentWeekStart.getDate() + 1)
+    }
+  } else {
+    // 月別データ
+    let currentMonth = new Date(normalizedStartDate.getFullYear(), normalizedStartDate.getMonth(), 1)
+    while (currentMonth < normalizedEndDate) {
+      const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+
+      const monthRecords = periodRecords.filter((r) => {
+        const recordStudyDate = getStudyDate(r.studiedAt)
+        return recordStudyDate >= currentMonth && recordStudyDate < nextMonth
+      })
+
+      const monthCorrectCount = monthRecords.filter((r) => r.result === 'correct').length
+      const monthPartialCount = monthRecords.filter((r) => r.result === 'partial').length
+      const monthTotalScore = monthCorrectCount + (monthPartialCount * 0.5)
+      const monthAccuracy = monthRecords.length > 0
+        ? Math.round((monthTotalScore / monthRecords.length) * 100)
+        : null
+
+      chartData.push({
+        date: currentMonth.toISOString().split('T')[0],
+        studyTime: monthRecords.reduce((sum, r) => sum + r.studyTime, 0),
+        problemsSolved: monthRecords.length,
+        accuracy: monthAccuracy,
+        isMonthly: true,
+      })
+
+      currentMonth = nextMonth
+    }
+  }
+
+  return {
+    totalStudyTime,
+    todayStudyTime,
+    weekStudyTime,
+    periodStudyTime,
+    totalProblemsSolved: allRecords.length,
+    periodProblemsSolved: periodRecords.length,
+    correctRate: Math.round(correctRate),
+    chartData,
+    dateRange: {
+      type: rangeType,
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate,
+      aggregationType,
+    },
+  }
+}
+
 // 問題セットの直近回答の正解率を計算（重み付け平均）
 export async function calculateRecentAccuracyForProblems(problems: Problem[]): Promise<number | null> {
   if (problems.length === 0) return null
