@@ -6,34 +6,98 @@ body {
   min-height: 100vh;
 }
 
+/* ページ遷移アニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.page-transition {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* カードのホバー効果 */
 .notion-hover {
-  transition: colors;
+  transition: all 0.2s ease;
   cursor: pointer;
   border-radius: 0.25rem;
 }
 
 .notion-hover:hover {
   background-color: hsl(0 0% 96%);
+  transform: translateY(-1px);
 }
 
+.notion-hover:active {
+  transform: translateY(0);
+}
+
+/* カードコンポーネント */
 .notion-card {
   background-color: white;
   border: 1px solid hsl(0 0% 90%);
   border-radius: 0.5rem;
   padding: 1rem;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: all 0.2s ease;
 }
 
+.notion-card:hover {
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08);
+}
+
+/* インタラクティブなカード */
+.notion-card-interactive {
+  cursor: pointer;
+}
+
+.notion-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px 0 rgb(0 0 0 / 0.1);
+}
+
+.notion-card-interactive:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+}
+
+/* ボタンコンポーネント */
 .btn {
   padding: 0.5rem 1rem;
   border-radius: 0.375rem;
   font-weight: 500;
-  transition: colors;
+  transition: all 0.15s ease;
   cursor: pointer;
   border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 44px; /* タッチターゲットの推奨サイズ */
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-primary {
@@ -41,8 +105,9 @@ body {
   color: hsl(0 0% 98%);
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: hsl(0 0% 15%);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
 }
 
 .btn-secondary {
@@ -50,8 +115,9 @@ body {
   color: hsl(0 0% 9%);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background-color: hsl(0 0% 90%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
 }
 
 .btn-success {
@@ -59,8 +125,9 @@ body {
   color: white;
 }
 
-.btn-success:hover {
+.btn-success:hover:not(:disabled) {
   background-color: hsl(142 76% 32%);
+  box-shadow: 0 2px 8px hsl(142 76% 36% / 0.4);
 }
 
 .btn-warning {
@@ -68,8 +135,9 @@ body {
   color: white;
 }
 
-.btn-warning:hover {
+.btn-warning:hover:not(:disabled) {
   background-color: hsl(38 92% 45%);
+  box-shadow: 0 2px 8px hsl(38 92% 50% / 0.4);
 }
 
 .btn-error {
@@ -77,6 +145,88 @@ body {
   color: white;
 }
 
-.btn-error:hover {
+.btn-error:hover:not(:disabled) {
   background-color: hsl(0 84% 55%);
+  box-shadow: 0 2px 8px hsl(0 84% 60% / 0.4);
+}
+
+/* スケルトンローディングアニメーション */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(0 0% 90%) 0%,
+    hsl(0 0% 96%) 50%,
+    hsl(0 0% 90%) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* モーダルアニメーション */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop {
+  animation: modalFadeIn 0.15s ease-out;
+}
+
+.modal-content {
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+/* トースト通知アニメーション */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
+.toast-enter {
+  animation: toastSlideIn 0.3s ease-out;
+}
+
+.toast-exit {
+  animation: toastSlideOut 0.2s ease-in;
 }

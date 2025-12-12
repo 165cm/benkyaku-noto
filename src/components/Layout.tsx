@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { useAuthStore } from '@/store/authStore'
 import { useAutoSync } from '@/hooks/useAutoSync'
 import ToastContainer from './Toast'
+import Onboarding, { isOnboardingCompleted } from './Onboarding'
 
 interface LayoutProps {
   children: ReactNode
@@ -19,6 +20,7 @@ export default function Layout({ children }: LayoutProps) {
     return saved === 'true'
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingCompleted())
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(isSidebarCollapsed))
@@ -134,8 +136,10 @@ export default function Layout({ children }: LayoutProps) {
         )}
 
         {/* Page Content */}
-        <main className="flex-1 bg-gray-50 overflow-auto">
-          <div className="max-w-5xl mx-auto p-6">{children}</div>
+        <main className="flex-1 bg-gray-50 overflow-auto pb-20 md:pb-0">
+          <div className="max-w-5xl mx-auto p-4 md:p-6 page-transition" key={location.pathname}>
+            {children}
+          </div>
         </main>
       </div>
 
@@ -165,6 +169,11 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <Onboarding onComplete={() => setShowOnboarding(false)} />
+      )}
     </div>
   )
 }
