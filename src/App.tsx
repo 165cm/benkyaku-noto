@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import DataMigrationPrompt from '@/components/DataMigrationPrompt'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import { useAutoSync } from '@/hooks/useAutoSync'
+
 
 // Code Splitting: 各ページコンポーネントを遅延読み込み
 const Home = lazy(() => import('@/pages/Home'))
@@ -33,49 +33,49 @@ function LoadingFallback() {
 
 export default function App() {
   // ページロード時の自動同期
-  useAutoSync()
+
 
   return (
     <ErrorBoundary>
       <BrowserRouter basename="/benkyaku-noto">
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          {/* Protected routes */}
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <>
-                  <DataMigrationPrompt />
-                  <Layout>
-                    <Suspense fallback={<LoadingFallback />}>
-                      <Routes>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/workbooks" element={<Workbooks />} />
-                        <Route path="/workbooks/:id" element={<WorkbookDetail />} />
-                        <Route path="/workbooks/import" element={<ImportFromImage />} />
-                        <Route path="/study/:id" element={<Study />} />
-                        <Route path="/study-report" element={<StudyReport />} />
-                        <Route path="/weak-mode-report" element={<WeakModeReport />} />
-                        <Route path="/review" element={<Review />} />
-                        <Route path="/stats" element={<Stats />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="/explanations" element={<Explanations />} />
-                        <Route path="/explanations/image-upload" element={<ImageExplanation />} />
-                        <Route path="/trash" element={<Trash />} />
-                        <Route path="/debug" element={<Debug />} />
-                      </Routes>
-                    </Suspense>
-                  </Layout>
-                </>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected routes */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <DataMigrationPrompt />
+                    <Layout>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <Routes>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/workbooks" element={<Workbooks />} />
+                          <Route path="/workbooks/:id" element={<WorkbookDetail />} />
+                          <Route path="/workbooks/import" element={<ImportFromImage />} />
+                          <Route path="/study/:id" element={<Study />} />
+                          <Route path="/study-report" element={<StudyReport />} />
+                          <Route path="/weak-mode-report" element={<WeakModeReport />} />
+                          <Route path="/review" element={<Review />} />
+                          <Route path="/stats" element={<Stats />} />
+                          <Route path="/settings" element={<Settings />} />
+                          <Route path="/explanations" element={<Explanations />} />
+                          <Route path="/explanations/image-upload" element={<ImageExplanation />} />
+                          <Route path="/trash" element={<Trash />} />
+                          <Route path="/debug" element={<Debug />} />
+                        </Routes>
+                      </Suspense>
+                    </Layout>
+                  </>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </Suspense>
       </BrowserRouter>

@@ -1,5 +1,5 @@
 import { db, isParentProblem } from './db'
-import { getTodayReviewList, isProblemExcluded } from './review'
+import { getTodayReviewList, isProblemExcluded, getExclusions } from './review'
 import type { Problem } from '@/types'
 
 // 学習セットの生成
@@ -49,10 +49,13 @@ export async function generateStudySet(targetMinutes: number): Promise<Problem[]
   // 復習問題で時間が足りない場合は新規問題を追加
   const allProblems = await db.problems.toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   // 削除された問題と除外設定された問題を除外
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   // 親問題（箱）を除外
   const learnableProblems: Problem[] = []
@@ -117,10 +120,13 @@ export async function generateFirstTimeStudySet(targetMinutes: number): Promise<
   // 未学習の問題をすべて取得
   const allProblems = await db.problems.toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   // 削除された問題と除外設定された問題を除外
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   // 親問題（箱）を除外
   const learnableProblems: Problem[] = []
@@ -256,7 +262,7 @@ function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled
 }

@@ -7,6 +7,18 @@ export interface Workbook {
   pdfUrl?: string // Firebase StorageのPDF URL
   pdfFileName?: string // PDFファイル名
   standardTime?: number // 問題集全体の標準時間（秒）- スパルタモード用
+
+  // Google Books API / メタデータ
+  isbn?: string
+  coverUrl?: string
+  description?: string
+  authors?: string[]
+  publisher?: string
+  publishedDate?: string
+  subtitle?: string
+  pageCount?: number
+  previewLink?: string
+
   createdAt: Date
   updatedAt: Date
 }
@@ -121,7 +133,9 @@ export interface ImageBasedExplanation {
   sectionTitle?: string
   tags?: string[]
 
+
   // 関連付け（オプション）
+  relatedProblemId?: string
   problemId?: string // 既存の問題に紐付ける場合
   workbookId?: string // 既存の問題集に紐付ける場合
 
@@ -132,4 +146,11 @@ export interface ImageBasedExplanation {
 
   createdAt: Date
   deletedAt?: Date // 論理削除
+}
+
+// ユーザー設定（同期用）
+export interface UserSettings {
+  key: string // 設定キー（例: 'excludedSections', 'weekStartDay'）
+  value: any // 設定値（JSONなど）
+  updatedAt: Date
 }

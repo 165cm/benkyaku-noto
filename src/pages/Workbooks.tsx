@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, BookOpen, Trash2, Image, Settings, ChevronDown, Play, RotateCcw } from 'lucide-react'
+import { BookOpen, Trash2, Settings, ChevronDown, Play, RotateCcw, Search, Loader2, Image, Plus } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -17,6 +17,9 @@ import {
 import { calculateRecentAccuracyForProblems, getWorkbookSections, type SectionStats } from '@/lib/review'
 import { getExcludedSections, saveExcludedSections, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
 import type { Workbook } from '@/types'
+import { fetchBookByISBN } from '@/lib/googleBooks'
+
+const AMAZON_TAG = import.meta.env.VITE_AMAZON_ASSOCIATE_TAG || 'notestimatobe-22'
 
 // 拡張された問題集データ型
 interface ExtendedWorkbook extends Workbook {
@@ -41,7 +44,14 @@ export default function Workbooks() {
   const [formData, setFormData] = useState({
     title: '',
     subject: '',
+    isbn: '',
+    coverUrl: '',
+    description: '',
+    authors: [] as string[],
+    publisher: '',
+    publishedDate: '',
   })
+  const [isSearching, setIsSearching] = useState(false)
 
   // 拡張データ
   const [extendedWorkbooks, setExtendedWorkbooks] = useState<ExtendedWorkbook[]>([])
@@ -51,6 +61,7 @@ export default function Workbooks() {
   const [studyStatusFilter, setStudyStatusFilter] = useState<StudyStatusFilter>('all')
   const [accuracyFilter, setAccuracyFilter] = useState<AccuracyFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('updated')
+  const [isEditMode, setIsEditMode] = useState(false)
 
   // 設定モーダル
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -59,9 +70,21 @@ export default function Workbooks() {
   const [excludedSections, setExcludedSections] = useState<string[]>([])
   const [workbookStandardTime, setWorkbookStandardTime] = useState(180)
   const [sectionStandardTimes, setSectionStandardTimes] = useState<Map<string, number>>(new Map())
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    subject: '',
+    isbn: '',
+    description: '',
+    pageCount: 0,
+    coverUrl: '',
+    authors: [] as string[],
+    publisher: '',
+    publishedDate: ''
+  })
 
   useEffect(() => {
     loadWorkbooks()
+    getExcludedSections().then(setExcludedSections)
   }, [])
 
   // 各問題集の拡張データを取得
@@ -79,6 +102,7 @@ export default function Workbooks() {
 
         extended.push({
           ...workbook,
+          totalProblems: problems.length,
           accuracy,
           lastStudyDate,
           studiedCount
@@ -107,9 +131,24 @@ export default function Workbooks() {
       title: formData.title,
       subject: formData.subject,
       totalProblems: 0,
+      isbn: formData.isbn,
+      coverUrl: formData.coverUrl,
+      description: formData.description,
+      authors: formData.authors,
+      publisher: formData.publisher,
+      publishedDate: formData.publishedDate,
     })
 
-    setFormData({ title: '', subject: '' })
+    setFormData({
+      title: '',
+      subject: '',
+      isbn: '',
+      coverUrl: '',
+      description: '',
+      authors: [],
+      publisher: '',
+      publishedDate: '',
+    })
     setIsModalOpen(false)
     loadWorkbooks()
   }
@@ -134,12 +173,26 @@ export default function Workbooks() {
 
     const sectionList = await getWorkbookSections(workbook.id)
     setSections(sectionList)
-    setExcludedSections(getExcludedSections())
+    setExcludedSections(await getExcludedSections())
     setWorkbookStandardTime(workbook.standardTime || 180)
+
+    // 編集用フォームの初期化
+    setEditFormData({
+      title: workbook.title,
+      subject: workbook.subject,
+      isbn: workbook.isbn || '',
+      description: workbook.description || '',
+      pageCount: workbook.pageCount || 0,
+      coverUrl: workbook.coverUrl || '',
+      authors: workbook.authors || [],
+      publisher: workbook.publisher || '',
+      publishedDate: workbook.publishedDate || ''
+    })
+    setIsEditMode(false)
 
     const sectionTimes = new Map<string, number>()
     for (const section of sectionList) {
-      const time = getSectionStandardTime(section.sectionKey)
+      const time = await getSectionStandardTime(section.sectionKey)
       if (time) {
         sectionTimes.set(section.sectionKey, time)
       } else {
@@ -154,16 +207,39 @@ export default function Workbooks() {
     if (!settingsWorkbook) return
 
     if (workbookStandardTime > 0) {
-      await updateWorkbook(settingsWorkbook.id, { standardTime: workbookStandardTime })
+      await updateWorkbook(settingsWorkbook.id, {
+        standardTime: workbookStandardTime,
+        title: editFormData.title,
+        subject: editFormData.subject,
+        isbn: editFormData.isbn,
+        description: editFormData.description,
+        pageCount: editFormData.pageCount,
+        coverUrl: editFormData.coverUrl,
+        authors: editFormData.authors,
+        publisher: editFormData.publisher,
+        publishedDate: editFormData.publishedDate,
+      })
+    } else {
+      await updateWorkbook(settingsWorkbook.id, {
+        title: editFormData.title,
+        subject: editFormData.subject,
+        isbn: editFormData.isbn,
+        description: editFormData.description,
+        pageCount: editFormData.pageCount,
+        coverUrl: editFormData.coverUrl,
+        authors: editFormData.authors,
+        publisher: editFormData.publisher,
+        publishedDate: editFormData.publishedDate,
+      })
     }
 
     for (const [sectionKey, time] of sectionStandardTimes.entries()) {
       if (time > 0) {
-        setSectionStandardTime(sectionKey, time)
+        await setSectionStandardTime(sectionKey, time)
       }
     }
 
-    saveExcludedSections(excludedSections)
+    await saveExcludedSections(excludedSections)
     setIsSettingsModalOpen(false)
     setSettingsWorkbook(null)
     loadWorkbooks()
@@ -295,20 +371,42 @@ export default function Workbooks() {
   return (
     <div className="pb-4">
       {/* ヘッダー */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-2xl font-bold">問題集</h1>
-          <Button
-            size="sm"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <Plus size={16} className="mr-1" />
-            新規作成
-          </Button>
-        </div>
+      {/* ヘッダーアクション */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-4">問題集</h1>
 
-        {/* フィルタチップ（横スクロール可能） */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+        <div className="flex flex-col gap-3">
+          <Button
+            size="lg"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md py-4"
+            onClick={() => navigate('/workbooks/import')}
+          >
+            <div className="flex flex-col items-center">
+              <div className="flex items-center text-lg font-bold mb-0.5">
+                <Image size={24} className="mr-2" />
+                カメラ・画像から読み込む
+              </div>
+              <span className="text-xs opacity-90 font-normal">
+                目次を自動解析して最短1分で作成 (推奨)
+              </span>
+            </div>
+          </Button>
+
+          <div className="text-center">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="text-xs text-gray-500 underline hover:text-gray-700 flex items-center justify-center gap-1 mx-auto"
+            >
+              <Plus size={12} />
+              手動で作成する...
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* フィルタエリア（アコーディオンにして隠すことも検討できるが、一旦保持） */}
+      <div className="mb-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide">
           {/* 科目フィルタ */}
           <select
             value={subjectFilter}
@@ -346,40 +444,26 @@ export default function Workbooks() {
           </select>
 
           {/* その他メニュー */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate('/workbooks/import')}
-            className="whitespace-nowrap"
-          >
-            <Image size={14} className="mr-1" />
-            目次インポート
-          </Button>
+
         </div>
 
         {/* ソート + 件数 */}
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-xs text-gray-500 px-1">
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">並替:</span>
+            <span>並替:</span>
             <div className="relative">
               <select
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="text-sm px-2 py-1 pr-6 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
+                className="bg-transparent font-medium text-gray-700 focus:outline-none pr-3"
               >
-                <option value="updated">更新日順</option>
-                <option value="updated-asc">更新日順（古）</option>
-                <option value="accuracy">正解率順（高）</option>
-                <option value="accuracy-asc">正解率順（低）</option>
-                <option value="problems">問題数順（多）</option>
-                <option value="problems-asc">問題数順（少）</option>
-                <option value="name">名前順（あ→ん）</option>
-                <option value="name-desc">名前順（ん→あ）</option>
+                <option value="updated">更新日</option>
+                <option value="accuracy">正解率</option>
+                <option value="problems">問題数</option>
               </select>
-              <ChevronDown size={14} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
           </div>
-          <span className="text-gray-500">{filteredAndSortedWorkbooks.length}件</span>
+          <span>{filteredAndSortedWorkbooks.length}件</span>
         </div>
       </div>
 
@@ -401,123 +485,142 @@ export default function Workbooks() {
           {filteredAndSortedWorkbooks.map((workbook) => (
             <div
               key={workbook.id}
-              className={`border-2 rounded-lg transition-all bg-white hover:shadow-md ${getBorderColor(workbook.accuracy)}`}
+              className={`border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden ${getBorderColor(workbook.accuracy)}`}
             >
-              {/* タイトルエリア（タップで詳細へ） */}
+              {/* 上部: 画像 + 情報 + 統計 */}
               <div
-                className="px-4 pt-3 pb-2 cursor-pointer"
+                className="flex gap-3 p-3 pb-2 cursor-pointer"
                 onClick={() => navigate(`/workbooks/${workbook.id}`)}
               >
-                <h3 className="text-lg font-semibold leading-tight mb-1 text-gray-900">
-                  {workbook.title}
-                </h3>
-                <p className="text-xs text-gray-600">
-                  {workbook.subject} | {formatLastStudyDate(workbook.lastStudyDate)}
-                </p>
-              </div>
-
-              {/* 進捗バー */}
-              <div className="px-4 pb-2">
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      workbook.studiedCount === workbook.totalProblems && workbook.totalProblems > 0
-                        ? 'bg-green-500'
-                        : workbook.studiedCount > 0
-                        ? 'bg-blue-500'
-                        : 'bg-gray-300'
-                    }`}
-                    style={{
-                      width: workbook.totalProblems > 0
-                        ? `${(workbook.studiedCount / workbook.totalProblems) * 100}%`
-                        : '0%'
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-1 text-xs text-gray-600">
-                  <span>
-                    {workbook.studiedCount}/{workbook.totalProblems}問
-                  </span>
-                  {workbook.totalProblems > 0 && (
-                    <span>
-                      {Math.round((workbook.studiedCount / workbook.totalProblems) * 100)}%
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* ステータス行 */}
-              <div className="px-4 pb-2">
-                <div className="flex items-center gap-3 text-xs flex-wrap">
-                  {/* 正解率 */}
-                  {workbook.accuracy !== null && (
-                    <span
-                      className={`px-2 py-0.5 rounded font-medium ${
-                        workbook.accuracy >= 80
-                          ? 'bg-green-100 text-green-700'
-                          : workbook.accuracy >= 50
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
+                {/* 表紙画像 (Amazonリンク) */}
+                <div className="w-16 flex-shrink-0">
+                  {workbook.isbn ? (
+                    <a
+                      href={`https://www.amazon.co.jp/dp/${workbook.isbn}?tag=${AMAZON_TAG}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-16 aspect-[2/3] bg-gray-100 rounded shadow-sm overflow-hidden hover:opacity-80 transition-opacity relative"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      正解率 {workbook.accuracy}%
-                    </span>
+                      {workbook.coverUrl ? (
+                        <img src={workbook.coverUrl} alt={workbook.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300"><BookOpen size={24} /></div>
+                      )}
+                      {/* Amazon Icon Overlay */}
+                      <div className="absolute bottom-0 right-0 bg-white/90 px-1 rounded-tl text-[8px] font-bold text-orange-600 shadow-sm">Amazon</div>
+                    </a>
+                  ) : (
+                    <div className="w-16 aspect-[2/3] bg-gray-100 rounded shadow-sm overflow-hidden flex items-center justify-center text-gray-300">
+                      {workbook.coverUrl ? (
+                        <img src={workbook.coverUrl} alt={workbook.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen size={24} />
+                      )}
+                    </div>
                   )}
+                </div>
 
-                  {/* 標準タイム */}
-                  {workbook.standardTime && (
-                    <span className="text-gray-600">
-                      📏 {formatTime(workbook.standardTime)}
-                    </span>
-                  )}
+                {/* 右: 情報＆統計カラム */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900 leading-tight mb-2 line-clamp-2 h-[2.5em]">
+                      {workbook.title}
+                    </h3>
+                  </div>
+
+                  {/* 2. 統計ブロック */}
+                  <div className="mt-auto">
+                    <div className="flex justify-between items-end mb-1">
+                      {workbook.accuracy !== null ? (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${workbook.accuracy >= 80 ? 'bg-green-100 text-green-700' :
+                          workbook.accuracy >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                          正解率 {workbook.accuracy}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-[10px] font-medium">-</span>
+                      )}
+                      <span className="text-gray-500 text-[10px]">
+                        {workbook.lastStudyDate ? `最終: ${formatLastStudyDate(workbook.lastStudyDate)}` : '未学習'}
+                      </span>
+                    </div>
+
+                    <div className="relative h-5 bg-gray-100 rounded-md overflow-hidden border border-gray-100">
+                      {/* オーバーレイテキスト (左寄せ・影なし・見やすく) */}
+                      <div className="absolute inset-0 flex items-center justify-start pl-2 text-[11px] font-bold z-10 text-gray-700">
+                        {workbook.studiedCount}/{workbook.totalProblems}
+                        {workbook.totalProblems > 0 && ` (${Math.round((workbook.studiedCount / workbook.totalProblems) * 100)}%)`}
+                      </div>
+                      {/* プログレスバー */}
+                      {/* プログレスバー (Vibrant & Youthful) */}
+                      <div
+                        className={`h-full transition-all ${workbook.accuracy === null ? 'bg-gradient-to-r from-cyan-400 to-blue-500' :
+                          workbook.accuracy >= 80 ? 'bg-gradient-to-r from-emerald-400 to-green-500' :
+                            workbook.accuracy >= 50 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+                              'bg-gradient-to-r from-pink-500 to-red-500'
+                          }`}
+                        style={{ width: `${workbook.totalProblems > 0 ? (workbook.studiedCount / workbook.totalProblems) * 100 : 0}%`, opacity: 0.8 }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* アクションボタン */}
-              <div className="px-4 pb-3 flex gap-2">
+
+
+              {/* C. アクションフッター (下段) - さらに薄くコンパクトに */}
+              <div className="bg-gray-50 px-2 py-1.5 border-t border-gray-100 flex gap-2 items-center">
                 <Button
+                  className={`flex-1 py-1 h-8 text-xs font-bold transition-all ${workbook.studiedCount === workbook.totalProblems && workbook.totalProblems > 0
+                    ? 'bg-gray-100 text-gray-500 hover:bg-gray-200 shadow-none border border-gray-200'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:shadow-md hover:scale-[1.02]'
+                    }`}
                   size="sm"
-                  className="flex-1"
                   onClick={(e) => {
                     e.stopPropagation()
                     navigate(`/workbooks/${workbook.id}`)
                   }}
                 >
-                  <Play size={14} className="mr-1" />
-                  学習
+                  <Play size={12} className={`mr-1 ${workbook.studiedCount === workbook.totalProblems && workbook.totalProblems > 0 ? 'fill-gray-500 stroke-gray-500' : 'fill-white/20'}`} /> 新規学習
                 </Button>
+
                 <Button
+                  className={`flex-1 py-1 h-8 text-xs font-bold transition-all ${workbook.studiedCount === workbook.totalProblems && workbook.totalProblems > 0
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm hover:shadow-md hover:scale-[1.02]'
+                    : ''
+                    }`}
+                  variant={workbook.studiedCount === workbook.totalProblems && workbook.totalProblems > 0 ? "primary" : "secondary"}
                   size="sm"
-                  variant="secondary"
-                  className="flex-1"
                   onClick={(e) => {
                     e.stopPropagation()
                     navigate(`/workbooks/${workbook.id}?mode=review`)
                   }}
                 >
-                  <RotateCcw size={14} className="mr-1" />
-                  復習
+                  <RotateCcw size={12} className="mr-1" /> 弱点復習
                 </Button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openSettingsModal(workbook)
-                  }}
-                  className="px-3 py-1.5 hover:bg-white/80 rounded transition-colors"
-                  title="設定"
-                >
-                  <Settings size={16} className="text-primary" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(workbook.id)
-                  }}
-                  className="px-3 py-1.5 hover:bg-white/80 rounded transition-colors"
-                  title="削除"
-                >
-                  <Trash2 size={16} className="text-error" />
-                </button>
+
+                <div className="flex gap-0.5 border-l border-gray-200 ml-1 pl-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openSettingsModal(workbook)
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    <Settings size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(workbook.id)
+                    }}
+                    className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  >
+                    <Trash2 size={16} className="text-red-400" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -531,6 +634,50 @@ export default function Workbooks() {
         title="問題集の新規作成"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <label className="block text-xs font-bold text-blue-800 mb-1">
+              ISBNから自動入力（任意）
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.isbn}
+                onChange={(e) => setFormData({ ...formData, isbn: e.target.value })}
+                className="flex-1 px-3 py-1.5 text-sm border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="例: 9784000000000"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={async () => {
+                  if (!formData.isbn) return
+                  setIsSearching(true)
+                  const book = await fetchBookByISBN(formData.isbn)
+                  setIsSearching(false)
+
+                  if (book) {
+                    setFormData(prev => ({
+                      ...prev,
+                      title: book.title,
+                      subject: book.categories[0] || prev.subject,
+                      coverUrl: book.coverUrl || '',
+                      description: book.description,
+                      authors: book.authors,
+                      publisher: book.publisher,
+                      publishedDate: book.publishedDate
+                    }))
+                  } else {
+                    alert('書籍が見つかりませんでした')
+                  }
+                }}
+                disabled={!formData.isbn || isSearching}
+              >
+                {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                検索
+              </Button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">
               問題集名 <span className="text-error">*</span>
@@ -584,6 +731,112 @@ export default function Workbooks() {
           title={`📚 ${settingsWorkbook.title} の設定`}
         >
           <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+            {/* 基本情報編集 */}
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setIsEditMode(!isEditMode)}
+              >
+                <h3 className="text-xs font-bold text-gray-800">📝 基本情報</h3>
+                <ChevronDown size={16} className={`text-gray-500 transition-transform ${isEditMode ? 'rotate-180' : ''}`} />
+              </div>
+
+              {isEditMode && (
+                <div className="mt-3 space-y-3">
+                  {/* ISBN検索 */}
+                  <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                    <label className="block text-[10px] font-bold text-blue-800 mb-1">
+                      ISBNから情報を更新
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editFormData.isbn}
+                        onChange={(e) => setEditFormData({ ...editFormData, isbn: e.target.value })}
+                        className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: 9784000000000"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="px-2 py-1 text-xs"
+                        onClick={async () => {
+                          if (!editFormData.isbn) return
+                          setIsSearching(true)
+                          const book = await fetchBookByISBN(editFormData.isbn)
+                          setIsSearching(false)
+
+                          if (book) {
+                            if (window.confirm('取得した書籍情報で上書きしますか？')) {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                title: book.title,
+                                subject: book.categories[0] || prev.subject,
+                                coverUrl: book.coverUrl || '',
+                                description: book.description,
+                                pageCount: book.pageCount || 0,
+                                authors: book.authors,
+                                publisher: book.publisher,
+                                publishedDate: book.publishedDate
+                              }))
+                            }
+                          } else {
+                            alert('書籍が見つかりませんでした')
+                          }
+                        }}
+                        disabled={!editFormData.isbn || isSearching}
+                      >
+                        {isSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                        検索
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">タイトル</label>
+                    <input
+                      type="text"
+                      value={editFormData.title}
+                      onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-600 mb-1">科目</label>
+                      <input
+                        type="text"
+                        value={editFormData.subject}
+                        onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="w-24">
+                      <label className="block text-xs text-gray-600 mb-1">ページ数</label>
+                      <input
+                        type="number"
+                        value={editFormData.pageCount || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, pageCount: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">説明 (メモ)</label>
+                    <textarea
+                      value={editFormData.description}
+                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded h-16"
+                      placeholder="任意"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 問題集全体の標準タイム */}
             <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
               <h3 className="text-xs font-bold text-gray-800 mb-1">🎯 問題集全体の標準タイム</h3>
@@ -708,13 +961,12 @@ export default function Workbooks() {
 
                                   {section.accuracy !== null && (
                                     <span
-                                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
-                                        section.accuracy >= 80
-                                          ? 'bg-green-100 text-green-700'
-                                          : section.accuracy >= 50
+                                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${section.accuracy >= 80
+                                        ? 'bg-green-100 text-green-700'
+                                        : section.accuracy >= 50
                                           ? 'bg-yellow-100 text-yellow-700'
                                           : 'bg-red-100 text-red-700'
-                                      }`}
+                                        }`}
                                     >
                                       {section.accuracy}%
                                     </span>

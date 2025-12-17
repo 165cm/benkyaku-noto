@@ -64,6 +64,10 @@ export function useAutoSync() {
           await db.explanations.put(explanation)
         }
 
+        for (const setting of cloudData.settings) {
+          await db.settings.put(setting)
+        }
+
         console.log('Auto-sync: Completed successfully')
 
         // 成功通知（控えめに）

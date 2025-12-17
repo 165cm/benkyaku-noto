@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, ArrowLeft, Loader2, Trash2 } from 'lucide-react'
+import { Upload, ArrowLeft, Loader2, Trash2, Search } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { hasOpenAIApiKey } from '@/lib/storage'
 // import { uploadPDF } from '@/lib/storage' // PDF機能一時無効化
 import { imageToBase64, parseTableOfContents, type ParsedTableOfContents } from '@/lib/openai'
 import { addWorkbook, addProblem } from '@/lib/db'
+import { fetchBookByISBN, type GoogleBookInfo } from '@/lib/googleBooks'
 // import { db } from '@/lib/db' // PDF機能一時無効化
 
 const MAX_IMAGES = 5
@@ -22,6 +23,9 @@ export default function ImportFromImage() {
   const [categories, setCategories] = useState<{ [sectionId: string]: string }>({})
   // const [pdfFile, setPdfFile] = useState<File | null>(null) // PDF機能一時無効化
   const [isImporting, setIsImporting] = useState(false)
+  const [isbn, setIsbn] = useState('')
+  const [isSearchingIsbn, setIsSearchingIsbn] = useState(false)
+  const [bookInfo, setBookInfo] = useState<GoogleBookInfo | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -95,6 +99,15 @@ export default function ImportFromImage() {
         title: parsedData.workbookTitle,
         subject: parsedData.subject,
         totalProblems: 0,
+        // Google Books情報があれば追加
+        ...(bookInfo ? {
+          isbn: bookInfo.isbn,
+          coverUrl: bookInfo.coverUrl || undefined,
+          description: bookInfo.description,
+          authors: bookInfo.authors,
+          publisher: bookInfo.publisher,
+          publishedDate: bookInfo.publishedDate,
+        } : {})
       })
 
       // セクションごとに問題を登録
@@ -329,9 +342,8 @@ export default function ImportFromImage() {
                 />
                 <label
                   htmlFor="image-upload"
-                  className={`cursor-pointer flex flex-col items-center gap-3 ${
-                    files.length >= MAX_IMAGES ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`cursor-pointer flex flex-col items-center gap-3 ${files.length >= MAX_IMAGES ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                 >
                   <Upload size={48} className="text-gray-400" />
                   <div>
@@ -407,6 +419,52 @@ export default function ImportFromImage() {
             <h2 className="text-lg font-semibold mb-4">解析結果</h2>
 
             <div className="space-y-4">
+              {/* ISBN検索 */}
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                <label className="block text-xs font-bold text-blue-800 mb-1">
+                  ISBNから情報を補完（任意）
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={isbn}
+                    onChange={(e) => setIsbn(e.target.value)}
+                    className="flex-1 px-3 py-1.5 text-sm border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 9784000000000"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      if (!isbn) return
+                      setIsSearchingIsbn(true)
+                      const book = await fetchBookByISBN(isbn)
+                      setIsSearchingIsbn(false)
+
+                      if (book) {
+                        setBookInfo(book)
+                        setParsedData({
+                          ...parsedData,
+                          workbookTitle: book.title,
+                          subject: book.categories[0] || parsedData.subject
+                        })
+                      } else {
+                        alert('書籍が見つかりませんでした')
+                      }
+                    }}
+                    disabled={!isbn || isSearchingIsbn}
+                  >
+                    {isSearchingIsbn ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                    検索
+                  </Button>
+                </div>
+                {bookInfo && (
+                  <p className="text-xs text-green-700 mt-2 font-medium">
+                    ✓ {bookInfo.title} の情報を読み込みました
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2">
                   問題集タイトル

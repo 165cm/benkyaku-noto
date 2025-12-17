@@ -1,6 +1,7 @@
 import { db } from './db'
 import { getExcludedCategories, getExcludedSections, getExcludedProblems } from './storage'
 import { getTodayStartTime, getStudyDate, getStudyDaysDiff } from './dateUtils'
+
 import { calculateWeightedAverage } from './weakModeSession'
 import type { StudyRecord, ReviewSchedule, Problem } from '@/types'
 
@@ -11,26 +12,39 @@ function getProblemSectionKey(problem: Problem): string {
   return `${category}-${title}`
 }
 
-// 問題が除外対象かどうかをチェック
-export function isProblemExcluded(problem: Problem): boolean {
-  const excludedCategories = getExcludedCategories()
-  const excludedSections = getExcludedSections()
-  const excludedProblems = getExcludedProblems()
+// 除外設定の型定義
+export interface Exclusions {
+  categories: string[]
+  sections: string[]
+  problems: string[]
+}
 
+// 除外設定を一括取得
+export async function getExclusions(): Promise<Exclusions> {
+  const [categories, sections, problems] = await Promise.all([
+    getExcludedCategories(),
+    getExcludedSections(),
+    getExcludedProblems()
+  ])
+  return { categories, sections, problems }
+}
+
+// 問題が除外対象かどうかをチェック
+export function isProblemExcluded(problem: Problem, exclusions: Exclusions): boolean {
   // 問題ID単位で除外（最優先）
-  if (excludedProblems.includes(problem.id)) {
+  if (exclusions.problems.includes(problem.id)) {
     return true
   }
 
   // カテゴリで除外
   const category = problem.category || '未分類'
-  if (excludedCategories.includes(category)) {
+  if (exclusions.categories.includes(category)) {
     return true
   }
 
   // セクションで除外
   const sectionKey = getProblemSectionKey(problem)
-  if (excludedSections.includes(sectionKey)) {
+  if (exclusions.sections.includes(sectionKey)) {
     return true
   }
 
@@ -76,10 +90,13 @@ export async function getTodayReviewList(): Promise<ReviewSchedule[]> {
   const allRecords = await db.studyRecords.toArray()
   const allProblems = await db.problems.toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   // 削除された問題と除外設定された問題を除外
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   const allWorkbooks = await db.workbooks.toArray()
 
@@ -207,10 +224,13 @@ export async function getReviewAgainList(options?: ReviewAgainOptions): Promise<
   const allRecords = await db.studyRecords.toArray()
   const allProblems = await db.problems.toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   // 削除された問題と除外設定された問題を除外
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   const allWorkbooks = await db.workbooks.toArray()
 
@@ -761,10 +781,13 @@ export interface SectionStats {
 export async function calculateSectionStats(): Promise<SectionStats[]> {
   const allProblems = await db.problems.toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   // 削除された問題と除外設定された問題を除外
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   // 問題をセクション（カテゴリ×タイトル）でグルーピング
   const sectionMap = new Map<string, Problem[]>()
@@ -997,9 +1020,12 @@ export async function getWorkbookStatistics(workbookId: string): Promise<Workboo
     .equals(workbookId)
     .toArray()
 
+  // 除外設定を取得
+  const exclusions = await getExclusions()
+
   const activeProblems = allProblems
     .filter(p => !p.deletedAt)
-    .filter(p => !isProblemExcluded(p))
+    .filter(p => !isProblemExcluded(p, exclusions))
 
   // 全学習記録を取得
   const allRecords = await db.studyRecords.toArray()

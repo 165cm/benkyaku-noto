@@ -55,6 +55,7 @@ export async function backupToCloud(
     })
 
     const explanations = await db.explanations.toArray()
+    const settings = await db.settings.toArray()
 
     // Firestoreにバックアップ
     onProgress?.({
@@ -68,7 +69,8 @@ export async function backupToCloud(
       workbooks,
       problems,
       studyRecords,
-      explanations
+      explanations,
+      settings
     })
 
     // 最終バックアップ時刻を保存
@@ -147,6 +149,17 @@ export async function restoreFromCloud(
 
     for (const explanation of cloudData.explanations) {
       await db.explanations.put(explanation)
+    }
+
+    onProgress?.({
+      stage: 'complete',
+      current: 4,
+      total: 4,
+      message: `設定を復元中... (${cloudData.settings.length}件)`
+    })
+
+    for (const setting of cloudData.settings) {
+      await db.settings.put(setting)
     }
 
     // 最終復元時刻を保存

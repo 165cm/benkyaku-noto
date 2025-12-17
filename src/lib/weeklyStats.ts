@@ -82,8 +82,8 @@ export const getWeeklyStudyTimeWithSettings = async (): Promise<{
   labels: string[]
 }> => {
   const records = await db.studyRecords.toArray()
-  const startDay = getWeekStartDay()
-  const displayMode = getWeekDisplayMode()
+  const startDay = await getWeekStartDay()
+  const displayMode = await getWeekDisplayMode()
 
   // 3時リセットのロジックで日付を正規化
   const normalizeDate = (timestamp: number | Date): string => {

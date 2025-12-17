@@ -1,6 +1,6 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-import type { Workbook, Problem, StudyRecord, Explanation, ImageBasedExplanation } from '@/types'
+import type { Workbook, Problem, StudyRecord, Explanation, ImageBasedExplanation, UserSettings } from '@/types'
 import { validateProblem, validateWorkbook, validateStudyRecord } from './validation'
 import { auth } from './firebase'
 import {
@@ -18,6 +18,7 @@ export class BenkyakuDB extends Dexie {
   studyRecords!: Table<StudyRecord>
   explanations!: Table<Explanation>
   imageBasedExplanations!: Table<ImageBasedExplanation>
+  settings!: Table<UserSettings>
 
   constructor() {
     super('BenkyakuNoto')
@@ -106,6 +107,16 @@ export class BenkyakuDB extends Dexie {
       studyRecords: 'id, problemId, workbookId, studiedAt',
       explanations: 'id, sectionKey, category, createdAt',
       imageBasedExplanations: 'id, createdAt, generatedAt, deletedAt',
+    })
+
+    // ユーザー設定テーブルを追加（同期用）
+    this.version(9).stores({
+      workbooks: 'id, title, subject, createdAt',
+      problems: 'id, workbookId, problemNumber, sectionTitle, sortOrder, createdAt, deletedAt, parentProblemId, isBookmarked',
+      studyRecords: 'id, problemId, workbookId, studiedAt',
+      explanations: 'id, sectionKey, category, createdAt',
+      imageBasedExplanations: 'id, createdAt, generatedAt, deletedAt',
+      settings: 'key, updatedAt',
     })
   }
 }
