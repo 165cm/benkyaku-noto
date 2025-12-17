@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, RotateCcw, Undo2 } from 'lucide-react'
+import { Plus, ArrowLeft, Play, Trash2, Edit2, ChevronDown, ChevronRight, RotateCcw, Undo2 } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -11,12 +11,11 @@ import {
   makeSubProblem,
   makeIndependentProblem,
   isParentProblem,
-  deleteStudyRecordsForWorkbook,
   addProblem,
   addTagToProblem,
   removeTagFromProblem,
 } from '@/lib/db'
-import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
+import { parseCSV } from '@/lib/csvExport'
 import { validateCSVData, ValidationError } from '@/lib/validation'
 import { calculateRecentAccuracyForProblems, getWorkbookStatistics, type WorkbookStatistics } from '@/lib/review'
 import { getExcludedSections, getExcludedCategories, saveExcludedCategories, addExcludedProblem, removeExcludedProblem } from '@/lib/storage'
@@ -842,6 +841,12 @@ export default function WorkbookDetail() {
         title: '小問の設定',
         message: `「${draggedProblem.problemNumber}」を「${targetProblem.problemNumber}」の小問にしますか？`,
         confirmText: '設定',
+        checkboxLabel: '10分間確認を省略',
+        onCheckboxChange: (checked) => {
+          if (checked) {
+            handleSkipConfirmFor10Min()
+          }
+        },
       })
       if (!confirmed) {
         setDraggedProblem(null)
@@ -906,6 +911,35 @@ export default function WorkbookDetail() {
     }
   }
 
+  // セクションに問題を直接追加（モーダルなし）
+  const handleAddProblemToSection = useCallback(async (category: string, sectionTitle: string, sectionProblems: Problem[]) => {
+    if (!id) return
+
+    // セクション内の最大問題番号を取得して次の番号を生成
+    const existingNumbers = sectionProblems
+      .filter(p => !p.parentProblemId) // 親問題のみを対象
+      .map(p => {
+        // 問題番号から数値部分を抽出（例: "5" → 5, "10" → 10）
+        const match = p.problemNumber.match(/^(\d+)/)
+        return match ? parseInt(match[1], 10) : 0
+      })
+      .filter(n => !isNaN(n))
+
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0
+    const nextProblemNumber = String(maxNumber + 1)
+
+    await addProblem({
+      workbookId: id,
+      problemNumber: nextProblemNumber,
+      sectionTitle: sectionTitle,
+      category: category,
+    })
+
+    loadData()
+  }, [id, loadData])
+
+
+
 
   // 小問を追加
   const handleAddSubProblem = async (parentProblem: Problem) => {
@@ -926,35 +960,6 @@ export default function WorkbookDetail() {
     })
 
     loadData()
-  }
-
-  const handleExportCSV = async () => {
-    if (!workbook) return
-
-    const csvContent = await exportProblemsToCSV(problems)
-    const filename = `${workbook.title}_問題集_${new Date().toISOString().split('T')[0]}.csv`
-    downloadCSV(csvContent, filename)
-  }
-
-  const handleResetStudyRecords = async () => {
-    if (!id || !workbook) return
-
-    const confirmed = await confirm({
-      title: '学習履歴のリセット',
-      message: `「${workbook.title}」の学習履歴を全て削除しますか？\n\nこの操作は取り消せません。`,
-      confirmText: 'リセット',
-      variant: 'danger',
-    })
-    if (!confirmed) return
-
-    try {
-      await deleteStudyRecordsForWorkbook(id)
-      toast.success('完了', '学習履歴をリセットしました')
-      loadData() // データを再読み込み
-    } catch (error) {
-      console.error('学習履歴のリセットに失敗しました:', error)
-      toast.error('エラー', '学習履歴のリセットに失敗しました')
-    }
   }
 
   const handleEditWorkbook = () => {
@@ -1187,24 +1192,28 @@ export default function WorkbookDetail() {
                 {workbook.pdfFileName}
               </p>
             )}
-            */}
-          </div>
-          {/* メインアクションボタン */}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={() => setIsModalOpen(true)}
-            >
-              <Plus size={16} className="mr-1" />
-              問題を追加
-            </Button>
+          */}
           </div>
         </div>
 
-        {/* フィルタ・ソートバー */}
-        <div className="mt-4 space-y-3">
-          {/* フィルタチップ（横スクロール可能） */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        {/* フィルタ・ソートバー（1行） */}
+        <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
+          {/* 並び替え */}
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
+            className="text-xs px-2 py-1 pr-6 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer flex-shrink-0"
+          >
+            <option value="page">P順</option>
+            <option value="accuracy-low">正解↑</option>
+            <option value="accuracy-high">正解↓</option>
+            <option value="unstudied-first">未優先</option>
+          </select>
+
+          <div className="w-px h-4 bg-gray-300 flex-shrink-0" />
+
+          {/* フィルタチップ */}
+          <div className="flex gap-1.5">
             <button
               onClick={() => {
                 setShowUnstudiedOnly(false)
@@ -1213,164 +1222,71 @@ export default function WorkbookDetail() {
                 setShowTaggedOnly(false)
                 setShowGiveUpOnly(false)
               }}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${!showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly && !showGiveUpOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${!showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly && !showGiveUpOnly
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
             >
               全て
             </button>
             <button
               onClick={() => setShowUnstudiedOnly(!showUnstudiedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showUnstudiedOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${showUnstudiedOnly
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
             >
-              未学習
+              未
             </button>
             <button
               onClick={() => setShowWeakOnly(!showWeakOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showWeakOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${showWeakOnly
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
             >
               苦手
             </button>
             <button
               onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showBookmarkedOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${showBookmarkedOnly
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
             >
-              ⭐ ブックマーク
+              ⭐
             </button>
             <button
               onClick={() => setShowTaggedOnly(!showTaggedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showTaggedOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${showTaggedOnly
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
             >
-              🏷️ タグ
+              🏷️
             </button>
             <button
               onClick={() => setShowGiveUpOnly(!showGiveUpOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showGiveUpOnly
-                  ? 'bg-red-600 text-white border-red-600 shadow-sm'
-                  : 'bg-red-50 text-red-700 border-red-200 hover:border-red-400 hover:bg-red-100'
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap transition-colors border font-medium ${showGiveUpOnly
+                ? 'bg-red-600 text-white border-red-600'
+                : 'bg-white text-red-600 border-gray-300 hover:bg-red-50'
                 }`}
             >
-              🏳️ ギブアップ
+              🏳️
             </button>
           </div>
 
-          {/* ソート + 件数 + その他アクション */}
-          <div className="flex items-center justify-between text-sm flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600 text-xs">並替:</span>
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="text-xs px-2 py-1 pr-6 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-              >
-                <option value="page">ページ順</option>
-                <option value="accuracy-low">正解率低い順</option>
-                <option value="accuracy-high">正解率高い順</option>
-                <option value="unstudied-first">未学習優先</option>
-              </select>
-            </div>
-
-            {/* その他アクション */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={problems.length === 0}
-                title="CSV出力"
-              >
-                <Download size={14} />
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleImportCSV}
-                className="hidden"
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                title="CSV取込"
-              >
-                <Upload size={14} />
-              </Button>
-              <Button
-                variant="error"
-                size="sm"
-                onClick={handleResetStudyRecords}
-                disabled={problems.length === 0}
-                title="学習履歴リセット"
-              >
-                <RotateCcw size={14} />
-              </Button>
-            </div>
-          </div>
+          {/* 隠しファイル入力（CSV取込用） */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
         </div>
 
       </div>
-
-      {/* Undo通知バーと確認スキップ */}
-      {problems.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          {lastDragOperation && (
-            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleUndoLastDrag}
-              >
-                <Undo2 size={14} className="mr-1" />
-                元に戻す
-              </Button>
-              <button
-                onClick={() => setLastDragOperation(null)}
-                className="text-gray-400 hover:text-gray-600 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-          {skipConfirmUntil > Date.now() ? (
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
-              <span className="text-blue-700">確認省略中</span>
-              <button
-                onClick={() => setSkipConfirmUntil(0)}
-                className="text-blue-500 hover:text-blue-700 underline"
-              >
-                解除
-              </button>
-            </div>
-          ) : (
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    handleSkipConfirmFor10Min()
-                  }
-                }}
-                className="rounded"
-              />
-              10分間確認を省略
-            </label>
-          )}
-        </div>
-      )}
 
       {/* コンパクトダッシュボード */}
       {statistics && problems.length > 0 && (
@@ -1393,8 +1309,8 @@ export default function WorkbookDetail() {
                 {statistics.currentAccuracy !== null && (
                   <span className="font-medium text-gray-700">
                     正解率 <span className={`font-bold ${statistics.currentAccuracy >= 80 ? 'text-green-700' :
-                        statistics.currentAccuracy >= 50 ? 'text-yellow-700' :
-                          'text-red-700'
+                      statistics.currentAccuracy >= 50 ? 'text-yellow-700' :
+                        'text-red-700'
                       }`}>{statistics.currentAccuracy}%</span>
                   </span>
                 )}
@@ -1458,6 +1374,17 @@ export default function WorkbookDetail() {
         </div>
       )}
 
+      {/* 問題追加ボタン（ダッシュボードの下） */}
+      <div className="mb-4">
+        <Button
+          size="sm"
+          onClick={() => setIsModalOpen(true)}
+        >
+          <Plus size={16} className="mr-1" />
+          問題を追加
+        </Button>
+      </div>
+
       {problems.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">問題がありません</p>
@@ -1485,9 +1412,10 @@ export default function WorkbookDetail() {
             return (
               <div key={category}>
                 {/* 親カテゴリヘッダー */}
-                <div className={`flex items-center justify-between p-4 rounded-lg transition-colors ${categoryExcluded ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                <div className={`flex flex-col gap-2 p-4 rounded-lg transition-colors ${categoryExcluded ? 'bg-gray-100' : 'bg-gray-50'}`}>
+                  {/* 行1: タイトル（クリックで開閉） + 編集ボタン */}
                   <div
-                    className="flex items-center gap-3 flex-1 cursor-pointer"
+                    className="flex items-center gap-3 w-full cursor-pointer"
                     onClick={() => toggleCategory(category)}
                   >
                     {isCategoryExpanded ? (
@@ -1495,58 +1423,73 @@ export default function WorkbookDetail() {
                     ) : (
                       <ChevronRight size={20} className={categoryExcluded ? "text-gray-400" : "text-gray-600"} />
                     )}
-                    <h2 className={`text-xl font-bold ${categoryExcluded ? 'text-gray-400' : ''}`}>{category}</h2>
-                    {categoryExcluded && (
-                      <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap">
-                        復習から除外
-                      </span>
-                    )}
-                    <span className={`text-sm ${categoryExcluded ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {Object.keys(titles).length}セクション · {totalProblems}問
-                    </span>
-                    {(() => {
-                      const categoryAccuracy = categoryAccuracyRates.get(category)
-                      if (categoryAccuracy !== null && categoryAccuracy !== undefined) {
-                        const colorClass = categoryAccuracy >= 80
-                          ? 'bg-green-100 text-green-700'
-                          : categoryAccuracy >= 50
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                        return (
-                          <span
-                            className={`text-sm px-2 py-1 rounded font-medium ${colorClass}`}
-                            title="最新3回の重み付け平均（最新50%、1つ前30%、2つ前20%）"
-                          >
-                            正解率 {categoryAccuracy}%
-                          </span>
-                        )
-                      }
-                      return null
-                    })()}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleToggleCategoryExclusion(category)
-                      }}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isCategoryExcluded
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-red-100 text-red-700 hover:bg-red-200'
-                        }`}
-                      title={isCategoryExcluded ? 'カテゴリ除外を解除' : 'カテゴリを除外'}
-                    >
-                      {isCategoryExcluded ? '✅ 除外解除' : '⛔ 除外'}
-                    </button>
+                    <h2 className={`text-xl font-bold truncate ${categoryExcluded ? 'text-gray-400' : ''}`}>{category}</h2>
+
+                    {/* スペーサー */}
+                    <div className="flex-1"></div>
+
+                    {/* 編集ボタン（右端へ移動） */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         handleEditCategoryWrapper(category, Object.values(titles))
                       }}
-                      className="p-2 hover:bg-blue-100 rounded transition-colors"
+                      className="p-2 hover:bg-blue-100 rounded transition-colors flex-shrink-0"
                     >
                       <Edit2 size={16} className="text-primary" />
                     </button>
+                  </div>
+
+                  {/* 行2: メタデータと操作ボタン */}
+                  <div className="flex items-center justify-between ml-8">
+                    {/* メタデータ */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap overflow-hidden">
+                      {categoryExcluded && (
+                        <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                          除外中
+                        </span>
+                      )}
+                      <span className={`text-sm whitespace-nowrap flex-shrink-0 ${categoryExcluded ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {Object.keys(titles).length}セク/{totalProblems}問
+                      </span>
+                      {(() => {
+                        const categoryAccuracy = categoryAccuracyRates.get(category)
+                        if (categoryAccuracy !== null && categoryAccuracy !== undefined) {
+                          const colorClass = categoryAccuracy >= 80
+                            ? 'bg-green-100 text-green-700'
+                            : categoryAccuracy >= 50
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
+                          return (
+                            <span
+                              className={`text-sm px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${colorClass}`}
+                              title="最新3回の重み付け平均"
+                            >
+                              {categoryAccuracy}%
+                            </span>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
+
+                    {/* 操作ボタン（除外切替のみ、編集は上に移動） */}
+                    <div className="flex items-center gap-2 ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleCategoryExclusion(category)
+                        }}
+                        className={`px-2 sm:px-3 py-1.5 rounded text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${isCategoryExcluded
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        title={isCategoryExcluded ? 'カテゴリ除外を解除' : 'カテゴリを除外'}
+                      >
+                        {/* スマホは短縮、PCは少し長めでも可だが統一してシンプルに */}
+                        {isCategoryExcluded ? '解除' : '除外'}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1566,48 +1509,46 @@ export default function WorkbookDetail() {
                         <div key={titleKey}>
                           {/* 目次タイトルヘッダー（スマホ2行/PC1行） */}
                           <div className={`border border-border rounded-lg ${isExcluded ? 'bg-gray-100' : 'bg-white'}`}>
-                            <div
-                              className={`p-3 cursor-pointer transition-colors ${isExcluded ? 'hover:bg-gray-200' : 'hover:bg-blue-50'}`}
-                              onClick={() => toggleTitle(titleKey)}
-                            >
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                {/* 1行目（スマホ）/ 左側（PC）：チェブロン + タイトル + 学習ボタン（スマホのみ） */}
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  {/* チェブロン */}
-                                  {isTitleExpanded ? (
-                                    <ChevronDown size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
-                                  ) : (
-                                    <ChevronRight size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
-                                  )}
+                            <div className="flex flex-col gap-2">
+                              {/* 行1: タイトル（クリックで開閉） + 編集ボタン（右寄せ） */}
+                              <div className="flex items-center gap-2 cursor-pointer p-3" onClick={() => toggleTitle(titleKey)}>
+                                {/* チェブロン */}
+                                {isTitleExpanded ? (
+                                  <ChevronDown size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                ) : (
+                                  <ChevronRight size={16} className={isExcluded ? "text-gray-400 flex-shrink-0" : "text-gray-600 flex-shrink-0"} />
+                                )}
 
-                                  {/* タイトル */}
-                                  <h3 className={`font-semibold text-sm sm:text-base truncate ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
+                                {/* タイトル */}
+                                <h3 className={`font-semibold text-sm sm:text-base truncate ${isExcluded ? 'text-gray-400' : ''}`}>{title}</h3>
 
-                                  {/* 除外バッジ（タイトルの直後） */}
-                                  {isExcluded && (
-                                    <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
-                                      除外中
-                                    </span>
-                                  )}
+                                {/* 除外バッジ */}
+                                {isExcluded && (
+                                  <span className="text-xs bg-gray-300 text-gray-600 px-2 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                                    除外中
+                                  </span>
+                                )}
 
-                                  {/* スペーサー（タイトルエリアの残りスペース） */}
-                                  <div className="flex-1 min-w-0"></div>
+                                {/* スペーサー */}
+                                <div className="flex-1"></div>
 
-                                  {/* 学習ボタン（スマホのみ表示、小さめ） */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleStartGroupStudy(titleProblems, title)
-                                    }}
-                                    className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90 transition-colors flex-shrink-0"
-                                  >
-                                    <Play size={12} />
-                                    学習
-                                  </button>
-                                </div>
+                                {/* 編集ボタン（右端へ移動） */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditGroupWrapper(`${category}${title}`, titleProblems)
+                                  }}
+                                  className="p-1.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                  title="セクション設定"
+                                >
+                                  <Edit2 size={14} className="text-gray-500" />
+                                </button>
+                              </div>
 
-                                {/* 2行目（スマホ）/ 右側（PC）：ステータス情報 + ボタン */}
-                                <div className="flex items-center gap-2 flex-wrap ml-6 sm:ml-0" onClick={(e) => e.stopPropagation()}>
+                              {/* 行2: メタデータと学習ボタン */}
+                              <div className="flex items-center justify-between ml-6 p-3 pt-0" onClick={(e) => e.stopPropagation()}>
+                                {/* メタデータ */}
+                                <div className="flex items-center gap-2 flex-wrap">
                                   {/* 正解率バッジ */}
                                   {(() => {
                                     const accuracy = sectionAccuracyRates.get(titleKey)
@@ -1633,7 +1574,7 @@ export default function WorkbookDetail() {
                                     )
                                   })()}
 
-                                  {/* 進捗バッジ（学習済み/総問題数-周回数） */}
+                                  {/* 進捗バッジ */}
                                   {(() => {
                                     const progress = sectionProgressMap.get(titleKey)
                                     if (progress) {
@@ -1695,35 +1636,34 @@ export default function WorkbookDetail() {
                                       p.{firstProblemWithPage.page}
                                     </span>
                                   )}
+                                </div>
 
-                                  {/* スペーサー（PC時右寄せのため） */}
-                                  <div className="hidden sm:block flex-1 min-w-[8px]"></div>
+                                {/* ボタン群（学習ボタン + 問題追加ボタン） */}
+                                <div className="flex items-center gap-2 ml-2">
+                                  {/* 学習ボタン（スマホ・PC共通、スマホはアイコンのみ） */}
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleStartGroupStudy(titleProblems, title)
+                                    }}
+                                    className="py-1 h-8 px-2 sm:px-3"
+                                  >
+                                    <Play size={14} className="sm:mr-1" />
+                                    <span className="hidden sm:inline">学習</span>
+                                  </Button>
 
-                                  {/* 編集ボタン */}
+                                  {/* 問題追加ボタン（セクション内に追加） */}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleEditGroupWrapper(`${category}${title}`, titleProblems)
+                                      handleAddProblemToSection(category, title, titleProblems)
                                     }}
-                                    className="p-1.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
-                                    title="セクション設定"
+                                    className="p-1.5 hover:bg-green-100 rounded transition-colors text-green-600 flex-shrink-0"
+                                    title="このセクションに問題を追加"
                                   >
-                                    <Edit2 size={14} className="text-gray-500" />
+                                    <Plus size={16} />
                                   </button>
-
-                                  {/* 学習ボタン（PCのみ表示） */}
-                                  <div className="hidden sm:block flex-shrink-0">
-                                    <Button
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleStartGroupStudy(titleProblems, title)
-                                      }}
-                                    >
-                                      <Play size={14} className="mr-1" />
-                                      学習
-                                    </Button>
-                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1785,8 +1725,8 @@ export default function WorkbookDetail() {
                                               handleToggleGiveUp(problem)
                                             }}
                                             className={`p-1.5 rounded transition-colors ${problem.tags?.includes('ギブアップ')
-                                                ? 'bg-red-600 text-white hover:bg-red-700'
-                                                : 'hover:bg-red-100 text-red-600'
+                                              ? 'bg-red-600 text-white hover:bg-red-700'
+                                              : 'hover:bg-red-100 text-red-600'
                                               }`}
                                             title={problem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
                                           >
@@ -1846,8 +1786,8 @@ export default function WorkbookDetail() {
                                                     handleToggleGiveUp(subProblem)
                                                   }}
                                                   className={`p-1.5 rounded transition-colors ${subProblem.tags?.includes('ギブアップ')
-                                                      ? 'bg-red-600 text-white hover:bg-red-700'
-                                                      : 'hover:bg-red-100 text-red-600'
+                                                    ? 'bg-red-600 text-white hover:bg-red-700'
+                                                    : 'hover:bg-red-100 text-red-600'
                                                     }`}
                                                   title={subProblem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
                                                 >
@@ -1906,10 +1846,10 @@ export default function WorkbookDetail() {
                   <div>
                     <span className="text-xs text-gray-600">正答率: </span>
                     <span className={`text-sm font-medium ${problemAccuracy >= 80
-                        ? 'text-green-600'
-                        : problemAccuracy >= 50
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
+                      ? 'text-green-600'
+                      : problemAccuracy >= 50
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
                       }`}>
                       {problemAccuracy}%
                     </span>
@@ -1923,10 +1863,10 @@ export default function WorkbookDetail() {
                     {studyRecords.slice(0, 5).map((record) => (
                       <div key={record.id} className="text-xs flex items-center gap-2">
                         <span className={`px-1.5 py-0.5 rounded ${record.result === 'correct'
-                            ? 'bg-green-100 text-green-700'
-                            : record.result === 'partial'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
+                          ? 'bg-green-100 text-green-700'
+                          : record.result === 'partial'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                           }`}>
                           {record.result === 'correct' ? '◯' : record.result === 'partial' ? '△' : '×'}
                         </span>
@@ -2260,6 +2200,43 @@ export default function WorkbookDetail() {
 
       {/* 確認ダイアログ */}
       <ConfirmDialog {...dialogProps} />
+
+      {/* フローティングUI（元に戻す・確認省略中） */}
+      {(lastDragOperation || skipConfirmUntil > Date.now()) && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white border border-gray-300 rounded-lg shadow-lg px-3 py-1.5 text-sm whitespace-nowrap">
+          {lastDragOperation && (
+            <>
+              <button
+                onClick={handleUndoLastDrag}
+                className="flex items-center gap-1 text-yellow-700 hover:text-yellow-900 font-medium"
+              >
+                <Undo2 size={14} />
+                元に戻す
+              </button>
+              <button
+                onClick={() => setLastDragOperation(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </>
+          )}
+          {lastDragOperation && skipConfirmUntil > Date.now() && (
+            <div className="w-px h-4 bg-gray-300" />
+          )}
+          {skipConfirmUntil > Date.now() && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-blue-600">確認省略中</span>
+              <button
+                onClick={() => setSkipConfirmUntil(0)}
+                className="text-blue-500 hover:text-blue-700 underline"
+              >
+                解除
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

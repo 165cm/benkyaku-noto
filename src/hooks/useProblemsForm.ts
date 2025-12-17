@@ -15,6 +15,7 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
   const [formData, setFormData] = useState({
     problemNumber: '',
     category: '',
+    sectionTitle: '',
     page: '',
     memo: '',
   })
@@ -31,6 +32,7 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
       await db.problems.update(editingProblem.id, {
         problemNumber: formData.problemNumber,
         category: formData.category || undefined,
+        sectionTitle: formData.sectionTitle || undefined,
         page: formData.page ? parseInt(formData.page) : undefined,
         memo: formData.memo || undefined,
       })
@@ -40,6 +42,7 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
         workbookId,
         problemNumber: formData.problemNumber,
         category: formData.category || undefined,
+        sectionTitle: formData.sectionTitle || undefined,
         page: formData.page ? parseInt(formData.page) : undefined,
         memo: formData.memo || undefined,
       })
@@ -54,6 +57,7 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
     setFormData({
       problemNumber: problem.problemNumber,
       category: problem.category || '',
+      sectionTitle: problem.sectionTitle || '',
       page: problem.page?.toString() || '',
       memo: problem.memo || '',
     })
@@ -67,8 +71,8 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
     // カテゴリが既存のものでない場合、カスタム入力を表示
     setShowCustomCategoryInput(
       problem.category !== undefined &&
-        problem.category !== '' &&
-        !availableCategories.includes(problem.category)
+      problem.category !== '' &&
+      !availableCategories.includes(problem.category)
     )
   }
 
@@ -80,7 +84,7 @@ export function useProblemsForm(workbookId: string | undefined, availableCategor
   }
 
   const resetForm = () => {
-    setFormData({ problemNumber: '', category: '', page: '', memo: '' })
+    setFormData({ problemNumber: '', category: '', sectionTitle: '', page: '', memo: '' })
     setEditingProblem(null)
     setStudyRecords([])
     setProblemAccuracy(null)

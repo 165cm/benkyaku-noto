@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   variant?: 'default' | 'danger'
+  checkboxLabel?: string
+  onCheckboxChange?: (checked: boolean) => void
 }
 
 export default function ConfirmDialog({
@@ -22,6 +24,8 @@ export default function ConfirmDialog({
   confirmText = '確認',
   cancelText = 'キャンセル',
   variant = 'default',
+  checkboxLabel,
+  onCheckboxChange,
 }: ConfirmDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -40,6 +44,19 @@ export default function ConfirmDialog({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <p className="text-gray-600 mb-6 whitespace-pre-wrap">{message}</p>
+
+      {/* チェックボックス（オプション） */}
+      {checkboxLabel && onCheckboxChange && (
+        <label className="flex items-center gap-2 mb-4 text-sm text-gray-600 cursor-pointer w-fit">
+          <input
+            type="checkbox"
+            onChange={(e) => onCheckboxChange(e.target.checked)}
+            className="rounded border-gray-300 text-primary focus:ring-primary"
+          />
+          {checkboxLabel}
+        </label>
+      )}
+
       <div className="flex gap-3 justify-end">
         <Button
           variant="secondary"

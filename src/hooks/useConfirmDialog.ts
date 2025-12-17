@@ -6,6 +6,8 @@ interface ConfirmOptions {
   confirmText?: string
   cancelText?: string
   variant?: 'default' | 'danger'
+  checkboxLabel?: string
+  onCheckboxChange?: (checked: boolean) => void
 }
 
 interface ConfirmDialogState {
@@ -52,6 +54,8 @@ export function useConfirmDialog() {
       confirmText: state.options?.confirmText,
       cancelText: state.options?.cancelText,
       variant: state.options?.variant,
+      checkboxLabel: state.options?.checkboxLabel,
+      onCheckboxChange: state.options?.onCheckboxChange,
     },
   }
 }
