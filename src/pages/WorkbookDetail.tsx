@@ -140,10 +140,10 @@ export default function WorkbookDetail() {
   useEffect(() => {
     const loadStatistics = async () => {
       // 最新の除外設定を取得（設定画面で変更された場合に対応）
-      const latestExcludedSections = getExcludedSections()
+      const latestExcludedSections = await getExcludedSections()
       setExcludedSections(latestExcludedSections)
 
-      const latestExcludedCategories = getExcludedCategories()
+      const latestExcludedCategories = await getExcludedCategories()
       setExcludedCategories(latestExcludedCategories)
 
       if (id) {
@@ -1213,61 +1213,55 @@ export default function WorkbookDetail() {
                 setShowTaggedOnly(false)
                 setShowGiveUpOnly(false)
               }}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                !showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly && !showGiveUpOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${!showUnstudiedOnly && !showWeakOnly && !showBookmarkedOnly && !showTaggedOnly && !showGiveUpOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-              }`}
+                }`}
             >
               全て
             </button>
             <button
               onClick={() => setShowUnstudiedOnly(!showUnstudiedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                showUnstudiedOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showUnstudiedOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-              }`}
+                }`}
             >
               未学習
             </button>
             <button
               onClick={() => setShowWeakOnly(!showWeakOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                showWeakOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showWeakOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-              }`}
+                }`}
             >
               苦手
             </button>
             <button
               onClick={() => setShowBookmarkedOnly(!showBookmarkedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                showBookmarkedOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showBookmarkedOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-              }`}
+                }`}
             >
               ⭐ ブックマーク
             </button>
             <button
               onClick={() => setShowTaggedOnly(!showTaggedOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                showTaggedOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showTaggedOnly
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-              }`}
+                }`}
             >
               🏷️ タグ
             </button>
             <button
               onClick={() => setShowGiveUpOnly(!showGiveUpOnly)}
-              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${
-                showGiveUpOnly
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border-2 font-medium ${showGiveUpOnly
                   ? 'bg-red-600 text-white border-red-600 shadow-sm'
                   : 'bg-red-50 text-red-700 border-red-200 hover:border-red-400 hover:bg-red-100'
-              }`}
+                }`}
             >
               🏳️ ギブアップ
             </button>
@@ -1398,11 +1392,10 @@ export default function WorkbookDetail() {
                 <span className="text-gray-300">|</span>
                 {statistics.currentAccuracy !== null && (
                   <span className="font-medium text-gray-700">
-                    正解率 <span className={`font-bold ${
-                      statistics.currentAccuracy >= 80 ? 'text-green-700' :
-                      statistics.currentAccuracy >= 50 ? 'text-yellow-700' :
-                      'text-red-700'
-                    }`}>{statistics.currentAccuracy}%</span>
+                    正解率 <span className={`font-bold ${statistics.currentAccuracy >= 80 ? 'text-green-700' :
+                        statistics.currentAccuracy >= 50 ? 'text-yellow-700' :
+                          'text-red-700'
+                      }`}>{statistics.currentAccuracy}%</span>
                   </span>
                 )}
               </div>
@@ -1517,8 +1510,8 @@ export default function WorkbookDetail() {
                         const colorClass = categoryAccuracy >= 80
                           ? 'bg-green-100 text-green-700'
                           : categoryAccuracy >= 50
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                         return (
                           <span
                             className={`text-sm px-2 py-1 rounded font-medium ${colorClass}`}
@@ -1537,11 +1530,10 @@ export default function WorkbookDetail() {
                         e.stopPropagation()
                         handleToggleCategoryExclusion(category)
                       }}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        isCategoryExcluded
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isCategoryExcluded
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
                           : 'bg-red-100 text-red-700 hover:bg-red-200'
-                      }`}
+                        }`}
                       title={isCategoryExcluded ? 'カテゴリ除外を解除' : 'カテゴリを除外'}
                     >
                       {isCategoryExcluded ? '✅ 除外解除' : '⛔ 除外'}
@@ -1623,8 +1615,8 @@ export default function WorkbookDetail() {
                                       const colorClass = accuracy >= 80
                                         ? 'bg-green-100 text-green-700'
                                         : accuracy >= 50
-                                        ? 'bg-yellow-100 text-yellow-700'
-                                        : 'bg-red-100 text-red-700'
+                                          ? 'bg-yellow-100 text-yellow-700'
+                                          : 'bg-red-100 text-red-700'
                                       return (
                                         <span
                                           className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${colorClass}`}
@@ -1792,11 +1784,10 @@ export default function WorkbookDetail() {
                                               e.stopPropagation()
                                               handleToggleGiveUp(problem)
                                             }}
-                                            className={`p-1.5 rounded transition-colors ${
-                                              problem.tags?.includes('ギブアップ')
+                                            className={`p-1.5 rounded transition-colors ${problem.tags?.includes('ギブアップ')
                                                 ? 'bg-red-600 text-white hover:bg-red-700'
                                                 : 'hover:bg-red-100 text-red-600'
-                                            }`}
+                                              }`}
                                             title={problem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
                                           >
                                             🏳️
@@ -1854,11 +1845,10 @@ export default function WorkbookDetail() {
                                                     e.stopPropagation()
                                                     handleToggleGiveUp(subProblem)
                                                   }}
-                                                  className={`p-1.5 rounded transition-colors ${
-                                                    subProblem.tags?.includes('ギブアップ')
+                                                  className={`p-1.5 rounded transition-colors ${subProblem.tags?.includes('ギブアップ')
                                                       ? 'bg-red-600 text-white hover:bg-red-700'
                                                       : 'hover:bg-red-100 text-red-600'
-                                                  }`}
+                                                    }`}
                                                   title={subProblem.tags?.includes('ギブアップ') ? 'ギブアップを解除' : 'ギブアップ'}
                                                 >
                                                   🏳️
@@ -1915,13 +1905,12 @@ export default function WorkbookDetail() {
                 {problemAccuracy !== null && (
                   <div>
                     <span className="text-xs text-gray-600">正答率: </span>
-                    <span className={`text-sm font-medium ${
-                      problemAccuracy >= 80
+                    <span className={`text-sm font-medium ${problemAccuracy >= 80
                         ? 'text-green-600'
                         : problemAccuracy >= 50
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                    }`}>
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }`}>
                       {problemAccuracy}%
                     </span>
                   </div>
@@ -1933,13 +1922,12 @@ export default function WorkbookDetail() {
                   <div className="space-y-1 max-h-24 overflow-y-auto">
                     {studyRecords.slice(0, 5).map((record) => (
                       <div key={record.id} className="text-xs flex items-center gap-2">
-                        <span className={`px-1.5 py-0.5 rounded ${
-                          record.result === 'correct'
+                        <span className={`px-1.5 py-0.5 rounded ${record.result === 'correct'
                             ? 'bg-green-100 text-green-700'
                             : record.result === 'partial'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
                           {record.result === 'correct' ? '◯' : record.result === 'partial' ? '△' : '×'}
                         </span>
                         <span className="text-gray-600">

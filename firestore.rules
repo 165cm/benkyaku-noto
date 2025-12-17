@@ -110,6 +110,16 @@ service cloud.firestore {
     }
 
     // ============================================
+    // User's settings
+    // ============================================
+    match /users/{userId}/settings/{settingKey} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // ============================================
     // Deny all other access by default
     // ============================================
     match /{document=**} {

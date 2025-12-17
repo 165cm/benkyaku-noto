@@ -53,7 +53,7 @@ export default function Settings() {
   const [showGoalsSettings, setShowGoalsSettings] = useState(false)
 
   // 週設定
-  const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>(getWeekStartDay())
+  const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>(1)
   const [weekSettingsSaved, setWeekSettingsSaved] = useState(false)
   const [showWeekSettings, setShowWeekSettings] = useState(false)
 
@@ -71,6 +71,9 @@ export default function Settings() {
     calculateBackupSize().then(setBackupSize)
     setLastBackupTime(getLastBackupTime())
     setLastRestoreTime(getLastRestoreTime())
+
+    // 週設定を取得
+    getWeekStartDay().then(setWeekStartDay)
   }, [])
 
   const handleSave = () => {
@@ -362,20 +365,18 @@ export default function Settings() {
             )}
 
             {syncMessage && (
-              <div className={`border rounded-md p-2 mb-3 ${
-                syncMessage.type === 'success'
+              <div className={`border rounded-md p-2 mb-3 ${syncMessage.type === 'success'
                   ? 'bg-green-50 border-green-200'
                   : 'bg-red-50 border-red-200'
-              }`}>
+                }`}>
                 <div className="flex items-center gap-2">
                   {syncMessage.type === 'success' ? (
                     <CheckCircle size={16} className="text-green-600 flex-shrink-0" />
                   ) : (
                     <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
                   )}
-                  <p className={`text-xs font-medium ${
-                    syncMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
-                  }`}>{syncMessage.text}</p>
+                  <p className={`text-xs font-medium ${syncMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
+                    }`}>{syncMessage.text}</p>
                 </div>
               </div>
             )}

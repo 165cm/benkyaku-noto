@@ -11,7 +11,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db as firestore } from './firebase'
-import type { Workbook, Problem, StudyRecord, Explanation } from '@/types'
+import type { Workbook, Problem, StudyRecord, Explanation, UserSettings } from '@/types'
 
 // Firestore用の型定義（Dateをserverのタイムスタンプに変換）
 type FirestoreWorkbook = Omit<Workbook, 'createdAt' | 'updatedAt'> & {
@@ -26,6 +26,10 @@ type FirestoreProblem = Omit<Problem, 'createdAt' | 'deletedAt'> & {
 
 type FirestoreStudyRecord = Omit<StudyRecord, 'studiedAt'> & {
   studiedAt: Timestamp
+}
+
+type FirestoreSettings = Omit<UserSettings, 'updatedAt'> & {
+  updatedAt: Timestamp
 }
 
 type FirestoreExplanation = Omit<Explanation, 'createdAt'> & {
@@ -197,6 +201,33 @@ export async function deleteExplanationFromFirestore(userId: string, explanation
   await deleteDoc(explanationRef)
 }
 
+// ================== Settings ==================
+
+export async function syncSettingsToFirestore(userId: string, settings: UserSettings) {
+  const settingsRef = doc(firestore, `${getUserPath(userId)}/settings/${settings.key}`)
+
+  const firestoreSettings = removeUndefined({
+    ...settings,
+    updatedAt: dateToTimestamp(settings.updatedAt)
+  }) as FirestoreSettings
+
+  await setDoc(settingsRef, firestoreSettings, { merge: true })
+}
+
+export async function getSettingsFromFirestore(userId: string): Promise<UserSettings[]> {
+  const settingsRef = collection(firestore, `${getUserPath(userId)}/settings`)
+  const snapshot = await getDocs(settingsRef)
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data() as FirestoreSettings
+    return {
+      key: data.key,
+      value: data.value,
+      updatedAt: timestampToDate(data.updatedAt)
+    }
+  })
+}
+
 // ================== Batch Operations ==================
 
 export async function backupAllDataToFirestore(
@@ -206,6 +237,7 @@ export async function backupAllDataToFirestore(
     problems: Problem[]
     studyRecords: StudyRecord[]
     explanations: Explanation[]
+    settings: UserSettings[]
   }
 ) {
   const batch = writeBatch(firestore)
@@ -260,6 +292,16 @@ export async function backupAllDataToFirestore(
     batch.set(ref, firestoreExplanation)
   })
 
+  // Settings
+  data.settings.forEach((setting) => {
+    const ref = doc(firestore, `${getUserPath(userId)}/settings/${setting.key}`)
+    const firestoreSetting = removeUndefined({
+      ...setting,
+      updatedAt: dateToTimestamp(setting.updatedAt)
+    }) as FirestoreSettings
+    batch.set(ref, firestoreSetting)
+  })
+
   // 最初のバッチをコミット
   await batch.commit()
 
@@ -290,7 +332,8 @@ export async function restoreAllDataFromFirestore(userId: string) {
     workbooks,
     problems,
     studyRecords,
-    explanations
+    explanations,
+    settings: await getSettingsFromFirestore(userId)
   }
 }
 
@@ -313,7 +356,8 @@ export async function hasCloudData(userId: string): Promise<boolean> {
       workbooks.length > 0 ||
       problems.length > 0 ||
       studyRecords.length > 0 ||
-      explanations.length > 0
+      explanations.length > 0 ||
+      (await getSettingsFromFirestore(userId)).length > 0
     )
   } catch (error) {
     console.error('Error checking cloud data:', error)

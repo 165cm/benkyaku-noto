@@ -27,8 +27,12 @@ export default function Home() {
   const [streak, setStreak] = useState(0)
   const [weeklyData, setWeeklyData] = useState<number[]>([])
   const [weeklyLabels, setWeeklyLabels] = useState<string[]>([])
-  const [displayMode, setDisplayMode] = useState<WeekDisplayMode>(getWeekDisplayMode())
+  const [displayMode, setDisplayMode] = useState<WeekDisplayMode>('current-week')
   const [showOtherModes, setShowOtherModes] = useState(false)
+
+  useEffect(() => {
+    getWeekDisplayMode().then(setDisplayMode)
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -225,40 +229,36 @@ export default function Home() {
             <div className="flex gap-1 text-xs">
               <button
                 onClick={() => handleDisplayModeChange('current-week')}
-                className={`px-2 py-1 rounded ${
-                  displayMode === 'current-week'
+                className={`px-2 py-1 rounded ${displayMode === 'current-week'
                     ? 'bg-primary text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 今週
               </button>
               <button
                 onClick={() => handleDisplayModeChange('last-7-days')}
-                className={`px-2 py-1 rounded ${
-                  displayMode === 'last-7-days'
+                className={`px-2 py-1 rounded ${displayMode === 'last-7-days'
                     ? 'bg-primary text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 7日
               </button>
               <button
                 onClick={() => handleDisplayModeChange('last-14-days')}
-                className={`px-2 py-1 rounded ${
-                  displayMode === 'last-14-days'
+                className={`px-2 py-1 rounded ${displayMode === 'last-14-days'
                     ? 'bg-primary text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 14日
               </button>
             </div>
           </div>
 
-          <div className={`grid gap-1 mb-2 ${
-            displayMode === 'last-14-days' ? 'grid-cols-14' : 'grid-cols-7'
-          }`}>
+          <div className={`grid gap-1 mb-2 ${displayMode === 'last-14-days' ? 'grid-cols-14' : 'grid-cols-7'
+            }`}>
             {weeklyLabels.map((label, i) => {
               const timeInMinutes = Math.round(weeklyData[i] / 60)
 
@@ -278,11 +278,11 @@ export default function Home() {
               // グラフの最大値を計算
               const maxTime = displayMode === 'current-week'
                 ? Math.max(...weeklyData, ...[0, 1, 2, 3, 4, 5, 6].map(idx => {
-                    const dayKeys: (keyof typeof weeklyGoals)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-                    const dayLabel = weeklyLabels[idx]
-                    const dayIdx = ['日', '月', '火', '水', '木', '金', '土'].indexOf(dayLabel)
-                    return dayIdx >= 0 ? weeklyGoals[dayKeys[dayIdx]] * 60 : 0
-                  }), 1)
+                  const dayKeys: (keyof typeof weeklyGoals)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                  const dayLabel = weeklyLabels[idx]
+                  const dayIdx = ['日', '月', '火', '水', '木', '金', '土'].indexOf(dayLabel)
+                  return dayIdx >= 0 ? weeklyGoals[dayKeys[dayIdx]] * 60 : 0
+                }), 1)
                 : Math.max(...weeklyData, 1)
 
               const barHeight = (weeklyData[i] / maxTime) * 100
@@ -297,9 +297,8 @@ export default function Home() {
                   <p className={`text-xs text-gray-600 mb-1.5 ${displayMode === 'last-14-days' ? 'text-[10px]' : ''}`}>
                     {label}
                   </p>
-                  <div className={`bg-gray-50 border border-gray-100 rounded-sm flex items-end justify-center relative ${
-                    displayMode === 'last-14-days' ? 'h-16' : 'h-20'
-                  }`}>
+                  <div className={`bg-gray-50 border border-gray-100 rounded-sm flex items-end justify-center relative ${displayMode === 'last-14-days' ? 'h-16' : 'h-20'
+                    }`}>
                     {/* 目標線（今週モードのみ） */}
                     {displayMode === 'current-week' && goalInMinutes > 0 && (
                       <div
@@ -361,8 +360,8 @@ export default function Home() {
                     accuracy >= 80
                       ? 'text-green-600'
                       : accuracy >= 50
-                      ? 'text-yellow-600'
-                      : 'text-red-600'
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
                   return (
                     <div key={section.sectionKey} className="flex items-center justify-between py-1">
                       <span className="text-sm truncate flex items-center gap-2">
@@ -383,11 +382,10 @@ export default function Home() {
             <Button
               onClick={recommendedMode.action}
               disabled={startingReview}
-              className={`w-full h-16 text-lg font-bold ${
-                recommendedMode.color === 'blue'
+              className={`w-full h-16 text-lg font-bold ${recommendedMode.color === 'blue'
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-green-600 hover:bg-green-700'
-              }`}
+                }`}
             >
               {startingReview ? (
                 <>
