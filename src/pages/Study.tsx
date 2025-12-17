@@ -377,7 +377,7 @@ export default function Study() {
           // 2. セクションの標準時間
           if (!standardTime && problemData.category && problemData.sectionTitle) {
             const sectionKey = `${problemData.category}-${problemData.sectionTitle}`
-            standardTime = getSectionStandardTime(sectionKey)
+            standardTime = await getSectionStandardTime(sectionKey)
           }
 
           // 3. 問題集の標準時間
@@ -446,13 +446,13 @@ export default function Study() {
       await removeTagFromProblem(problem.id, tag)
       // 「ギブアップ」タグを削除する場合、除外リストからも削除
       if (tag === 'ギブアップ') {
-        removeExcludedProblem(problem.id)
+        await removeExcludedProblem(problem.id)
       }
     } else {
       await addTagToProblem(problem.id, tag)
       // 「ギブアップ」タグを追加する場合、除外リストにも追加
       if (tag === 'ギブアップ') {
-        addExcludedProblem(problem.id)
+        await addExcludedProblem(problem.id)
       }
     }
     await loadData()
@@ -511,7 +511,7 @@ export default function Study() {
     if (problem.category && problem.sectionTitle) {
       // セクション単位で保存
       const sectionKey = `${problem.category}-${problem.sectionTitle}`
-      setSectionStandardTime(sectionKey, timeInSeconds)
+      await setSectionStandardTime(sectionKey, timeInSeconds)
     } else {
       // 問題単位で保存
       await updateProblem(problem.id, { standardTime: timeInSeconds })
@@ -922,921 +922,913 @@ export default function Study() {
       <div>
         {/* 問題情報エリア */}
         <div>
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-4">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            if (problem?.workbookId) {
-              navigate(`/workbooks/${problem.workbookId}`)
-            } else {
-              navigate('/workbooks')
-            }
-          }}
-          title="問題集に戻る"
-        >
-          <ArrowLeft size={16} />
-        </Button>
-        <p className="text-sm text-gray-600 truncate mx-2 flex-1 text-center">{workbook?.title || ''}</p>
-        <div className="flex items-center gap-2">
-          {isWeakMode && (
-            <button
-              onClick={() => navigate('/weak-mode-report')}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 transition-colors text-red-700 text-sm font-medium"
-              title="学習を終了してレポートを見る"
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">終了</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 時間終了メッセージ */}
-      {timeExpired && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-400 rounded-lg">
-          <p className="text-sm font-bold text-red-900">⏰ 目標時間に到達しました！</p>
-          <p className="text-xs text-red-700 mt-1">キリの良いところで終了しましょう</p>
-        </div>
-      )}
-
-      {/* 問題情報カード */}
-      <Card className="mb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            {problem.category && (
-              <p className="text-xs text-gray-500 mb-1 truncate">
-                {problem.category}
-              </p>
-            )}
-            <div className="flex items-center gap-2 min-w-0">
-              {/* セクションタイトル（省略可） */}
-              {problem.sectionTitle && (
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold truncate">
-                    {problem.sectionTitle}
-                  </h1>
-                </div>
-              )}
-              {/* 問題番号（常に表示） */}
-              <h1 className="text-xl sm:text-2xl font-bold whitespace-nowrap flex-none">
-                {problem.sectionTitle ? `-${problem.problemNumber}` : problem.problemNumber}
-              </h1>
-              <button
-                onClick={handleToggleBookmark}
-                className={`p-1.5 rounded-lg transition-all ${
-                  problem.isBookmarked
-                    ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200'
-                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                }`}
-                title={problem.isBookmarked ? '苦手マークを外す' : '苦手な問題としてマーク'}
-              >
-                <Star size={20} fill={problem.isBookmarked ? 'currentColor' : 'none'} />
-              </button>
-            </div>
-
-            {/* AI解説リンク */}
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {problem.category && problem.sectionTitle && hasExplanation && (
-                <button
-                  onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
-                  title="AI解説を見る"
-                >
-                  <BookOpen size={16} />
-                  <span>AI解説を見る</span>
-                </button>
-              )}
-
-              {/* 画像ベース解説ボタン */}
-              {imageExplanations.length > 0 && (
-                <button
-                  onClick={() => setShowImageExplanations(!showImageExplanations)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 shadow-sm"
-                  title="画像から作成した解説を見る"
-                >
-                  <Image size={16} />
-                  <span>画像解説 ({imageExplanations.length})</span>
-                </button>
-              )}
-
-              {/* 画像解説作成ボタン - 記録画面でのみ表示 */}
-              {imageExplanations.length === 0 && phase === 'record' && (
-                <button
-                  onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-purple-50 text-purple-700 hover:bg-purple-100 active:bg-purple-200 shadow-sm"
-                  title="画像から解説を作成（答え合わせ後におすすめ）"
-                >
-                  <Camera size={16} />
-                  <span>画像で解説を作る</span>
-                </button>
-              )}
-            </div>
-
-            {/* タイマー設定（コンパクト） */}
-            <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
-              {/* スパルタモード */}
-              <label className="inline-flex items-center gap-1.5 cursor-pointer bg-orange-50 px-2 py-1 rounded border border-orange-200">
-                <input
-                  type="checkbox"
-                  checked={spartaModeEnabled}
-                  onChange={toggleSpartaMode}
-                  className="w-3 h-3 text-orange-600 rounded"
-                />
-                <span className="text-[11px] font-medium text-orange-900">🔥 スパルタ</span>
-                {spartaModeEnabled && targetTime !== null && (
-                  <span className="text-[10px] text-orange-700">({formatTime(targetTime)})</span>
-                )}
-              </label>
-
-              {/* スパルタモード設定：有効時のみ表示 */}
-              {spartaModeEnabled && (
-                <>
-                  <button
-                    onClick={() => changeSpartaModeType('standard')}
-                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                      spartaModeType === 'standard'
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    📏 標準
-                  </button>
-                  <button
-                    onClick={() => changeSpartaModeType('personal')}
-                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                      spartaModeType === 'personal'
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    ⚡ 自己
-                  </button>
-                  {spartaModeType === 'standard' && targetTime === null && (
-                    <button
-                      onClick={() => setShowStandardTimeInput(!showStandardTimeInput)}
-                      className="px-2 py-1 rounded text-[10px] bg-orange-100 text-orange-800 hover:bg-orange-200"
-                    >
-                      ⚙️ 設定
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* 時計表示トグル */}
-              <label className="inline-flex items-center gap-1.5 cursor-pointer bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                <input
-                  type="checkbox"
-                  checked={showClock}
-                  onChange={toggleShowClock}
-                  className="w-3 h-3 text-blue-600 rounded"
-                />
-                <span className="text-[11px] font-medium text-blue-900">🕐 時計</span>
-              </label>
-              {showClock && (
-                <span className="text-sm font-mono font-bold text-gray-700">
-                  {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
-
-            {/* 標準時間設定入力（展開時のみ） */}
-            {showStandardTimeInput && spartaModeEnabled && spartaModeType === 'standard' && (
-              <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
-                <p className="text-[10px] text-gray-600 mb-1">標準時間を設定</p>
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={standardTimeInput}
-                    onChange={(e) => setStandardTimeInput(e.target.value)}
-                    placeholder="例: 3:00"
-                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
-                  />
-                  <button
-                    onClick={handleSetStandardTime}
-                    className="px-2 py-1 text-[10px] bg-orange-600 text-white rounded hover:bg-orange-700"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowStandardTimeInput(false)
-                      setStandardTimeInput('')
-                    }}
-                    className="px-2 py-1 text-[10px] bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* ページ数を大きく表示 */}
-          {problem.page && (
-            <div className="flex-shrink-0 text-center bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-2">
-              <p className="text-xs text-blue-600 font-medium">ページ</p>
-              <p className="text-3xl sm:text-4xl font-bold text-blue-700">{problem.page}</p>
-            </div>
-          )}
-        </div>
-
-        {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
-        <div className="mt-4 pt-4 border-t border-border">
-          {/* 連続学習プログレスバー - コンパクト版 */}
-          {sessionProgress && (
-            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-2 mb-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold text-gray-700">
-                  🎯 {sessionProgress.completedCount}/{sessionProgress.totalCount}問 ({sessionProgress.progressRate}%)
-                </p>
-                <p className="text-xs font-semibold text-blue-700">
-                  残り {formatTime(sessionProgress.estimatedRemainingTime)}
-                </p>
-              </div>
-
-              {/* プログレスバー */}
-              <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500 ease-out"
-                  style={{ width: `${sessionProgress.progressRate}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* メインタイマー：現在の問題を解く時間 */}
-          {spartaModeEnabled && targetTime !== null ? (
-            // スパルタモード：カウントダウン形式
-            <div className={`rounded-lg p-4 mb-3 text-center transition-all ${
-              elapsedTime > targetTime
-                ? 'bg-gradient-to-r from-red-600 to-orange-600 animate-pulse'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600'
-            }`}>
-              <p className="text-xs text-white/90 mb-1 font-medium">
-                🔥 スパルタモード
-              </p>
-              <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
-                {formatTime(targetTime - elapsedTime)}
-              </p>
-              {elapsedTime > targetTime ? (
-                <p className="text-xs text-white/90 font-bold">
-                  ⚠️ 目標超過
-                </p>
-              ) : (
-                <p className="text-xs text-white/80">
-                  目標: {formatTime(targetTime)}
-                </p>
-              )}
-            </div>
-          ) : (
-            // 通常モード：カウントアップ形式
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-4 mb-3 text-center">
-              <p className="text-xs text-white/90 mb-1 font-medium">⏱️ 解答時間</p>
-              <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
-                {formatTime(elapsedTime)}
-              </p>
-              {timerMode === 'solving' && (
-                <p className="text-xs text-white/80">
-                  💡 集中して取り組みましょう
-                </p>
-              )}
-              {timerMode === 'explanation' && (
-                <p className="text-xs text-white/80">
-                  📖 解説中（{formatTime(explanationTime)}）
-                </p>
-              )}
-              {timerMode === 'paused' && (
-                <p className="text-xs text-white/80">
-                  ⏸️ 休憩中（{formatTime(pausedTime)}）
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* サブ情報：今日の累計・解説時間 */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-600 mb-1">📊 今日の累計</p>
-              <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
-              <p className="text-[10px] text-gray-500 mt-1">
-                目標1h {todayStudyTime < 3600 ? `残り${formatTime(3600 - todayStudyTime)}` : '達成🎉'}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-600 mb-1">📖 解説時間</p>
-              <p className="text-lg font-bold text-blue-700">{formatTime(explanationTime)}</p>
-              {getSession() && (
-                <p className="text-[10px] text-gray-500 mt-1">
-                  セッション: {formatTime(sessionElapsedTime)}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* フェーズ1: 問題表示 */}
-      {phase === 'problem' && timerMode === 'solving' && (
-        <>
-          {/* タイマー操作ボタン */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between mb-4">
             <Button
-              onClick={handleStartExplanation}
-              className="bg-blue-600 hover:bg-blue-700 text-white h-12"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (problem?.workbookId) {
+                  navigate(`/workbooks/${problem.workbookId}`)
+                } else {
+                  navigate('/workbooks')
+                }
+              }}
+              title="問題集に戻る"
             >
-              📖 解説を見る
+              <ArrowLeft size={16} />
             </Button>
-            <Button
-              onClick={handleStartPause}
-              className="bg-orange-500 hover:bg-orange-600 text-white h-12"
-            >
-              ⏸️ 休憩
-            </Button>
-          </div>
-
-          {/* 解答ボタン */}
-          <div className="space-y-3 mb-4">
-            {/* 正解・不正解ボタン（大きめ、横並び） */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="success"
-                size="lg"
-                onClick={() => handleRecord('correct')}
-                disabled={isProcessing}
-                className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
-              >
-                <Circle size={32} className="sm:w-12 sm:h-12" />
-                <span className="text-lg sm:text-xl font-bold">正解</span>
-                <span className="text-xs opacity-75">キー: 1</span>
-              </Button>
-              <Button
-                variant="error"
-                size="lg"
-                onClick={() => handleRecord('incorrect')}
-                disabled={isProcessing}
-                className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
-              >
-                <X size={32} className="sm:w-12 sm:h-12" />
-                <span className="text-lg sm:text-xl font-bold">不正解</span>
-                <span className="text-xs opacity-75">キー: 3</span>
-              </Button>
-            </div>
-
-            {/* 部分正解ボタン */}
-            <div className="flex justify-center">
-              <Button
-                variant="warning"
-                size="lg"
-                onClick={() => handleRecord('partial')}
-                disabled={isProcessing}
-                className="flex items-center gap-2 h-14 px-8 shadow-md hover:shadow-lg transition-all"
-              >
-                <Triangle size={20} />
-                <span className="text-base font-bold">部分正解</span>
-                <span className="text-xs opacity-75 ml-2">キー: 2</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* 補助機能（小さく） */}
-          <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
-            {hasExplanation && explanationId && (
-              <button
-                onClick={() => navigate(`/explanations/${explanationId}`)}
-                className="hover:text-blue-600 transition-colors"
-              >
-                📚 AI解説
-              </button>
-            )}
-            {showHistory && studyRecords.length > 0 && (
-              <button
-                onClick={() => setShowHistory(false)}
-                className="hover:text-gray-700 transition-colors"
-              >
-                📖 履歴を隠す
-              </button>
-            )}
-            {!showHistory && studyRecords.length > 0 && (
-              <button
-                onClick={() => setShowHistory(true)}
-                className="hover:text-gray-700 transition-colors"
-              >
-                📖 履歴を見る ({studyRecords.length}回)
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* 解説モード画面 */}
-      {phase === 'problem' && timerMode === 'explanation' && (
-        <>
-          <Card className="mb-4 bg-gradient-to-r from-blue-50 to-sky-50 border-blue-200">
-            <div className="p-6 text-center">
-              <div className="text-4xl mb-3">📖</div>
-              <p className="text-xl font-bold text-blue-900 mb-2">解説を読んでいます...</p>
-              <p className="text-sm text-blue-700 mb-4">
-                解説時間: {formatTime(explanationTime)}
-              </p>
-              <p className="text-xs text-gray-600">
-                💡 解説時間も学習時間にカウントされます
-              </p>
-            </div>
-          </Card>
-
-          {/* AI解説・画像解説へのリンク */}
-          <div className="space-y-3 mb-4">
-            {hasExplanation && explanationId && (
-              <Button
-                onClick={() => navigate(`/explanations/${explanationId}`)}
-                className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                📚 AI解説を見る
-              </Button>
-            )}
-            {imageExplanations.length > 0 && (
-              <Button
-                onClick={() => setShowImageExplanations(!showImageExplanations)}
-                className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                📷 画像解説を見る ({imageExplanations.length}枚)
-              </Button>
-            )}
-          </div>
-
-          {/* 問題に戻るボタン */}
-          <Button
-            onClick={handleBackToProblem}
-            className="w-full h-16 bg-green-600 hover:bg-green-700 text-white text-lg font-bold"
-          >
-            ✅ 問題に戻る
-            <span className="text-sm ml-2 opacity-90">(解説時間: {formatTime(explanationTime)})</span>
-          </Button>
-        </>
-      )}
-
-      {/* 休憩モード画面 */}
-      {phase === 'problem' && timerMode === 'paused' && !isProcessing && (
-        <>
-          <Card className="mb-4 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300">
-            <div className="p-8 text-center">
-              <div className="text-6xl mb-4">😌</div>
-              <p className="text-2xl font-bold text-gray-800 mb-4">一息ついてください</p>
-              <p className="text-3xl font-mono font-bold text-gray-700 mb-4">
-                {formatTime(pausedTime)}
-              </p>
-              <p className="text-sm text-gray-600 mb-2">
-                💡 長時間の集中の後は休憩が大切です
-              </p>
-              <p className="text-xs text-gray-500">
-                ※ 休憩時間は学習時間にカウントされません
-              </p>
-            </div>
-          </Card>
-
-          {/* 学習再開ボタン */}
-          <Button
-            onClick={handleResume}
-            className="w-full h-20 bg-green-600 hover:bg-green-700 text-white text-xl font-bold shadow-lg"
-          >
-            ▶️ 学習を再開する
-          </Button>
-        </>
-      )}
-
-      {/* フェーズ2: 記録画面 */}
-      {phase === 'record' && lastResult && (
-        <>
-          {/* アクションボタン */}
-          <div className="mb-4">
-            {/* 次の問題情報 */}
-            {nextProblemInfo && (
-              <p className="text-sm text-gray-600 mb-2 text-center">
-                次の問題: {nextProblemInfo.problemNumber}
-                {nextProblemInfo.page && ` (p.${nextProblemInfo.page})`}
-              </p>
-            )}
-
-            {/* ボタングリッド */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* 解説を読むボタン */}
-              {hasExplanation && explanationId ? (
-                <Button
-                  onClick={() => navigate(`/explanations/${explanationId}`)}
-                  className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700"
+            <p className="text-sm text-gray-600 truncate mx-2 flex-1 text-center">{workbook?.title || ''}</p>
+            <div className="flex items-center gap-2">
+              {isWeakMode && (
+                <button
+                  onClick={() => navigate('/weak-mode-report')}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 transition-colors text-red-700 text-sm font-medium"
+                  title="学習を終了してレポートを見る"
                 >
-                  📖 解説を読む
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => {
-                    if (problem?.page) {
-                      // 自動遷移タイマーをクリア
-                      if (autoTransitionTimeout) {
-                        clearTimeout(autoTransitionTimeout)
-                        setAutoTransitionTimeout(null)
-                      }
-                      // 解説モードに切り替え
-                      setTimerMode('explanation')
-                      setModeStartTime(Date.now())
-                    }
-                  }}
-                  disabled={!problem?.page}
-                  className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
-                >
-                  📖 解説を読む
-                </Button>
+                  <LogOut size={16} />
+                  <span className="hidden sm:inline">終了</span>
+                </button>
               )}
-
-              {/* 次の問題へ進むボタン */}
-              <Button
-                onClick={navigateToNextProblem}
-                className="h-14 text-base font-bold bg-blue-600 hover:bg-blue-700"
-              >
-                ⏩ 次の問題へ
-              </Button>
             </div>
           </div>
 
-          {/* フィードバック表示 */}
-          <Card className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-            <div className="p-6 text-center">
-              <div className="text-6xl mb-3">
-                {lastResult === 'correct' && '⭕'}
-                {lastResult === 'partial' && '△'}
-                {lastResult === 'incorrect' && '❌'}
-              </div>
-              <p className="text-2xl font-bold mb-2">
-                {lastResult === 'correct' && '正解！'}
-                {lastResult === 'partial' && '部分正解'}
-                {lastResult === 'incorrect' && '不正解'}
-              </p>
-              <p className="text-sm text-gray-600 mb-4">
-                学習時間: {formatTime(elapsedTime)}
-              </p>
+          {/* 時間終了メッセージ */}
+          {timeExpired && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-400 rounded-lg">
+              <p className="text-sm font-bold text-red-900">⏰ 目標時間に到達しました！</p>
+              <p className="text-xs text-red-700 mt-1">キリの良いところで終了しましょう</p>
+            </div>
+          )}
 
-              {/* 結果変更ボタン */}
-              <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">間違えて入力した場合は変更できます</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => handleChangeResult('correct')}
-                    className={`p-3 rounded-lg transition-all ${
-                      lastResult === 'correct'
-                        ? 'bg-green-600 text-white shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <Circle size={20} />
-                      <span className="text-xs font-medium">正解</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleChangeResult('partial')}
-                    className={`p-3 rounded-lg transition-all ${
-                      lastResult === 'partial'
-                        ? 'bg-yellow-500 text-white shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <Triangle size={20} />
-                      <span className="text-xs font-medium">部分正解</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleChangeResult('incorrect')}
-                    className={`p-3 rounded-lg transition-all ${
-                      lastResult === 'incorrect'
-                        ? 'bg-red-600 text-white shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <X size={20} />
-                      <span className="text-xs font-medium">不正解</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* 自動遷移の設定 */}
-              <div className="border-t border-gray-200 pt-4">
-                <label className="flex items-center justify-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoAdvanceEnabled}
-                    onChange={toggleAutoAdvance}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">次回から自動で進む（3秒後）</span>
-                </label>
-                {autoAdvanceEnabled && (
-                  <p className="text-xs text-gray-600 mt-2">
-                    3秒後に次の問題へ...
+          {/* 問題情報カード */}
+          <Card className="mb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                {problem.category && (
+                  <p className="text-xs text-gray-500 mb-1 truncate">
+                    {problem.category}
                   </p>
                 )}
-              </div>
-            </div>
-          </Card>
-
-          {/* メモ入力 */}
-          <Card className="mb-4">
-            <div className="p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">💡 記録を残しますか？（任意）</p>
-              <textarea
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none mb-3"
-                placeholder="気づいたことをメモ..."
-                rows={3}
-              />
-
-              {/* タグ選択（よく使うもののみ） */}
-              <p className="text-sm font-medium text-gray-700 mb-2">🏷️ タグをつける</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {COMMON_TAGS.map(tag => {
-                  const isActive = problem?.tags?.includes(tag.name)
-                  const isGiveUp = tag.name === 'ギブアップ'
-                  return (
-                    <button
-                      key={tag.name}
-                      onClick={() => handleToggleTag(tag.name)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        isActive
-                          ? isGiveUp
-                            ? 'bg-red-600 text-white shadow-md'
-                            : 'bg-purple-600 text-white shadow-md'
-                          : isGiveUp
-                            ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* セクションタイトル（省略可） */}
+                  {problem.sectionTitle && (
+                    <div className="flex-1 min-w-0">
+                      <h1 className="text-xl sm:text-2xl font-bold truncate">
+                        {problem.sectionTitle}
+                      </h1>
+                    </div>
+                  )}
+                  {/* 問題番号（常に表示） */}
+                  <h1 className="text-xl sm:text-2xl font-bold whitespace-nowrap flex-none">
+                    {problem.sectionTitle ? `-${problem.problemNumber}` : problem.problemNumber}
+                  </h1>
+                  <button
+                    onClick={handleToggleBookmark}
+                    className={`p-1.5 rounded-lg transition-all ${problem.isBookmarked
+                      ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200'
+                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                       }`}
-                      title={tag.help}
+                    title={problem.isBookmarked ? '苦手マークを外す' : '苦手な問題としてマーク'}
+                  >
+                    <Star size={20} fill={problem.isBookmarked ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
+
+                {/* AI解説リンク */}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {problem.category && problem.sectionTitle && hasExplanation && (
+                    <button
+                      onClick={() => explanationId && navigate(`/explanations/${explanationId}`)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 shadow-sm"
+                      title="AI解説を見る"
                     >
-                      <span className="mr-1">{tag.emoji}</span>
-                      {tag.name}
+                      <BookOpen size={16} />
+                      <span>AI解説を見る</span>
                     </button>
-                  )
-                })}
-              </div>
-            </div>
-          </Card>
-        </>
-      )}
+                  )}
 
-      {/* 学習履歴（両フェーズで表示可能） */}
-      {showHistory && studyRecords.length > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-700">
-              📖 学習履歴 ({studyRecords.length}回)
-            </h3>
-          </div>
+                  {/* 画像ベース解説ボタン */}
+                  {imageExplanations.length > 0 && (
+                    <button
+                      onClick={() => setShowImageExplanations(!showImageExplanations)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 shadow-sm"
+                      title="画像から作成した解説を見る"
+                    >
+                      <Image size={16} />
+                      <span>画像解説 ({imageExplanations.length})</span>
+                    </button>
+                  )}
 
-          {/* 横スクロール可能な履歴カード */}
-          <div className="overflow-x-auto pb-2 -mx-2 px-2">
-            <div className="flex gap-3 min-w-min">
-              {studyRecords.slice(0, showHistory ? undefined : 5).map((record) => (
-                <Card
-                  key={record.id}
-                  className="flex-shrink-0 w-44 p-3 bg-gradient-to-br from-white to-gray-50"
-                >
-                  <div className="space-y-2">
-                    {/* 結果アイコンと日時 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {getResultIcon(record.result)}
-                        <span className="text-sm font-bold">
-                          {getResultText(record.result)}
-                        </span>
-                      </div>
-                    </div>
+                  {/* 画像解説作成ボタン - 記録画面でのみ表示 */}
+                  {imageExplanations.length === 0 && phase === 'record' && (
+                    <button
+                      onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-purple-50 text-purple-700 hover:bg-purple-100 active:bg-purple-200 shadow-sm"
+                      title="画像から解説を作成（答え合わせ後におすすめ）"
+                    >
+                      <Camera size={16} />
+                      <span>画像で解説を作る</span>
+                    </button>
+                  )}
+                </div>
 
-                    {/* 時間 */}
-                    <div className="flex items-center gap-1 text-xs text-gray-600">
-                      <span>⏱️</span>
-                      <span className="font-mono font-medium">{formatTime(record.studyTime)}</span>
-                    </div>
-
-                    {/* 日付 */}
-                    <div className="text-xs text-gray-500">
-                      {new Date(record.studiedAt).toLocaleDateString('ja-JP', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-
-                    {/* メモ */}
-                    {record.memo && (
-                      <p className="text-xs text-gray-600 line-clamp-2 pt-1 border-t border-gray-200">
-                        {record.memo}
-                      </p>
+                {/* タイマー設定（コンパクト） */}
+                <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
+                  {/* スパルタモード */}
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer bg-orange-50 px-2 py-1 rounded border border-orange-200">
+                    <input
+                      type="checkbox"
+                      checked={spartaModeEnabled}
+                      onChange={toggleSpartaMode}
+                      className="w-3 h-3 text-orange-600 rounded"
+                    />
+                    <span className="text-[11px] font-medium text-orange-900">🔥 スパルタ</span>
+                    {spartaModeEnabled && targetTime !== null && (
+                      <span className="text-[10px] text-orange-700">({formatTime(targetTime)})</span>
                     )}
+                  </label>
 
-                    {/* 編集・削除ボタン */}
-                    <div className="flex gap-1 pt-1">
+                  {/* スパルタモード設定：有効時のみ表示 */}
+                  {spartaModeEnabled && (
+                    <>
                       <button
-                        onClick={() => openEditModal(record)}
-                        className="flex-1 p-1.5 hover:bg-blue-100 rounded transition-colors text-center"
-                        title="編集"
+                        onClick={() => changeSpartaModeType('standard')}
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${spartaModeType === 'standard'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
                       >
-                        <Edit2 size={12} className="text-primary mx-auto" />
+                        📏 標準
                       </button>
                       <button
-                        onClick={() => handleDeleteRecord(record.id)}
-                        className="flex-1 p-1.5 hover:bg-red-100 rounded transition-colors text-center"
-                        title="削除"
+                        onClick={() => changeSpartaModeType('personal')}
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${spartaModeType === 'personal'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
                       >
-                        <Trash2 size={12} className="text-error mx-auto" />
+                        ⚡ 自己
+                      </button>
+                      {spartaModeType === 'standard' && targetTime === null && (
+                        <button
+                          onClick={() => setShowStandardTimeInput(!showStandardTimeInput)}
+                          className="px-2 py-1 rounded text-[10px] bg-orange-100 text-orange-800 hover:bg-orange-200"
+                        >
+                          ⚙️ 設定
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* 時計表示トグル */}
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                    <input
+                      type="checkbox"
+                      checked={showClock}
+                      onChange={toggleShowClock}
+                      className="w-3 h-3 text-blue-600 rounded"
+                    />
+                    <span className="text-[11px] font-medium text-blue-900">🕐 時計</span>
+                  </label>
+                  {showClock && (
+                    <span className="text-sm font-mono font-bold text-gray-700">
+                      {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
+                {/* 標準時間設定入力（展開時のみ） */}
+                {showStandardTimeInput && spartaModeEnabled && spartaModeType === 'standard' && (
+                  <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
+                    <p className="text-[10px] text-gray-600 mb-1">標準時間を設定</p>
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={standardTimeInput}
+                        onChange={(e) => setStandardTimeInput(e.target.value)}
+                        placeholder="例: 3:00"
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                      />
+                      <button
+                        onClick={handleSetStandardTime}
+                        className="px-2 py-1 text-[10px] bg-orange-600 text-white rounded hover:bg-orange-700"
+                      >
+                        保存
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowStandardTimeInput(false)
+                          setStandardTimeInput('')
+                        }}
+                        className="px-2 py-1 text-[10px] bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                      >
+                        ×
                       </button>
                     </div>
                   </div>
-                </Card>
-              ))}
+                )}
+              </div>
+              {/* ページ数を大きく表示 */}
+              {problem.page && (
+                <div className="flex-shrink-0 text-center bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-2">
+                  <p className="text-xs text-blue-600 font-medium">ページ</p>
+                  <p className="text-3xl sm:text-4xl font-bold text-blue-700">{problem.page}</p>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* スクロールのヒント */}
-          {studyRecords.length > 3 && !showHistory && (
-            <p className="text-xs text-gray-400 text-center mt-2">
-              ← スワイプして過去の履歴を確認 →
-            </p>
-          )}
-        </div>
-      )}
+            {/* 時間表示 - 現在の問題を解く時間を最も強調 */}
+            <div className="mt-4 pt-4 border-t border-border">
+              {/* 連続学習プログレスバー - コンパクト版 */}
+              {sessionProgress && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-2 mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-semibold text-gray-700">
+                      🎯 {sessionProgress.completedCount}/{sessionProgress.totalCount}問 ({sessionProgress.progressRate}%)
+                    </p>
+                    <p className="text-xs font-semibold text-blue-700">
+                      残り {formatTime(sessionProgress.estimatedRemainingTime)}
+                    </p>
+                  </div>
 
-      {/* 編集モーダル */}
-      {editingRecord && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">学習記録を編集</h2>
+                  {/* プログレスバー */}
+                  <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500 ease-out"
+                      style={{ width: `${sessionProgress.progressRate}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">結果</label>
-                <div className="grid grid-cols-3 gap-2">
+              {/* メインタイマー：現在の問題を解く時間 */}
+              {spartaModeEnabled && targetTime !== null ? (
+                // スパルタモード：カウントダウン形式
+                <div className={`rounded-lg p-4 mb-3 text-center transition-all ${elapsedTime > targetTime
+                  ? 'bg-gradient-to-r from-red-600 to-orange-600 animate-pulse'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+                  }`}>
+                  <p className="text-xs text-white/90 mb-1 font-medium">
+                    🔥 スパルタモード
+                  </p>
+                  <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
+                    {formatTime(targetTime - elapsedTime)}
+                  </p>
+                  {elapsedTime > targetTime ? (
+                    <p className="text-xs text-white/90 font-bold">
+                      ⚠️ 目標超過
+                    </p>
+                  ) : (
+                    <p className="text-xs text-white/80">
+                      目標: {formatTime(targetTime)}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                // 通常モード：カウントアップ形式
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-4 mb-3 text-center">
+                  <p className="text-xs text-white/90 mb-1 font-medium">⏱️ 解答時間</p>
+                  <p className="text-4xl font-bold text-white mb-1 font-mono tracking-tight">
+                    {formatTime(elapsedTime)}
+                  </p>
+                  {timerMode === 'solving' && (
+                    <p className="text-xs text-white/80">
+                      💡 集中して取り組みましょう
+                    </p>
+                  )}
+                  {timerMode === 'explanation' && (
+                    <p className="text-xs text-white/80">
+                      📖 解説中（{formatTime(explanationTime)}）
+                    </p>
+                  )}
+                  {timerMode === 'paused' && (
+                    <p className="text-xs text-white/80">
+                      ⏸️ 休憩中（{formatTime(pausedTime)}）
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* サブ情報：今日の累計・解説時間 */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-600 mb-1">📊 今日の累計</p>
+                  <p className="text-lg font-bold text-gray-800">{formatTime(todayStudyTime)}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    目標1h {todayStudyTime < 3600 ? `残り${formatTime(3600 - todayStudyTime)}` : '達成🎉'}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-600 mb-1">📖 解説時間</p>
+                  <p className="text-lg font-bold text-blue-700">{formatTime(explanationTime)}</p>
+                  {getSession() && (
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      セッション: {formatTime(sessionElapsedTime)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* フェーズ1: 問題表示 */}
+          {phase === 'problem' && timerMode === 'solving' && (
+            <>
+              {/* タイマー操作ボタン */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <Button
+                  onClick={handleStartExplanation}
+                  className="bg-blue-600 hover:bg-blue-700 text-white h-12"
+                >
+                  📖 解説を見る
+                </Button>
+                <Button
+                  onClick={handleStartPause}
+                  className="bg-orange-500 hover:bg-orange-600 text-white h-12"
+                >
+                  ⏸️ 休憩
+                </Button>
+              </div>
+
+              {/* 解答ボタン */}
+              <div className="space-y-3 mb-4">
+                {/* 正解・不正解ボタン（大きめ、横並び） */}
+                <div className="grid grid-cols-2 gap-3">
                   <Button
-                    variant={editResult === 'correct' ? 'success' : 'secondary'}
-                    size="sm"
-                    onClick={() => setEditResult('correct')}
-                    className="flex flex-col items-center gap-1 h-16"
+                    variant="success"
+                    size="lg"
+                    onClick={() => handleRecord('correct')}
+                    disabled={isProcessing}
+                    className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
                   >
-                    <Circle size={20} />
-                    <span className="text-xs">正解</span>
+                    <Circle size={32} className="sm:w-12 sm:h-12" />
+                    <span className="text-lg sm:text-xl font-bold">正解</span>
+                    <span className="text-xs opacity-75">キー: 1</span>
                   </Button>
                   <Button
-                    variant={editResult === 'partial' ? 'warning' : 'secondary'}
-                    size="sm"
-                    onClick={() => setEditResult('partial')}
-                    className="flex flex-col items-center gap-1 h-16"
+                    variant="error"
+                    size="lg"
+                    onClick={() => handleRecord('incorrect')}
+                    disabled={isProcessing}
+                    className="flex flex-col items-center gap-2 h-28 sm:h-32 shadow-md hover:shadow-lg transition-all"
+                  >
+                    <X size={32} className="sm:w-12 sm:h-12" />
+                    <span className="text-lg sm:text-xl font-bold">不正解</span>
+                    <span className="text-xs opacity-75">キー: 3</span>
+                  </Button>
+                </div>
+
+                {/* 部分正解ボタン */}
+                <div className="flex justify-center">
+                  <Button
+                    variant="warning"
+                    size="lg"
+                    onClick={() => handleRecord('partial')}
+                    disabled={isProcessing}
+                    className="flex items-center gap-2 h-14 px-8 shadow-md hover:shadow-lg transition-all"
                   >
                     <Triangle size={20} />
-                    <span className="text-xs">部分正解</span>
-                  </Button>
-                  <Button
-                    variant={editResult === 'incorrect' ? 'error' : 'secondary'}
-                    size="sm"
-                    onClick={() => setEditResult('incorrect')}
-                    className="flex flex-col items-center gap-1 h-16"
-                  >
-                    <X size={20} />
-                    <span className="text-xs">不正解</span>
+                    <span className="text-base font-bold">部分正解</span>
+                    <span className="text-xs opacity-75 ml-2">キー: 2</span>
                   </Button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  学習時間（分:秒）
-                </label>
-                <input
-                  type="text"
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="例: 5:30"
-                />
+              {/* 補助機能（小さく） */}
+              <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
+                {hasExplanation && explanationId && (
+                  <button
+                    onClick={() => navigate(`/explanations/${explanationId}`)}
+                    className="hover:text-blue-600 transition-colors"
+                  >
+                    📚 AI解説
+                  </button>
+                )}
+                {showHistory && studyRecords.length > 0 && (
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    className="hover:text-gray-700 transition-colors"
+                  >
+                    📖 履歴を隠す
+                  </button>
+                )}
+                {!showHistory && studyRecords.length > 0 && (
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="hover:text-gray-700 transition-colors"
+                  >
+                    📖 履歴を見る ({studyRecords.length}回)
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* 解説モード画面 */}
+          {phase === 'problem' && timerMode === 'explanation' && (
+            <>
+              <Card className="mb-4 bg-gradient-to-r from-blue-50 to-sky-50 border-blue-200">
+                <div className="p-6 text-center">
+                  <div className="text-4xl mb-3">📖</div>
+                  <p className="text-xl font-bold text-blue-900 mb-2">解説を読んでいます...</p>
+                  <p className="text-sm text-blue-700 mb-4">
+                    解説時間: {formatTime(explanationTime)}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    💡 解説時間も学習時間にカウントされます
+                  </p>
+                </div>
+              </Card>
+
+              {/* AI解説・画像解説へのリンク */}
+              <div className="space-y-3 mb-4">
+                {hasExplanation && explanationId && (
+                  <Button
+                    onClick={() => navigate(`/explanations/${explanationId}`)}
+                    className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    📚 AI解説を見る
+                  </Button>
+                )}
+                {imageExplanations.length > 0 && (
+                  <Button
+                    onClick={() => setShowImageExplanations(!showImageExplanations)}
+                    className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    📷 画像解説を見る ({imageExplanations.length}枚)
+                  </Button>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">メモ</label>
-                <textarea
-                  value={editMemo}
-                  onChange={(e) => setEditMemo(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary h-20"
-                  placeholder="メモ（任意）"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end">
-                <Button variant="secondary" onClick={cancelEdit}>
-                  キャンセル
-                </Button>
-                <Button variant="primary" onClick={handleSaveEdit}>
-                  保存
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* 画像ベース解説表示エリア */}
-      {showImageExplanations && imageExplanations.length > 0 && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowImageExplanations(false)}>
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-border p-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Image size={20} className="text-green-600" />
-                画像から作成した解説 ({imageExplanations.length}件)
-              </h2>
-              <button
-                onClick={() => setShowImageExplanations(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              {/* 問題に戻るボタン */}
+              <Button
+                onClick={handleBackToProblem}
+                className="w-full h-16 bg-green-600 hover:bg-green-700 text-white text-lg font-bold"
               >
-                <X size={20} />
-              </button>
-            </div>
+                ✅ 問題に戻る
+                <span className="text-sm ml-2 opacity-90">(解説時間: {formatTime(explanationTime)})</span>
+              </Button>
+            </>
+          )}
 
-            <div className="p-4 space-y-4">
-              {imageExplanations.map((explanation, index) => (
-                <Card key={explanation.id} className="border-l-4 border-l-green-500">
-                  <div className="space-y-4">
-                    {/* ヘッダー */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">解説 #{imageExplanations.length - index}</h3>
-                        <p className="text-sm text-gray-500">
-                          レベル: {explanation.userLevel.level === 'beginner' ? '初級' : explanation.userLevel.level === 'intermediate' ? '中級' : '上級'}
-                          ({explanation.userLevel.overallAccuracy}%)
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(explanation.createdAt).toLocaleDateString('ja-JP', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </p>
-                      </div>
-                    </div>
+          {/* 休憩モード画面 */}
+          {phase === 'problem' && timerMode === 'paused' && !isProcessing && (
+            <>
+              <Card className="mb-4 bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300">
+                <div className="p-8 text-center">
+                  <div className="text-6xl mb-4">😌</div>
+                  <p className="text-2xl font-bold text-gray-800 mb-4">一息ついてください</p>
+                  <p className="text-3xl font-mono font-bold text-gray-700 mb-4">
+                    {formatTime(pausedTime)}
+                  </p>
+                  <p className="text-sm text-gray-600 mb-2">
+                    💡 長時間の集中の後は休憩が大切です
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    ※ 休憩時間は学習時間にカウントされません
+                  </p>
+                </div>
+              </Card>
 
-                    {/* 問題文 */}
-                    {(explanation.editedText || explanation.extractedText) && (
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <h4 className="text-sm font-semibold mb-2">📝 問題文</h4>
-                        <p className="text-sm whitespace-pre-wrap">
-                          {explanation.editedText || explanation.extractedText}
-                        </p>
-                      </div>
-                    )}
+              {/* 学習再開ボタン */}
+              <Button
+                onClick={handleResume}
+                className="w-full h-20 bg-green-600 hover:bg-green-700 text-white text-xl font-bold shadow-lg"
+              >
+                ▶️ 学習を再開する
+              </Button>
+            </>
+          )}
 
-                    {/* 答え */}
-                    {explanation.answer && (
-                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                        <h4 className="text-sm font-semibold mb-2 text-green-800">✅ この問題の答え</h4>
-                        <p className="text-sm font-medium text-green-900">
-                          {explanation.answer}
-                        </p>
-                      </div>
-                    )}
+          {/* フェーズ2: 記録画面 */}
+          {phase === 'record' && lastResult && (
+            <>
+              {/* アクションボタン */}
+              <div className="mb-4">
+                {/* 次の問題情報 */}
+                {nextProblemInfo && (
+                  <p className="text-sm text-gray-600 mb-2 text-center">
+                    次の問題: {nextProblemInfo.problemNumber}
+                    {nextProblemInfo.page && ` (p.${nextProblemInfo.page})`}
+                  </p>
+                )}
 
-                    {/* 元の画像 */}
-                    {explanation.imageUrl && (
-                      <details className="bg-gray-50 p-3 rounded-lg">
-                        <summary className="text-sm font-semibold cursor-pointer">📸 元の画像を見る</summary>
-                        <img
-                          src={explanation.imageUrl}
-                          alt="問題画像"
-                          className="mt-2 w-full max-w-2xl rounded-lg"
-                        />
-                      </details>
-                    )}
+                {/* ボタングリッド */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* 解説を読むボタン */}
+                  {hasExplanation && explanationId ? (
+                    <Button
+                      onClick={() => navigate(`/explanations/${explanationId}`)}
+                      className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700"
+                    >
+                      📖 解説を読む
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        if (problem?.page) {
+                          // 自動遷移タイマーをクリア
+                          if (autoTransitionTimeout) {
+                            clearTimeout(autoTransitionTimeout)
+                            setAutoTransitionTimeout(null)
+                          }
+                          // 解説モードに切り替え
+                          setTimerMode('explanation')
+                          setModeStartTime(Date.now())
+                        }
+                      }}
+                      disabled={!problem?.page}
+                      className="h-14 text-base font-bold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      📖 解説を読む
+                    </Button>
+                  )}
 
-                    {/* 解説内容 */}
-                    <div>
-                      <MarkdownRenderer content={explanation.explanationContent} />
+                  {/* 次の問題へ進むボタン */}
+                  <Button
+                    onClick={navigateToNextProblem}
+                    className="h-14 text-base font-bold bg-blue-600 hover:bg-blue-700"
+                  >
+                    ⏩ 次の問題へ
+                  </Button>
+                </div>
+              </div>
+
+              {/* フィードバック表示 */}
+              <Card className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                <div className="p-6 text-center">
+                  <div className="text-6xl mb-3">
+                    {lastResult === 'correct' && '⭕'}
+                    {lastResult === 'partial' && '△'}
+                    {lastResult === 'incorrect' && '❌'}
+                  </div>
+                  <p className="text-2xl font-bold mb-2">
+                    {lastResult === 'correct' && '正解！'}
+                    {lastResult === 'partial' && '部分正解'}
+                    {lastResult === 'incorrect' && '不正解'}
+                  </p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    学習時間: {formatTime(elapsedTime)}
+                  </p>
+
+                  {/* 結果変更ボタン */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">間違えて入力した場合は変更できます</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => handleChangeResult('correct')}
+                        className={`p-3 rounded-lg transition-all ${lastResult === 'correct'
+                          ? 'bg-green-600 text-white shadow-lg'
+                          : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <Circle size={20} />
+                          <span className="text-xs font-medium">正解</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleChangeResult('partial')}
+                        className={`p-3 rounded-lg transition-all ${lastResult === 'partial'
+                          ? 'bg-yellow-500 text-white shadow-lg'
+                          : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <Triangle size={20} />
+                          <span className="text-xs font-medium">部分正解</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleChangeResult('incorrect')}
+                        className={`p-3 rounded-lg transition-all ${lastResult === 'incorrect'
+                          ? 'bg-red-600 text-white shadow-lg'
+                          : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <X size={20} />
+                          <span className="text-xs font-medium">不正解</span>
+                        </div>
+                      </button>
                     </div>
                   </div>
-                </Card>
-              ))}
-            </div>
 
-            <div className="sticky bottom-0 bg-white border-t border-border p-4">
-              <Button
-                onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
-                className="w-full"
-              >
-                <Camera size={18} className="mr-2" />
-                新しい画像解説を作成
-              </Button>
+                  {/* 自動遷移の設定 */}
+                  <div className="border-t border-gray-200 pt-4">
+                    <label className="flex items-center justify-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoAdvanceEnabled}
+                        onChange={toggleAutoAdvance}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">次回から自動で進む（3秒後）</span>
+                    </label>
+                    {autoAdvanceEnabled && (
+                      <p className="text-xs text-gray-600 mt-2">
+                        3秒後に次の問題へ...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* メモ入力 */}
+              <Card className="mb-4">
+                <div className="p-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">💡 記録を残しますか？（任意）</p>
+                  <textarea
+                    value={memo}
+                    onChange={(e) => setMemo(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none mb-3"
+                    placeholder="気づいたことをメモ..."
+                    rows={3}
+                  />
+
+                  {/* タグ選択（よく使うもののみ） */}
+                  <p className="text-sm font-medium text-gray-700 mb-2">🏷️ タグをつける</p>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {COMMON_TAGS.map(tag => {
+                      const isActive = problem?.tags?.includes(tag.name)
+                      const isGiveUp = tag.name === 'ギブアップ'
+                      return (
+                        <button
+                          key={tag.name}
+                          onClick={() => handleToggleTag(tag.name)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isActive
+                            ? isGiveUp
+                              ? 'bg-red-600 text-white shadow-md'
+                              : 'bg-purple-600 text-white shadow-md'
+                            : isGiveUp
+                              ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          title={tag.help}
+                        >
+                          <span className="mr-1">{tag.emoji}</span>
+                          {tag.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {/* 学習履歴（両フェーズで表示可能） */}
+          {showHistory && studyRecords.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-700">
+                  📖 学習履歴 ({studyRecords.length}回)
+                </h3>
+              </div>
+
+              {/* 横スクロール可能な履歴カード */}
+              <div className="overflow-x-auto pb-2 -mx-2 px-2">
+                <div className="flex gap-3 min-w-min">
+                  {studyRecords.slice(0, showHistory ? undefined : 5).map((record) => (
+                    <Card
+                      key={record.id}
+                      className="flex-shrink-0 w-44 p-3 bg-gradient-to-br from-white to-gray-50"
+                    >
+                      <div className="space-y-2">
+                        {/* 結果アイコンと日時 */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getResultIcon(record.result)}
+                            <span className="text-sm font-bold">
+                              {getResultText(record.result)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 時間 */}
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <span>⏱️</span>
+                          <span className="font-mono font-medium">{formatTime(record.studyTime)}</span>
+                        </div>
+
+                        {/* 日付 */}
+                        <div className="text-xs text-gray-500">
+                          {new Date(record.studiedAt).toLocaleDateString('ja-JP', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+
+                        {/* メモ */}
+                        {record.memo && (
+                          <p className="text-xs text-gray-600 line-clamp-2 pt-1 border-t border-gray-200">
+                            {record.memo}
+                          </p>
+                        )}
+
+                        {/* 編集・削除ボタン */}
+                        <div className="flex gap-1 pt-1">
+                          <button
+                            onClick={() => openEditModal(record)}
+                            className="flex-1 p-1.5 hover:bg-blue-100 rounded transition-colors text-center"
+                            title="編集"
+                          >
+                            <Edit2 size={12} className="text-primary mx-auto" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecord(record.id)}
+                            className="flex-1 p-1.5 hover:bg-red-100 rounded transition-colors text-center"
+                            title="削除"
+                          >
+                            <Trash2 size={12} className="text-error mx-auto" />
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* スクロールのヒント */}
+              {studyRecords.length > 3 && !showHistory && (
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  ← スワイプして過去の履歴を確認 →
+                </p>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          )}
+
+          {/* 編集モーダル */}
+          {editingRecord && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <Card className="max-w-md w-full">
+                <h2 className="text-xl font-bold mb-4">学習記録を編集</h2>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">結果</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        variant={editResult === 'correct' ? 'success' : 'secondary'}
+                        size="sm"
+                        onClick={() => setEditResult('correct')}
+                        className="flex flex-col items-center gap-1 h-16"
+                      >
+                        <Circle size={20} />
+                        <span className="text-xs">正解</span>
+                      </Button>
+                      <Button
+                        variant={editResult === 'partial' ? 'warning' : 'secondary'}
+                        size="sm"
+                        onClick={() => setEditResult('partial')}
+                        className="flex flex-col items-center gap-1 h-16"
+                      >
+                        <Triangle size={20} />
+                        <span className="text-xs">部分正解</span>
+                      </Button>
+                      <Button
+                        variant={editResult === 'incorrect' ? 'error' : 'secondary'}
+                        size="sm"
+                        onClick={() => setEditResult('incorrect')}
+                        className="flex flex-col items-center gap-1 h-16"
+                      >
+                        <X size={20} />
+                        <span className="text-xs">不正解</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      学習時間（分:秒）
+                    </label>
+                    <input
+                      type="text"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="例: 5:30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">メモ</label>
+                    <textarea
+                      value={editMemo}
+                      onChange={(e) => setEditMemo(e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary h-20"
+                      placeholder="メモ（任意）"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="secondary" onClick={cancelEdit}>
+                      キャンセル
+                    </Button>
+                    <Button variant="primary" onClick={handleSaveEdit}>
+                      保存
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* 画像ベース解説表示エリア */}
+          {showImageExplanations && imageExplanations.length > 0 && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowImageExplanations(false)}>
+              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white border-b border-border p-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Image size={20} className="text-green-600" />
+                    画像から作成した解説 ({imageExplanations.length}件)
+                  </h2>
+                  <button
+                    onClick={() => setShowImageExplanations(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {imageExplanations.map((explanation, index) => (
+                    <Card key={explanation.id} className="border-l-4 border-l-green-500">
+                      <div className="space-y-4">
+                        {/* ヘッダー */}
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">解説 #{imageExplanations.length - index}</h3>
+                            <p className="text-sm text-gray-500">
+                              レベル: {explanation.userLevel.level === 'beginner' ? '初級' : explanation.userLevel.level === 'intermediate' ? '中級' : '上級'}
+                              ({explanation.userLevel.overallAccuracy}%)
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {new Date(explanation.createdAt).toLocaleDateString('ja-JP', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 問題文 */}
+                        {(explanation.editedText || explanation.extractedText) && (
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <h4 className="text-sm font-semibold mb-2">📝 問題文</h4>
+                            <p className="text-sm whitespace-pre-wrap">
+                              {explanation.editedText || explanation.extractedText}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* 答え */}
+                        {explanation.answer && (
+                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <h4 className="text-sm font-semibold mb-2 text-green-800">✅ この問題の答え</h4>
+                            <p className="text-sm font-medium text-green-900">
+                              {explanation.answer}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* 元の画像 */}
+                        {explanation.imageUrl && (
+                          <details className="bg-gray-50 p-3 rounded-lg">
+                            <summary className="text-sm font-semibold cursor-pointer">📸 元の画像を見る</summary>
+                            <img
+                              src={explanation.imageUrl}
+                              alt="問題画像"
+                              className="mt-2 w-full max-w-2xl rounded-lg"
+                            />
+                          </details>
+                        )}
+
+                        {/* 解説内容 */}
+                        <div>
+                          <MarkdownRenderer content={explanation.explanationContent} />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="sticky bottom-0 bg-white border-t border-border p-4">
+                  <Button
+                    onClick={() => navigate(`/explanations/image-upload?problemId=${id}`)}
+                    className="w-full"
+                  >
+                    <Camera size={18} className="mr-2" />
+                    新しい画像解説を作成
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
 
