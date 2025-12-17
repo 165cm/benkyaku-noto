@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Trash2, Settings, ChevronDown, Play, RotateCcw, Search, Loader2, Image, Plus } from 'lucide-react'
+import { BookOpen, Trash2, Settings, ChevronDown, Play, RotateCcw, Search, Loader2, Image, Plus, Download, Upload } from 'lucide-react'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -12,8 +12,13 @@ import {
   getProblems,
   updateWorkbook,
   getLastStudyDate,
-  getStudiedProblemCount
+  getStudiedProblemCount,
+  deleteStudyRecordsForWorkbook,
+  addProblem,
 } from '@/lib/db'
+import { exportProblemsToCSV, downloadCSV, parseCSV } from '@/lib/csvExport'
+import { validateCSVData } from '@/lib/validation'
+import { toast } from '@/store/toastStore'
 import { calculateRecentAccuracyForProblems, getWorkbookSections, type SectionStats } from '@/lib/review'
 import { getExcludedSections, saveExcludedSections, getSectionStandardTime, setSectionStandardTime } from '@/lib/storage'
 import type { Workbook } from '@/types'
@@ -81,6 +86,45 @@ export default function Workbooks() {
     publisher: '',
     publishedDate: ''
   })
+
+  // CSV取込用
+  const csvFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !settingsWorkbook) return
+
+    try {
+      const text = await file.text()
+      const rows = parseCSV(text)
+
+      // バリデーション（エラー時は例外をスロー）
+      validateCSVData(rows)
+
+      // 問題を追加
+      for (const row of rows) {
+        await addProblem({
+          workbookId: settingsWorkbook.id,
+          problemNumber: row.problemNumber,
+          sectionTitle: row.sectionTitle,
+          category: row.category,
+          page: row.page,
+          memo: row.memo,
+        })
+      }
+
+      toast.success('完了', `${rows.length}件の問題を取り込みました`)
+      loadWorkbooks()
+    } catch (error) {
+      console.error('CSV取込エラー:', error)
+      toast.error('エラー', error instanceof Error ? error.message : 'CSV取込に失敗しました')
+    } finally {
+      // ファイル入力をリセット
+      if (csvFileInputRef.current) {
+        csvFileInputRef.current.value = ''
+      }
+    }
+  }
 
   useEffect(() => {
     loadWorkbooks()
@@ -1017,6 +1061,69 @@ export default function Workbooks() {
                   })()}
                 </div>
               )}
+            </div>
+
+            {/* データ管理 */}
+            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-700">📁</span>
+                <button
+                  onClick={async () => {
+                    if (!settingsWorkbook) return
+                    const problems = await getProblems(settingsWorkbook.id)
+                    if (problems.length === 0) {
+                      toast.error('エラー', '問題がありません')
+                      return
+                    }
+                    const csvContent = await exportProblemsToCSV(problems)
+                    const filename = `${settingsWorkbook.title}_問題集_${new Date().toISOString().split('T')[0]}.csv`
+                    downloadCSV(csvContent, filename)
+                    toast.success('完了', 'CSVを出力しました')
+                  }}
+                  className="flex items-center gap-1 text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  <Download size={12} />
+                  出力
+                </button>
+                <input
+                  ref={csvFileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportCSV}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => csvFileInputRef.current?.click()}
+                  className="flex items-center gap-1 text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  <Upload size={12} />
+                  取込
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!settingsWorkbook) return
+                    const confirmed = await confirm({
+                      title: '学習履歴のリセット',
+                      message: `「${settingsWorkbook.title}」の学習履歴を全て削除しますか？\n\nこの操作は取り消せません。`,
+                      confirmText: 'リセット',
+                      variant: 'danger',
+                    })
+                    if (!confirmed) return
+                    try {
+                      await deleteStudyRecordsForWorkbook(settingsWorkbook.id)
+                      toast.success('完了', '学習履歴をリセットしました')
+                      loadWorkbooks()
+                    } catch (error) {
+                      console.error('学習履歴のリセットに失敗しました:', error)
+                      toast.error('エラー', '学習履歴のリセットに失敗しました')
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs px-2 py-1 bg-white border border-red-300 text-red-600 rounded hover:bg-red-50"
+                >
+                  <RotateCcw size={12} />
+                  リセット
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end pt-2 border-t">

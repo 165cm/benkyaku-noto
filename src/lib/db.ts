@@ -415,10 +415,13 @@ export async function recalculateProblemNumbers(workbookId: string) {
       const sectionNumber = (sectionNumberMap.get(sectionKey) || 0) + 1
       sectionNumberMap.set(sectionKey, sectionNumber)
 
+      // 親問題の problemNumber を確定
+      const parentProblemNumber = String(sectionNumber)
+
       if (subProblems.length > 0) {
         // 小問がある場合、親は箱として番号のみ
         await db.problems.update(parent.id, {
-          problemNumber: String(sectionNumber),
+          problemNumber: parentProblemNumber,
           sortOrder: baseSortOrder,
         })
         baseSortOrder += 10
@@ -427,8 +430,9 @@ export async function recalculateProblemNumbers(workbookId: string) {
         subProblems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
         let subNumber = 1
         for (const sub of subProblems) {
+          // 親問題の番号を使用して小問番号を生成
           await db.problems.update(sub.id, {
-            problemNumber: `${sectionNumber}-${subNumber}`,
+            problemNumber: `${parentProblemNumber}-${subNumber}`,
             sortOrder: baseSortOrder,
           })
           baseSortOrder += 10
@@ -437,7 +441,7 @@ export async function recalculateProblemNumbers(workbookId: string) {
       } else {
         // 小問がない通常の問題
         await db.problems.update(parent.id, {
-          problemNumber: String(sectionNumber),
+          problemNumber: parentProblemNumber,
           sortOrder: baseSortOrder,
         })
         baseSortOrder += 100
@@ -454,6 +458,7 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
     throw new Error('問題が見つかりません')
   }
   const workbookId = draggedProblem.workbookId
+  const originalParentId = draggedProblem.parentProblemId
 
   await db.transaction('rw', db.problems, db.studyRecords, async () => {
     const parentProblem = await db.problems.get(parentProblemId)
@@ -474,6 +479,36 @@ export async function makeSubProblem(problemId: string, parentProblemId: string)
 
     if (parentProblem.deletedAt || currentDraggedProblem.deletedAt) {
       throw new Error('削除された問題を操作することはできません')
+    }
+
+    // 元の親問題がある場合、その親の小問リストを更新
+    if (originalParentId && originalParentId !== parentProblemId) {
+      const originalParentSubProblems = await getSubProblems(originalParentId)
+      // ドラッグした問題を除外した残りの小問
+      const remainingSubProblems = originalParentSubProblems.filter(p => p.id !== problemId)
+
+      if (remainingSubProblems.length === 1) {
+        // 小問が1つだけ残る場合、その小問を独立した問題にして、元の親を削除
+        const lastSubProblem = remainingSubProblems[0]
+        const originalParent = await db.problems.get(originalParentId)
+
+        if (originalParent && lastSubProblem) {
+          // 最後の小問を元の親の位置に昇格
+          await db.problems.update(lastSubProblem.id, {
+            parentProblemId: undefined,
+            problemNumber: originalParent.problemNumber,
+            sortOrder: originalParent.sortOrder,
+            sectionTitle: originalParent.sectionTitle,
+            category: originalParent.category,
+          })
+
+          // 元の親を論理削除
+          await db.problems.update(originalParentId, {
+            deletedAt: new Date(),
+          })
+        }
+      }
+      // 2つ以上残る場合は recalculateProblemNumbers が処理する
     }
 
     // 既存の小問を取得
